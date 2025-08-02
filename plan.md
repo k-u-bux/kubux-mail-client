@@ -1,112 +1,284 @@
-### Proposed Work Plan for `kubux-notmuch-mail-client`
+# Work Plan for `kubux-notmuch-mail-client`
 
-**Phase 0: Project Setup & Core Foundation**
+## Phase 0: Project Setup & Core Foundation (2 weeks)
 
-1.  **Nix Flake Setup:**
-    * Initialize project with `flake.nix` and a basic project structure.
-    * Verify `nix develop` provides the correct Python environment and external tools (Notmuch, GnuPG, Msmtp).
-    * Ensure `nix build` creates a basic application placeholder.
-2.  **Initial Project Structure:**
-    * Create directories for `core_library/`, `gui_components/`, `background_services/`, `sync_services/`, `config/` (for templates).
-    * Create placeholder files for all major components (e.g., `core_library/tag_manager.py`, `gui_components/mail_list_gui.py`).
+**Goal:** Establish project structure and development environment.
 
-**Phase 1: Core Libraries & Foundational Services (Unit Testable)**
+### Tasks:
 
-* **Goal:** Establish the internal APIs and essential background services that don't depend on complex UI, enabling early unit testing.
+1. **Nix Flake Setup:**
+   * Initialize project with `flake.nix` and basic project structure
+   * Configure Python environment with necessary dependencies
+   * Ensure external tools (Notmuch, GnuPG, Msmtp) are properly integrated
+   * Verify `nix develop` provides correct environment and `nix build` creates application placeholder
 
-1.  **`core_library/utils.py` & `config.py`:**
-    * Implement functions for path management (Maildir, config files, sync dir).
-    * Implement functions for loading/saving application configuration (using TOML/INI/YAML, with `os.environ.get('EDITOR')` integration).
-    * Implement wrapper for launching external processes (`subprocess` calls for `gpg`, `msmtp`, `notmuch` CLI where bindings aren't used).
-    * [cite_start]Implement initial keybinding parsing logic[cite: 95].
-    * **Unit Tests:** For config parsing, path resolution, external command execution.
-2.  **`core_library/tag_manager.py` (Initial Version):**
-    * Implement core functions to add, remove, and set tags on messages using Notmuch Python bindings.
-    * [cite_start]Ensure these operations explicitly target the isolated Notmuch database. [cite: 7]
-    * **Unit Tests:** Verify tag operations against a dummy Notmuch database.
-3.  **`background_services/decrypt_mail_filter.py`:**
-    * [cite_start]Implement logic to detect encrypted messages and call `gpg` for decryption. [cite: 9, 10]
-    * [cite_start]Handle success/failure (passing original, adding "decryption-failed" tag). [cite: 12, 13]
-    * **Unit Tests:** With mock `gpg` outputs, encrypted/unencrypted email samples.
-4.  **`background_services/ai_classifier.py`:**
-    * Implement placeholder for loading a dummy ML model.
-    * [cite_start]Implement function to take text and return predefined tags. [cite: 23, 24]
-    * **Unit Tests:** For text preprocessing and dummy prediction.
+2. **Initial Project Structure:**
+   * Create directories for `core_library/`, `gui_components/`, `background_services/`, `sync_services/`, `config/`
+   * Create placeholder files for all major components
+   * Set up logging framework for development and production
 
-**Phase 2: Basic Notmuch Integration & First GUI (Proof of Concept)**
+3. **Version Control & CI Setup:**
+   * Initialize git repository with branching strategy
+   * Configure basic CI pipeline for automated testing
+   * Establish code style guidelines and linting configuration
 
-* **Goal:** Get the core Notmuch indexing and a minimal GUI working for basic mail listing and tagging.
+### Risk Assessment:
+* **Risk:** Notmuch Python bindings might have limitations compared to CLI
+* **Mitigation:** Early experimentation with bindings to identify any gaps
 
-1.  **Notmuch Database Isolation Setup:**
-    * [cite_start]Ensure the Mail Fetcher (user-configured `mbsync`/`OfflineIMAP`) writes to the dedicated Maildir. [cite: 4]
-    * [cite_start]Configure `notmuch new` to always use the custom config file pointing to the dedicated Maildir/database. [cite: 7]
-2.  **`background_services/ai_pre_tagging_hook.py` (Initial Version):**
-    * [cite_start]Implement the `post-new` script. [cite: 17]
-    * [cite_start]Call `ai_classifier.py`. [cite: 22]
-    * [cite_start]Use `tag_manager.py` to apply predicted tags and the `ai-pre-tagged` tag. [cite: 19]
-    * **Integration Tests:** Run `mbsync` (dummy), then `notmuch new` to see if emails get pre-tagged.
-3.  **`gui_components/mail_list_gui.py`:**
-    * [cite_start]Implement basic mail listing (sender, subject, date, tags) using Notmuch Python bindings. [cite: 54, 55, 57]
-    * [cite_start]Implement configurable search queries. [cite: 57, 58]
-    * [cite_start]Implement selection of messages. [cite: 56]
-    * **Integration Tests:** Verify list population and basic search.
-4.  **`gui_components/tag_editor_gui.py`:**
-    * [cite_start]Implement a dialog to display current tags and allow adding/removing tags. [cite: 86, 87]
-    * [cite_start]Use `tag_manager.py` for tag operations. [cite: 88, 89]
-    * **Integration Tests:** Launch from `mail_list_gui`, apply tags, verify changes in `mail_list_gui`.
+### Deliverables:
+* Functioning development environment with all dependencies
+* CI pipeline with basic tests
+* Project structure ready for phase 1 development
 
-**Phase 3: Synchronization & Refined Tag Management**
+## Phase 1: Core Libraries & Foundational Services (3 weeks)
 
-* **Goal:** Implement the multi-device tag synchronization, which requires modifying how tags are managed.
+**Goal:** Establish internal APIs and essential background services for unit testing.
 
-1.  **Refine `core_library/tag_manager.py` for Sync:**
-    * [cite_start]Modify `tag_manager.py` functions to *first* record tag operations to the "Tag Operations Log" (JSONL file in the sync directory)[cite: 50], *then* apply them locally to Notmuch.
-    * [cite_start]Add unique `device_id` and `timestamp` to each log entry. [cite: 42, 45]
-    * **Unit Tests:** Verify log file creation and content.
-2.  **`sync_services/tag_syncer.py`:**
-    * [cite_start]Implement the background process that monitors the sync directory for new log entries from other devices. [cite: 42, 44, 45]
-    * [cite_start]Implement logic to order entries by timestamp and apply them to the local Notmuch database using `tag_manager.py`. [cite: 43, 46]
-    * [cite_start]Implement basic conflict resolution (e.g., last-write-wins). [cite: 47]
-    * **Integration Tests:** Simulate sync by manually placing log files and verifying tag propagation.
+### Tasks:
 
-**Phase 4: Advanced GUI Components & User Feedback**
+1. **Core Utilities and Configuration:**
+   * Implement path management for Maildir, config files, and sync directories
+   * Develop configuration loading/saving with TOML/YAML support
+   * Create wrapper functions for external processes (`gpg`, `msmtp`, `notmuch`)
+   * Implement initial keybinding parsing logic
+   * **Unit Tests:** Config parsing, path resolution, external command execution
 
-* **Goal:** Implement the detailed mail viewing, composing, and AI feedback mechanisms.
+2. **Tag Manager (Initial Version):**
+   * Implement core functions for tag manipulation using Notmuch Python bindings
+   * Ensure operations target isolated Notmuch database
+   * **Unit Tests:** Tag operations against test Notmuch database
 
-1.  **`gui_components/mail_viewer_gui.py`:**
-    * [cite_start]Implement full email content display (plain text, basic HTML rendering). [cite: 61, 62]
-    * [cite_start]Implement attachment handling. [cite: 63, 67]
-    * [cite_start]Integrate AI feedback options (Accept/Correct tags) [cite: 64] [cite_start]and use `tag_manager.py` for tag changes and `ai_feedback_logger.py`. [cite: 68]
-    * **Integration Tests:** View various email types, test attachment saving, test AI feedback workflow.
-2.  **`background_services/ai_feedback_logger.py`:**
-    * [cite_start]Implement logging user tag corrections for AI retraining. [cite: 29, 30, 31]
-    * **Unit Tests:** Verify log file format and content.
-3.  **`gui_components/mail_composer_gui.py`:**
-    * [cite_start]Implement mail composition (To, Subject, Body editor, Attachments). [cite: 75, 76, 77, 78]
-    * [cite_start]Implement Reply/Reply All/Forward logic (quoting, pre-filling). [cite: 81]
-    * [cite_start]Integrate with `msmtp` for sending. [cite: 79, 81]
-    * **Integration Tests:** Compose/send emails, verify replies/forwards.
-4.  **`gui_components/thread_viewer_gui.py`:**
-    * [cite_start]Implement hierarchical thread display. [cite: 70]
-    * [cite_start]Integrate with `mail_viewer_gui` for opening individual messages within a thread. [cite: 72]
-    * **Integration Tests:** View complex threads.
+3. **Decrypt Mail Filter:**
+   * Develop detection logic for encrypted messages
+   * Implement GPG decryption workflow
+   * Handle success/failure cases with appropriate tags
+   * **Unit Tests:** Various encrypted/unencrypted email samples with mock GPG
 
-**Phase 5: AI Retraining & Polish**
+4. **AI Classifier Foundation:**
+   * Create framework for loading ML models and making predictions
+   * Implement text preprocessing pipeline
+   * Develop initial model training script with baseline features
+   * **Unit Tests:** Text preprocessing and prediction with dummy model
 
-* **Goal:** Close the AI feedback loop and add final polish to the application.
+### Risk Assessment:
+* **Risk:** Email decryption edge cases may be numerous
+* **Mitigation:** Comprehensive test suite with diverse encrypted email samples
 
-1.  **`background_services/ai_retrainer.py`:**
-    * [cite_start]Implement logic to read `ai_feedback_logger` data. [cite: 35]
-    * [cite_start]Implement full retraining of the AI Classifier model (using `scikit-learn`). [cite: 36, 38, 40, 41]
-    * [cite_start]Save the updated model. [cite: 37, 39]
-    * **Integration Tests:** Retrain with new feedback, verify model update.
-2.  **Full Configurable Keybindings & Visual Settings:**
-    * [cite_start]Implement robust parsing and application of global UI keybindings. [cite: 60, 69, 74, 84, 91, 95]
-    * [cite_start]Implement visual settings (font, font size, widget size) across all GUI components. [cite: 93]
-    * **Testing:** Comprehensive keybinding and UI customization tests.
-3.  **Error Handling & Robustness:**
-    * Implement comprehensive error logging and user-friendly error messages across all components.
-    * [cite_start]Refine temporary file management. [cite: 67, 94]
-4.  **Documentation & Deployment:**
-    * User manual (especially for configuration, keybindings, sync setup).
-    * Refine Nix packaging for easy deployment.
+### Deliverables:
+* Functioning core library with unit tests
+* Initial ML classification pipeline
+* Decryption filter capable of handling various encryption formats
+
+## Phase 2: Basic Notmuch Integration & First GUI (4 weeks)
+
+**Goal:** Implement Notmuch indexing and basic GUI for mail listing and tagging.
+
+### Tasks:
+
+1. **Notmuch Database Isolation:**
+   * Configure and test Mail Fetcher integration with dedicated Maildir
+   * Set up custom Notmuch configuration for database isolation
+   * Create environment variable management for consistent database targeting
+
+2. **AI Pre-tagging Hook:**
+   * Implement `post-new` script for Notmuch
+   * Integrate with AI Classifier to obtain tag predictions
+   * Apply tags via Tag Manager including `ai-pre-tagged` marker
+   * **Integration Tests:** End-to-end test with mail fetching and indexing
+
+3. **Mail List GUI:**
+   * Develop basic thread/message listing with sender, subject, date, tags
+   * Implement configurable search queries with history
+   * Add message selection functionality
+   * Include visual indicators for AI-tagged messages
+   * **Integration Tests:** List population and search functionality
+   * **Performance Test:** Loading and scrolling with large mailbox (10,000+ messages)
+
+4. **Tag Editor GUI:**
+   * Create dialog for viewing and editing message tags
+   * Integrate with Tag Manager for operations
+   * Add auto-completion for existing tags
+   * **Integration Tests:** Tag modification workflow
+
+### Risk Assessment:
+* **Risk:** GUI performance issues with large mailboxes
+* **Mitigation:** Early performance testing and optimization
+* **Risk:** User experience issues with tag editing workflow
+* **Mitigation:** Quick user feedback sessions with initial implementation
+
+### Deliverables:
+* Working mail list and tag editor GUIs
+* Functional Notmuch integration with custom configuration
+* Initial AI pre-tagging pipeline
+
+## Phase 3: Synchronization & Refined Tag Management (3 weeks)
+
+**Goal:** Implement multi-device tag synchronization system.
+
+### Tasks:
+
+1. **Enhanced Tag Manager:**
+   * Modify tag operations to record to Tag Operations Log (JSONL)
+   * Add device ID and timestamp to each operation
+   * Implement atomic transaction handling for log writing and tag application
+   * **Unit Tests:** Log file creation, format, and consistency
+
+2. **Tag Syncer:**
+   * Develop monitoring system for sync directory
+   * Implement entry ordering by timestamp
+   * Create conflict resolution strategy with configurable policies
+   * Add safeguards against duplicate application of operations
+   * **Integration Tests:** Multi-device simulation with various conflict scenarios
+   * **Security Test:** Validate integrity protection for operation logs
+
+3. **Sync Configuration UI:**
+   * Create simple interface for configuring sync settings
+   * Add sync status monitoring and reporting
+
+### Risk Assessment:
+* **Risk:** Complex race conditions in multi-device sync
+* **Mitigation:** Extensive testing with simulated timing scenarios
+* **Risk:** Data integrity issues during sync conflicts
+* **Mitigation:** Comprehensive logging and state verification
+
+### Deliverables:
+* Functioning tag synchronization system
+* Refined tag management with operation logging
+* Configuration interface for sync settings
+
+## Phase 4: Advanced GUI Components & User Feedback (5 weeks)
+
+**Goal:** Implement detailed mail viewing, composing, and AI feedback mechanisms.
+
+### Tasks:
+
+1. **Mail Viewer GUI:**
+   * Implement email content display with plain text and HTML support
+   * Add attachment handling with security controls
+   * Integrate AI feedback options (Accept/Correct tags)
+   * Connect to AI Feedback Logger for tag corrections
+   * **Integration Tests:** Various email formats and attachment types
+   * **Security Tests:** HTML rendering sandbox effectiveness
+
+2. **AI Feedback Logger:**
+   * Develop system for recording user corrections
+   * Implement efficient storage format for training data
+   * Add synchronization support for multi-device learning
+   * **Unit Tests:** Log format and content verification
+
+3. **Mail Composer GUI:**
+   * Create composition interface with all standard fields
+   * Implement attachment handling with drag-and-drop
+   * Add Reply/Reply All/Forward logic with smart quoting
+   * Integrate with msmtp for sending
+   * **Integration Tests:** Email composition and sending workflow
+   * **User Tests:** Gather feedback on composition workflow
+
+4. **Thread Viewer GUI:**
+   * Implement hierarchical thread display
+   * Add collapsible/expandable conversation view
+   * Integrate with Mail Viewer for individual messages
+   * **Integration Tests:** Complex thread visualization
+   * **Performance Tests:** Handling of very large threads
+
+### Risk Assessment:
+* **Risk:** HTML email rendering security vulnerabilities
+* **Mitigation:** Strict sandboxing and content filtering
+* **Risk:** User confusion with AI feedback workflow
+* **Mitigation:** Clear UI indicators and early user testing
+
+### Deliverables:
+* Complete set of GUI components for email interaction
+* AI feedback system for continuous learning
+* Thread visualization and navigation
+
+## Phase 5: AI Retraining & Polish (4 weeks)
+
+**Goal:** Complete the AI feedback loop and refine the application for production.
+
+### Tasks:
+
+1. **AI Retrainer:**
+   * Implement log data processing for training
+   * Develop incremental model training with scikit-learn
+   * Add model versioning and backup mechanisms
+   * Create scheduler for periodic retraining
+   * **Integration Tests:** Full feedback loop testing
+   * **Performance Tests:** Training time with growing feedback dataset
+
+2. **Keybindings & Visual Settings:**
+   * Implement comprehensive keybinding system across all components
+   * Add visual customization (fonts, colors, layouts)
+   * Create configuration UI for settings
+   * **User Tests:** Customization workflow with diverse users
+
+3. **Error Handling & Robustness:**
+   * Implement comprehensive error logging
+   * Add user-friendly error messages and recovery options
+   * Improve temporary file management
+   * Add crash recovery mechanisms
+   * **Security Review:** Comprehensive assessment of all components
+
+4. **Documentation & Deployment:**
+   * Create user manual with configuration guides
+   * Document synchronization setup and troubleshooting
+   * Refine Nix packaging for easy deployment
+   * Add system integration instructions
+   * **User Testing:** Installation and setup process
+
+### Risk Assessment:
+* **Risk:** AI model quality degradation with certain feedback patterns
+* **Mitigation:** Model quality metrics and automatic alerts
+* **Risk:** Resource consumption issues on long-running installations
+* **Mitigation:** Resource monitoring and automatic cleanup
+
+### Deliverables:
+* Complete AI training pipeline with feedback incorporation
+* Polished UI with comprehensive customization options
+* Production-ready error handling and recovery
+* Complete documentation and deployment packages
+
+## Phase 6: Beta Testing & Final Refinements (3 weeks)
+
+**Goal:** Gather real-world feedback and make final adjustments before release.
+
+### Tasks:
+
+1. **Beta Release:**
+   * Package application for distribution to beta testers
+   * Create feedback collection mechanism
+   * Monitor error reports and usage patterns
+
+2. **Performance Optimization:**
+   * Address any performance bottlenecks identified during beta
+   * Optimize database queries for large mailboxes
+   * Refine resource usage for long-running processes
+
+3. **Final Fixes and Enhancements:**
+   * Prioritize and address beta feedback
+   * Make final UI/UX improvements
+   * Complete any remaining documentation
+
+### Risk Assessment:
+* **Risk:** Unexpected issues in diverse user environments
+* **Mitigation:** Diverse beta tester selection and detailed environment reporting
+
+### Deliverables:
+* Production-ready application
+* Complete documentation
+* Installation and upgrade guides
+
+## Milestones and Checkpoints
+
+1. **End of Phase 0:** Development environment and project structure ready
+2. **End of Phase 2:** Basic mail viewing and tagging functional
+3. **Mid-Phase 4:** Complete mail management workflow available
+4. **End of Phase 5:** Full feature set ready for beta testing
+5. **Final Release:** Application ready for general use
+
+## Dependencies and External Factors
+
+* Notmuch API stability and compatibility
+* User feedback collection timing for AI improvements
+* Integration with system-specific mail sending facilities
