@@ -8,11 +8,18 @@ import email
 from email import policy
 from typing import List
 
-def extract_email_body(file_path: Path) -> str:
-    """Extracts the plain text body from an email file."""
+def extract_email_text(file_path: Path) -> str:
+    """
+    Extracts the subject, from, to, and plain text body from an email file
+    to use for classification.
+    """
     try:
         with open(file_path, 'rb') as f:
             msg = email.message_from_binary_file(f, policy=policy.default)
+
+        subject = msg.get("Subject", "")
+        from_field = msg.get("From", "")
+        to_field = msg.get("To", "")
         
         body = ""
         if msg.is_multipart():
@@ -23,7 +30,8 @@ def extract_email_body(file_path: Path) -> str:
                     break
         else:
             body = msg.get_content()
-        return body
+            
+        return f"Subject: {subject}\nFrom: {from_field}\nTo: {to_field}\n\n{body}"
     except Exception as e:
         sys.stderr.write(f"Error processing {file_path}: {e}\n")
         return ""
@@ -51,11 +59,11 @@ def main():
             sys.stderr.write(f"Warning: Mail file not found at {mail_file}. Skipping.\n")
             continue
             
-        body = extract_email_body(mail_file)
-        if not body:
+        text = extract_email_text(mail_file)
+        if not text:
             continue
 
-        X_test = [body]
+        X_test = [text]
         X_test_vectorized = vectorizer.transform(X_test)
         
         predictions = classifier.predict(X_test_vectorized)

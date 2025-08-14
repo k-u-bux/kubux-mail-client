@@ -5,26 +5,41 @@ import joblib
 from pathlib import Path
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.svm import LinearSVC
+from sklearn.multiclass import OneVsRestClassifier
+from sklearn.pipeline import Pipeline
 import email
 from email import policy
 from typing import List, Dict
 
-def extract_email_body(file_path: Path) -> str:
-    """Extracts the plain text body from an email file."""
-    with open(file_path, 'rb') as f:
-        msg = email.message_from_binary_file(f, policy=policy.default)
-    
-    body = ""
-    if msg.is_multipart():
-        for part in msg.walk():
-            ctype = part.get_content_type()
-            if ctype == 'text/plain':
-                body = part.get_content()
-                break
-    else:
-        body = msg.get_content()
-    
-    return body
+def extract_email_text(file_path: Path) -> str:
+    """
+    Extracts the subject, from, to, and plain text body from an email file
+    to use for classification.
+    """
+    try:
+        with open(file_path, 'rb') as f:
+            msg = email.message_from_binary_file(f, policy=policy.default)
+        
+        # Extract headers, handling potential missing values
+        subject = msg.get("Subject", "")
+        from_field = msg.get("From", "")
+        to_field = msg.get("To", "")
+        
+        body = ""
+        if msg.is_multipart():
+            for part in msg.walk():
+                ctype = part.get_content_type()
+                if ctype == 'text/plain':
+                    body = part.get_content()
+                    break
+        else:
+            body = msg.get_content()
+        
+        # Combine headers and body into a single string for classification
+        return f"Subject: {subject}\nFrom: {from_field}\nTo: {to_field}\n\n{body}"
+    except Exception as e:
+        # In case of any parsing error, return an empty string
+        return ""
 
 def load_tagged_mails(maildir: Path, tags_file: Path) -> Dict[str, List[str]]:
     """Loads tagged mail data from the maildir and a tag file."""
@@ -55,10 +70,11 @@ def main():
     for filename, tags in tagged_data.items():
         mail_path = args.maildir / filename
         if mail_path.exists():
-            body = extract_email_body(mail_path)
-            X_train.append(body)
-            y_train_map[filename] = tags
-            all_tags.update(tags)
+            text = extract_email_text(mail_path)
+            if text:
+                X_train.append(text)
+                y_train_map[filename] = tags
+                all_tags.update(tags)
     
     tag_list = sorted(list(all_tags))
     
@@ -75,10 +91,6 @@ def main():
     X_train_vectorized = vectorizer.fit_transform(X_train)
 
     print("Training model...")
-    # For multi-label classification, we use a OneVsRestClassifier with a linear SVM.
-    from sklearn.multiclass import OneVsRestClassifier
-    from sklearn.pipeline import Pipeline
-    
     classifier = OneVsRestClassifier(LinearSVC(C=1.0, dual=True, max_iter=1000))
     classifier.fit(X_train_vectorized, y_train)
 
