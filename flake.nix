@@ -10,7 +10,8 @@
     pkgs = nixpkgs.legacyPackages.${system};
     pythonEnv = pkgs.python3.withPackages (pyPkgs: with pyPkgs; [
       pyside6
-      notmuch-py
+      notmuch
+      notmuch2
       scikit-learn
       toml # For config file parsing
     ]);
@@ -70,7 +71,7 @@
         pkgs.black # Code formatter
         pkgs.isort # Import sorter
         pkgs.mypy # Type checker
-        pkgs.pytest # Testing framework
+        # pkgs.pytest # Testing framework
 
         # System dependencies for development/testing
         pkgs.notmuch
