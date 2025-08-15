@@ -6,25 +6,25 @@ from pathlib import Path
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.svm import LinearSVC
 from sklearn.multiclass import OneVsRestClassifier
-from sklearn.pipeline import Pipeline
 import email
 from email import policy
 from typing import List, Dict
 
 def extract_email_text(file_path: Path) -> str:
     """
-    Extracts the subject, from, to, and plain text body from an email file
+    Extracts the subject, from, to, cc, and plain text body from an email file
     to use for classification.
     """
     try:
         with open(file_path, 'rb') as f:
             msg = email.message_from_binary_file(f, policy=policy.default)
-        
+
         # Extract headers, handling potential missing values
         subject = msg.get("Subject", "")
         from_field = msg.get("From", "")
         to_field = msg.get("To", "")
-        
+        cc_field = msg.get("Cc", "")
+
         body = ""
         if msg.is_multipart():
             for part in msg.walk():
@@ -34,9 +34,9 @@ def extract_email_text(file_path: Path) -> str:
                     break
         else:
             body = msg.get_content()
-        
+
         # Combine headers and body into a single string for classification
-        return f"Subject: {subject}\nFrom: {from_field}\nTo: {to_field}\n\n{body}"
+        return f"Subject: {subject}\nFrom: {from_field}\nTo: {to_field}\nCc: {cc_field}\n\n{body}"
     except Exception as e:
         # In case of any parsing error, return an empty string
         return ""
@@ -62,11 +62,11 @@ def main():
 
     print("Loading data...")
     tagged_data = load_tagged_mails(args.maildir, args.tags)
-    
+
     X_train = []
     y_train_map = {}
     all_tags = set()
-    
+
     for filename, tags in tagged_data.items():
         mail_path = args.maildir / filename
         if mail_path.exists():
@@ -75,19 +75,19 @@ def main():
                 X_train.append(text)
                 y_train_map[filename] = tags
                 all_tags.update(tags)
-    
+
     tag_list = sorted(list(all_tags))
-    
+
     print(f"Found {len(X_train)} emails and {len(tag_list)} unique tags.")
-    
+
     # Create multi-label targets
     y_train = []
     for filename in tagged_data.keys():
         row = [1 if tag in y_train_map.get(filename, []) else 0 for tag in tag_list]
         y_train.append(row)
-    
+
     print("Vectorizing email content...")
-    vectorizer = TfidfVectorizer(ngram_range=(1, 2), stop_words='english', min_df=5, max_df=0.9)
+    vectorizer = TfidfVectorizer(ngram_range=(1, 4), stop_words='english', min_df=5, max_df=0.9)
     X_train_vectorized = vectorizer.fit_transform(X_train)
 
     print("Training model...")

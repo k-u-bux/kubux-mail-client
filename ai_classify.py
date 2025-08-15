@@ -10,7 +10,7 @@ from typing import List
 
 def extract_email_text(file_path: Path) -> str:
     """
-    Extracts the subject, from, to, and plain text body from an email file
+    Extracts the subject, from, to, cc, and plain text body from an email file
     to use for classification.
     """
     try:
@@ -20,7 +20,8 @@ def extract_email_text(file_path: Path) -> str:
         subject = msg.get("Subject", "")
         from_field = msg.get("From", "")
         to_field = msg.get("To", "")
-        
+        cc_field = msg.get("Cc", "")
+
         body = ""
         if msg.is_multipart():
             for part in msg.walk():
@@ -30,8 +31,8 @@ def extract_email_text(file_path: Path) -> str:
                     break
         else:
             body = msg.get_content()
-            
-        return f"Subject: {subject}\nFrom: {from_field}\nTo: {to_field}\n\n{body}"
+
+        return f"Subject: {subject}\nFrom: {from_field}\nTo: {to_field}\nCc: {cc_field}\n\n{body}"
     except Exception as e:
         sys.stderr.write(f"Error processing {file_path}: {e}\n")
         return ""
@@ -58,17 +59,17 @@ def main():
         if not mail_file.exists():
             sys.stderr.write(f"Warning: Mail file not found at {mail_file}. Skipping.\n")
             continue
-            
+
         text = extract_email_text(mail_file)
         if not text:
             continue
 
         X_test = [text]
         X_test_vectorized = vectorizer.transform(X_test)
-        
+
         predictions = classifier.predict(X_test_vectorized)
         predicted_tags = [tag_list[i] for i, pred in enumerate(predictions[0]) if pred == 1]
-        
+
         print(f"{mail_file.name} {' '.join(predicted_tags)}")
 
 if __name__ == "__main__":

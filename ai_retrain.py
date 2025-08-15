@@ -9,7 +9,7 @@ from typing import List, Dict
 
 def extract_email_text(file_path: Path) -> str:
     """
-    Extracts the subject, from, to, and plain text body from an email file
+    Extracts the subject, from, to, cc, and plain text body from an email file
     to use for classification.
     """
     try:
@@ -19,7 +19,8 @@ def extract_email_text(file_path: Path) -> str:
         subject = msg.get("Subject", "")
         from_field = msg.get("From", "")
         to_field = msg.get("To", "")
-        
+        cc_field = msg.get("Cc", "")
+
         body = ""
         if msg.is_multipart():
             for part in msg.walk():
@@ -29,8 +30,8 @@ def extract_email_text(file_path: Path) -> str:
                     break
         else:
             body = msg.get_content()
-            
-        return f"Subject: {subject}\nFrom: {from_field}\nTo: {to_field}\n\n{body}"
+
+        return f"Subject: {subject}\nFrom: {from_field}\nTo: {to_field}\nCc: {cc_field}\n\n{body}"
     except Exception as e:
         return ""
 
@@ -60,15 +61,14 @@ def main():
         existing_tags = set(existing_model_data['tags'])
     except FileNotFoundError:
         print(f"Model file not found at {args.model}. Starting a full training run instead.")
-        # Fallback to training from scratch if no model exists
         return
 
     print("Loading existing and new data...")
     new_tagged_data = load_tagged_mails(args.maildir, args.tags)
-    
+
     X_data = []
     y_data_map = {}
-    
+
     combined_data = {**new_tagged_data}
     all_tags = set(existing_tags)
     for filename, tags in combined_data.items():
@@ -85,15 +85,15 @@ def main():
     print(f"Found {len(X_data)} emails and {len(tag_list)} unique tags for retraining.")
 
     X_vectorized = existing_vectorizer.transform(X_data)
-    
+
     y_data = []
     for filename in combined_data.keys():
         row = [1 if tag in y_data_map.get(filename, []) else 0 for tag in tag_list]
         y_data.append(row)
-        
+
     print("Re-training model...")
     existing_classifier.fit(X_vectorized, y_data)
-    
+
     print(f"Saving updated model to {args.model}...")
     model_data = {
         'vectorizer': existing_vectorizer,
