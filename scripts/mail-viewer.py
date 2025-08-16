@@ -6,13 +6,14 @@ import os
 import tempfile
 import email
 from email import policy
+import re
 from pathlib import Path
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QTextEdit, QHBoxLayout,
-    QPushButton, QListWidget, QSplitter, QMessageBox, QMenu, QWidgetAction
+    QPushButton, QListWidget, QSplitter, QMessageBox, QMenu, QWidgetAction, QAction
 )
 from PySide6.QtCore import Qt, QSize
-from PySide6.QtGui import QFont, QAction, QGuiApplication, QKeySequence
+from PySide6.QtGui import QFont, QKeySequence
 import logging
 from config import config  # Import the shared config object
 
@@ -27,6 +28,7 @@ class MailViewer(QMainWindow):
 
         self.mail_file_path = Path(mail_file_path).expanduser()
         self.message = self.parse_mail_file()
+        self.attachments = []
 
         if not self.message:
             QMessageBox.critical(self, "Error", "Could not load or parse the mail file.")
@@ -57,39 +59,36 @@ class MailViewer(QMainWindow):
         top_bar_layout = QHBoxLayout(top_bar)
         main_layout.addWidget(top_bar)
 
-        # Action Buttons
-        self.reply_button = QPushButton("Reply")
-        self.reply_button.clicked.connect(lambda: QMessageBox.information(self, "Mock Action", "Reply functionality to be implemented."))
-        top_bar_layout.addWidget(self.reply_button)
+        # Compose button with menu
+        self.compose_button = QPushButton("Compose")
+        self.compose_menu = QMenu(self)
+        self.compose_menu.addAction("Reply").triggered.connect(lambda: self.show_mock_action("Reply to be implemented"))
+        self.compose_menu.addAction("Reply All").triggered.connect(lambda: self.show_mock_action("Reply All to be implemented"))
+        self.compose_menu.addAction("Forward").triggered.connect(lambda: self.show_mock_action("Forward to be implemented"))
+        self.compose_menu.addSeparator()
+        self.compose_menu.addAction("Compose New").triggered.connect(lambda: self.show_mock_action("Compose new mail to be implemented"))
+        self.compose_button.setMenu(self.compose_menu)
+        top_bar_layout.addWidget(self.compose_button)
         
-        self.reply_all_button = QPushButton("Reply All")
-        self.reply_all_button.clicked.connect(lambda: QMessageBox.information(self, "Mock Action", "Reply All functionality to be implemented."))
-        top_bar_layout.addWidget(self.reply_all_button)
-
-        self.forward_button = QPushButton("Forward")
-        self.forward_button.clicked.connect(lambda: QMessageBox.information(self, "Mock Action", "Forward functionality to be implemented."))
-        top_bar_layout.addWidget(self.forward_button)
-        
-        self.tags_button = QPushButton("Tags...")
-        self.tags_button.clicked.connect(lambda: QMessageBox.information(self, "Mock Action", "Tag management to be implemented."))
+        # Tags button with menu
+        self.tags_button = QPushButton("Tags")
+        self.tags_menu = QMenu(self)
+        self.tags_menu.addAction("Add/Remove Spam").triggered.connect(lambda: self.show_mock_action("Message will be tagged as +spam."))
+        self.tags_menu.addAction("Add/Remove Todo").triggered.connect(lambda: self.show_mock_action("Message will be tagged as +todo."))
+        self.tags_menu.addAction("Add/Remove Read").triggered.connect(lambda: self.show_mock_action("Message will be tagged as +read."))
+        self.tags_menu.addSeparator()
+        self.tags_menu.addAction("Edit All Tags").triggered.connect(lambda: self.show_mock_action("Full tag management to be implemented."))
+        self.tags_button.setMenu(self.tags_menu)
         top_bar_layout.addWidget(self.tags_button)
-        
-        self.spam_button = QPushButton("Mark as Spam")
-        self.spam_button.clicked.connect(lambda: QMessageBox.information(self, "Mock Action", "Message will be tagged as +spam."))
-        top_bar_layout.addWidget(self.spam_button)
-        
+
         self.delete_button = QPushButton("Delete")
-        self.delete_button.clicked.connect(lambda: QMessageBox.information(self, "Mock Action", "Message will be tagged as +deleted."))
+        self.delete_button.clicked.connect(lambda: self.show_mock_action("Message will be tagged as +deleted."))
         top_bar_layout.addWidget(self.delete_button)
 
-        self.todo_button = QPushButton("Mark as Todo")
-        self.todo_button.clicked.connect(lambda: QMessageBox.information(self, "Mock Action", "Message will be tagged as +todo."))
-        top_bar_layout.addWidget(self.todo_button)
-        
         self.view_thread_button = QPushButton("View Thread")
-        self.view_thread_button.clicked.connect(lambda: QMessageBox.information(self, "Mock Action", "Thread viewer to be implemented."))
+        self.view_thread_button.clicked.connect(lambda: self.show_mock_action("Thread viewer to be implemented."))
         top_bar_layout.addWidget(self.view_thread_button)
-
+        
         top_bar_layout.addStretch()
 
         # Splitter for Headers, Content, and Attachments
@@ -104,7 +103,7 @@ class MailViewer(QMainWindow):
         self.headers_content.setFont(config.interface_font)
         self.splitter.addWidget(self.headers_content)
         
-        # Header context menu (mocked for now)
+        # Header context menu
         self.headers_content.setContextMenuPolicy(Qt.CustomContextMenu)
         self.headers_content.customContextMenuRequested.connect(self.show_header_context_menu)
 
@@ -114,9 +113,9 @@ class MailViewer(QMainWindow):
         self.mail_content.setFont(config.text_font)
         self.splitter.addWidget(self.mail_content)
         
-        # Add a context menu for clipboard actions
+        # Add a context menu for clipboard actions and view raw
         self.mail_content.setContextMenuPolicy(Qt.CustomContextMenu)
-        self.mail_content.customContextMenuRequested.connect(self.show_context_menu)
+        self.mail_content.customContextMenuRequested.connect(self.show_content_context_menu)
 
         # Add a key press event handler for dynamic font sizing
         self.mail_content.keyPressEvent = self.mail_content_keyPressEvent
@@ -144,27 +143,25 @@ class MailViewer(QMainWindow):
 
         # Find the plain text or HTML body of the email
         body_text = ""
-        attachments = []
+        self.attachments.clear()
         for part in self.message.walk():
             # Check for attachments
             if part.get_content_disposition() == 'attachment':
                 filename = part.get_filename()
                 if filename:
-                    attachments.append(part)
+                    self.attachments.append(part)
                     self.attachments_list.addItem(f"Attachment: {filename}")
                     
             # Prioritize plain text over HTML
             if part.get_content_type() == 'text/plain':
                 body_text = part.get_content()
-                self.mail_content.setHtml("") # Clear any previous HTML rendering
+                self.mail_content.setHtml("")
                 self.mail_content.setPlainText(body_text)
                 return
 
             if part.get_content_type() == 'text/html' and not body_text:
                 body_text = part.get_content()
                 self.mail_content.setHtml(body_text)
-
-        self.attachments = attachments
 
     def handle_attachment_click(self, item):
         """Saves the attachment to a temporary file and opens it."""
@@ -177,17 +174,22 @@ class MailViewer(QMainWindow):
                 temp_file.write(attachment_part.get_payload(decode=True))
                 temp_path = temp_file.name
 
-            # Open the temporary file with the system's default application
             os.system(f"xdg-open '{temp_path}'")
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Could not open attachment: {e}")
 
-    def show_context_menu(self, pos):
+    def show_content_context_menu(self, pos):
         """Creates a context menu for the mail content area."""
         menu = QMenu(self)
         copy_action = QAction("Copy", self)
         copy_action.triggered.connect(self.mail_content.copy)
         menu.addAction(copy_action)
+        menu.addSeparator()
+        
+        view_raw_action = QAction("View Raw Message", self)
+        view_raw_action.triggered.connect(lambda: self.show_mock_action("Raw message will be opened in $EDITOR."))
+        menu.addAction(view_raw_action)
+
         menu.exec(self.mail_content.mapToGlobal(pos))
         
     def mail_content_keyPressEvent(self, event):
@@ -200,34 +202,40 @@ class MailViewer(QMainWindow):
                 self.mail_content.zoomOut()
                 return
 
-        # Let the default handler process the event if it's not a zoom hotkey
         QTextEdit.keyPressEvent(self.mail_content, event)
 
     def show_header_context_menu(self, pos):
         """Mocks a context menu for header fields."""
         menu = QMenu(self)
         
-        # Get the cursor position to find the email address
-        cursor = self.headers_content.textCursor()
+        # Get the cursor position and try to find an email address
+        cursor = self.headers_content.cursorForPosition(pos)
         cursor.select(cursor.SelectionType.WordUnderCursor)
-        selected_text = cursor.selectedText()
+        selected_text = cursor.selectedText().strip()
         
-        # This is a very simple check, we will need to improve this later
-        if '@' in selected_text:
-            add_contact_action = QAction(f"Add {selected_text} to Contacts", self)
-            add_contact_action.triggered.connect(lambda: QMessageBox.information(self, "Mock Action", f"Adding '{selected_text}' to contacts."))
+        # Regex to find a valid email address
+        email_regex = r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}"
+        match = re.search(email_regex, selected_text)
+        
+        if match:
+            email_address = match.group(0)
+            
+            add_contact_action = QAction(f"Add {email_address} to Contacts", self)
+            add_contact_action.triggered.connect(lambda: self.show_mock_action(f"Adding '{email_address}' to contacts."))
             menu.addAction(add_contact_action)
             
-            new_mail_action = QAction(f"Compose new mail to {selected_text}", self)
-            new_mail_action.triggered.connect(lambda: QMessageBox.information(self, "Mock Action", f"Composing new mail to '{selected_text}'."))
+            new_mail_action = QAction(f"Compose new mail to {email_address}", self)
+            new_mail_action.triggered.connect(lambda: self.show_mock_action(f"Composing new mail to '{email_address}'."))
             menu.addAction(new_mail_action)
             
-            search_action = QAction(f"Search for mail from {selected_text}", self)
-            search_action.triggered.connect(lambda: QMessageBox.information(self, "Mock Action", f"Searching for mail from '{selected_text}'."))
+            search_action = QAction(f"Search for mail from {email_address}", self)
+            search_action.triggered.connect(lambda: self.show_mock_action(f"Searching for mail from '{email_address}'."))
             menu.addAction(search_action)
 
         menu.exec(self.headers_content.mapToGlobal(pos))
-
+        
+    def show_mock_action(self, message):
+        QMessageBox.information(self, "Action Mocked", message)
 
 # --- 3. Main Entry Point ---
 def main():
