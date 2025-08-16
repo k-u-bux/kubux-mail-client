@@ -171,6 +171,12 @@ class MailViewer(QMainWindow):
         
         top_bar_layout.addStretch()
 
+        # Add the Quit button here to be flush right
+        self.quit_button = QPushButton("Quit")
+        self.quit_button.clicked.connect(self.close)
+        top_bar_layout.addWidget(self.quit_button)
+
+
         # Tags display area in a horizontal scroll area
         self.tags_scroll_area = QScrollArea()
         self.tags_scroll_area.setWidgetResizable(True)
@@ -220,6 +226,14 @@ class MailViewer(QMainWindow):
 
         # Set initial sizes
         self.splitter.setSizes([100, 500, 50])
+        
+        # Add the quit action to the main window
+        # Get key binding from the new config logic
+        quit_key = config.get_setting("bindings", "quit_action") or "Ctrl+Q"
+        quit_action = QAction("Quit", self)
+        quit_action.setShortcut(QKeySequence(quit_key))
+        quit_action.triggered.connect(self.close)
+        self.addAction(quit_action)
 
     def display_message(self):
         if not self.message:
