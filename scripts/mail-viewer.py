@@ -11,11 +11,11 @@ import re
 from pathlib import Path
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QTextEdit, QHBoxLayout,
-    QPushButton, QListWidget, QSplitter, QMessageBox, QMenu, QWidgetAction,
-    QAction, QGroupBox, QFormLayout, QLabel
+    QPushButton, QListWidget, QSplitter, QMessageBox, QMenu, QGroupBox,
+    QFormLayout, QLabel
 )
 from PySide6.QtCore import Qt, QSize, Signal
-from PySide6.QtGui import QFont, QKeySequence
+from PySide6.QtGui import QFont, QKeySequence, QAction
 import logging
 from config import config
 
@@ -200,26 +200,6 @@ class MailViewer(QMainWindow):
                 
                 addresses_layout.addStretch()
                 self.headers_layout.addRow(label, addresses_widget)
-
-        # Find the plain text or HTML body of the email
-        body_text = ""
-        self.attachments.clear()
-        for part in self.message.walk():
-            if part.get_content_disposition() == 'attachment':
-                filename = part.get_filename()
-                if filename:
-                    self.attachments.append(part)
-                    self.attachments_list.addItem(f"Attachment: {filename}")
-                    
-            if part.get_content_type() == 'text/plain':
-                body_text = part.get_content()
-                self.mail_content.setHtml("")
-                self.mail_content.setPlainText(body_text)
-                return
-
-            if part.get_content_type() == 'text/html' and not body_text:
-                body_text = part.get_content()
-                self.mail_content.setHtml(body_text)
 
     def handle_address_selection(self, address, is_selected):
         if is_selected:
