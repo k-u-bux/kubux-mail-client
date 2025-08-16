@@ -289,17 +289,15 @@ class MailViewer(QMainWindow):
     def get_tags(self):
         """Queries the notmuch database for tags of the current mail file."""
         try:
-            # Use the full path with the 'filename:' query term.
-            command = ['notmuch', 'search', '--format=json-bare', '--output=tags', f'filename:{self.mail_file_path}']
-            
-            # The output of notmuch is a single line with a JSON array
+            # Use a more compatible format that should work on older versions of notmuch
+            command = ['notmuch', 'search', '--output=tags', '--format=text', f'filename:{self.mail_file_path}']
             result = subprocess.run(command, capture_output=True, text=True, check=True)
-            tags_json = result.stdout.strip()
-            if tags_json:
-                data = json.loads(tags_json)
-                self.tags = data[0]['tags'] if data and 'tags' in data[0] else []
-            else:
-                self.tags = []
+            
+            # The output is a simple list of tags, one per line.
+            # We filter out any empty lines.
+            tags_list = [tag.strip() for tag in result.stdout.strip().split('\n') if tag.strip()]
+            self.tags = sorted(tags_list)
+
         except subprocess.CalledProcessError as e:
             dialog = CopyableErrorDialog(
                 "Notmuch Command Failed",
@@ -307,15 +305,7 @@ class MailViewer(QMainWindow):
             )
             dialog.exec()
             self.tags = []
-        except json.JSONDecodeError as e:
-            dialog = CopyableErrorDialog(
-                "Notmuch Output Error",
-                f"Failed to parse notmuch output as JSON:\n\n{e}"
-            )
-            dialog.exec()
-            self.tags = []
         
-        self.tags = sorted(self.tags)
         return self.tags
 
     def update_tags_ui(self):
