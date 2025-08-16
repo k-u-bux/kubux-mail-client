@@ -12,7 +12,8 @@ from pathlib import Path
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QTextEdit, QHBoxLayout,
     QPushButton, QListWidget, QSplitter, QMessageBox, QMenu, QGroupBox,
-    QFormLayout, QLabel, QInputDialog, QScrollArea, QDialog, QDialogButtonBox
+    QFormLayout, QLabel, QInputDialog, QScrollArea, QDialog, QDialogButtonBox,
+    QFileDialog
 )
 from PySide6.QtCore import Qt, QSize, Signal
 from PySide6.QtGui import QFont, QKeySequence, QAction
@@ -222,7 +223,10 @@ class MailViewer(QMainWindow):
         self.attachments_list.setMinimumHeight(40)
         self.attachments_list.setMaximumHeight(200)
         self.splitter.addWidget(self.attachments_list)
-        self.attachments_list.itemClicked.connect(self.handle_attachment_click)
+        
+        # Set context menu policy for the attachments list
+        self.attachments_list.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.attachments_list.customContextMenuRequested.connect(self.show_attachment_context_menu)
 
         # Set initial sizes
         self.splitter.setSizes([100, 500, 50])
@@ -287,7 +291,7 @@ class MailViewer(QMainWindow):
                 filename = part.get_filename()
                 if filename:
                     self.attachments.append(part)
-                    self.attachments_list.addItem(f"Attachment: {filename}")
+                    self.attachments_list.addItem(filename)
                     
             # Prioritize plain text over HTML
             if part.get_content_type() == 'text/plain':
@@ -400,7 +404,23 @@ class MailViewer(QMainWindow):
         else:
             self.show_mock_action("No addresses selected.")
 
-    def handle_attachment_click(self, item):
+    def show_attachment_context_menu(self, pos):
+        """Shows a context menu with actions for the clicked attachment."""
+        item = self.attachments_list.itemAt(pos)
+        if item:
+            menu = QMenu(self)
+            
+            open_action = QAction("Open", self)
+            open_action.triggered.connect(lambda: self.handle_attachment_open(item))
+            menu.addAction(open_action)
+            
+            save_as_action = QAction("Save As...", self)
+            save_as_action.triggered.connect(lambda: self.handle_attachment_save_as(item))
+            menu.addAction(save_as_action)
+            
+            menu.exec(self.attachments_list.mapToGlobal(pos))
+            
+    def handle_attachment_open(self, item):
         """Saves the attachment to a temporary file and opens it."""
         try:
             part_index = self.attachments_list.row(item)
@@ -411,9 +431,33 @@ class MailViewer(QMainWindow):
                 temp_file.write(attachment_part.get_payload(decode=True))
                 temp_path = temp_file.name
 
-            os.system(f"xdg-open '{temp_path}'")
+            # Use system default application to open the file
+            if sys.platform == "win32":
+                os.startfile(temp_path)
+            elif sys.platform == "darwin":
+                subprocess.run(["open", temp_path])
+            else: # Linux and other POSIX-like systems
+                subprocess.run(["xdg-open", temp_path])
+                
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Could not open attachment: {e}")
+
+    def handle_attachment_save_as(self, item):
+        """Prompts the user to save the attachment to a chosen location."""
+        try:
+            part_index = self.attachments_list.row(item)
+            attachment_part = self.attachments[part_index]
+            filename = attachment_part.get_filename()
+
+            save_path, _ = QFileDialog.getSaveFileName(self, "Save Attachment", filename)
+            
+            if save_path:
+                with open(save_path, 'wb') as f:
+                    f.write(attachment_part.get_payload(decode=True))
+                QMessageBox.information(self, "Success", f"Attachment saved to:\n{save_path}")
+                
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Could not save attachment: {e}")
 
     def show_content_context_menu(self, pos):
         """Creates a context menu for the mail content area."""
