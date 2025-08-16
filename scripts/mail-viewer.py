@@ -12,11 +12,13 @@ from pathlib import Path
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QTextEdit, QHBoxLayout,
     QPushButton, QListWidget, QSplitter, QMessageBox, QMenu, QGroupBox,
-    QFormLayout, QLabel
+    QFormLayout, QLabel, QInputDialog
 )
 from PySide6.QtCore import Qt, QSize, Signal
 from PySide6.QtGui import QFont, QKeySequence, QAction
 import logging
+import subprocess
+import json
 from config import config
 
 # Set up basic logging to console
@@ -66,6 +68,7 @@ class MailViewer(QMainWindow):
         self.message = self.parse_mail_file()
         self.attachments = []
         self.selected_addresses = set()
+        self.tags = []
 
         if not self.message:
             QMessageBox.critical(self, "Error", "Could not load or parse the mail file.")
@@ -129,6 +132,13 @@ class MailViewer(QMainWindow):
         
         top_bar_layout.addStretch()
 
+        # Tags display area
+        self.tags_widget = QWidget()
+        self.tags_layout = QHBoxLayout(self.tags_widget)
+        self.tags_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.addWidget(self.tags_widget)
+        self.tags_layout.addStretch() # Push buttons to the left
+
         # Splitter for Headers, Content, and Attachments
         self.splitter = QSplitter(Qt.Orientation.Vertical)
         main_layout.addWidget(self.splitter)
@@ -165,6 +175,8 @@ class MailViewer(QMainWindow):
     def display_message(self):
         if not self.message:
             return
+
+        self.update_tags_ui()
 
         # Clear existing header widgets
         while self.headers_layout.rowCount() > 0:
@@ -223,7 +235,89 @@ class MailViewer(QMainWindow):
             if part.get_content_type() == 'text/html' and not body_text:
                 body_text = part.get_content()
                 self.mail_content.setHtml(body_text)
+
+    def get_tags(self):
+        """Queries the notmuch database for tags of the current mail file."""
+        try:
+            # Use the full path with the 'filename:' query term.
+            command = ['notmuch', 'search', '--format=json-bare', '--output=tags', f'filename:{self.mail_file_path}']
+            
+            # The output of notmuch is a single line with a JSON array
+            result = subprocess.run(command, capture_output=True, text=True, check=True)
+            tags_json = result.stdout.strip()
+            if tags_json:
+                data = json.loads(tags_json)
+                self.tags = data[0]['tags'] if data and 'tags' in data[0] else []
+            else:
+                self.tags = []
+        except FileNotFoundError:
+            QMessageBox.critical(self, "Error", "The 'notmuch' command was not found. Please ensure it is installed and in your PATH.")
+            self.tags = []
+        except subprocess.CalledProcessError as e:
+            QMessageBox.critical(self, "Error", f"An error occurred while running notmuch: {e.stderr}")
+            self.tags = []
+        except json.JSONDecodeError as e:
+            QMessageBox.critical(self, "Error", f"Failed to parse notmuch output as JSON: {e}")
+            self.tags = []
+        
+        self.tags = sorted(self.tags)
+        return self.tags
+
+    def update_tags_ui(self):
+        """Clears and rebuilds the UI to display the current tags."""
+        # Clear existing tag widgets
+        while self.tags_layout.count():
+            item = self.tags_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+        
+        # Fetch the latest tags
+        self.tags = self.get_tags()
+        
+        # Add a button for each tag
+        for tag in self.tags:
+            tag_button = QPushButton(tag)
+            # Use lambda to pass the tag name to the slot
+            tag_button.clicked.connect(lambda checked, t=tag: self.remove_tag(t))
+            self.tags_layout.addWidget(tag_button)
+
+        # Add "Add tags" button
+        add_tag_button = QPushButton("Add tags")
+        add_tag_button.clicked.connect(self.add_tag)
+        self.tags_layout.addWidget(add_tag_button)
+
+        self.tags_layout.addStretch() # Push buttons to the left
+
+    def remove_tag(self, tag):
+        """Removes a tag from the current mail using the notmuch command."""
+        try:
+            # Use the full path with the 'filename:' query term.
+            command = ['notmuch', 'tag', f'-{tag}', f'filename:{self.mail_file_path}']
+            subprocess.run(command, check=True, capture_output=True, text=True)
+            logging.info(f"Tag '{tag}' removed successfully.")
+            self.update_tags_ui() # Refresh the UI to reflect the change
+        except subprocess.CalledProcessError as e:
+            QMessageBox.critical(self, "Error", f"Failed to remove tag '{tag}': {e.stderr}")
+        except FileNotFoundError:
+            QMessageBox.critical(self, "Error", "The 'notmuch' command was not found. Please ensure it is installed and in your PATH.")
     
+    def add_tag(self):
+        """Mock function for adding a new tag."""
+        text, ok = QInputDialog.getText(self, "Add Tags", "Enter tag(s) to add (comma-separated):")
+        if ok and text:
+            new_tags = [t.strip() for t in text.split(',')]
+            for tag in new_tags:
+                try:
+                    command = ['notmuch', 'tag', f'+{tag}', f'filename:{self.mail_file_path}']
+                    subprocess.run(command, check=True, capture_output=True, text=True)
+                    logging.info(f"Tag '{tag}' added successfully.")
+                except subprocess.CalledProcessError as e:
+                    QMessageBox.critical(self, "Error", f"Failed to add tag '{tag}': {e.stderr}")
+                except FileNotFoundError:
+                    QMessageBox.critical(self, "Error", "The 'notmuch' command was not found. Please ensure it is installed and in your PATH.")
+            self.update_tags_ui()
+
+
     def handle_address_selection(self, address, is_selected):
         if is_selected:
             self.selected_addresses.add(address)
@@ -270,7 +364,7 @@ class MailViewer(QMainWindow):
     def mail_content_keyPressEvent(self, event):
         """Handles key press events for the mail content area."""
         if event.modifiers() == Qt.KeyboardModifier.ControlModifier:
-            if event.key() == Qt.Key.Key_Plus or event.key() == Qt.Key.Key_Equal:
+            if event.key() in (Qt.Key.Key_Plus, Qt.Key.Key_Equal):
                 self.mail_content.zoomIn()
                 return
             elif event.key() == Qt.Key.Key_Minus:
