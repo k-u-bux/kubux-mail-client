@@ -6,19 +6,55 @@ import os
 import tempfile
 import email
 from email import policy
+from email.utils import getaddresses
 import re
 from pathlib import Path
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QTextEdit, QHBoxLayout,
-    QPushButton, QListWidget, QSplitter, QMessageBox, QMenu, QWidgetAction
+    QPushButton, QListWidget, QSplitter, QMessageBox, QMenu, QWidgetAction,
+    QAction, QGroupBox, QFormLayout, QLabel
 )
-from PySide6.QtCore import Qt, QSize
-from PySide6.QtGui import QFont, QKeySequence, QAction, QGuiApplication
+from PySide6.QtCore import Qt, QSize, Signal
+from PySide6.QtGui import QFont, QKeySequence
 import logging
 from config import config
 
 # Set up basic logging to console
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+# Custom widget for clickable email addresses
+class ClickableLabel(QLabel):
+    clicked = Signal(str, bool)
+    
+    def __init__(self, text, address, parent=None):
+        super().__init__(text, parent)
+        self.address = address
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.selected = False
+        self.update_style()
+        self.setToolTip(address)
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.selected = not self.selected
+            self.update_style()
+            self.clicked.emit(self.address, self.selected)
+        super().mousePressEvent(event)
+    
+    def enterEvent(self, event):
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setStyleSheet("background-color: lightgray;")
+        super().enterEvent(event)
+    
+    def leaveEvent(self, event):
+        self.update_style()
+        super().leaveEvent(event)
+        
+    def update_style(self):
+        if self.selected:
+            self.setStyleSheet("background-color: #aaddff;")
+        else:
+            self.setStyleSheet("background-color: transparent;")
 
 class MailViewer(QMainWindow):
     def __init__(self, mail_file_path, parent=None):
@@ -29,6 +65,7 @@ class MailViewer(QMainWindow):
         self.mail_file_path = Path(mail_file_path).expanduser()
         self.message = self.parse_mail_file()
         self.attachments = []
+        self.selected_addresses = set()
 
         if not self.message:
             QMessageBox.critical(self, "Error", "Could not load or parse the mail file.")
@@ -65,6 +102,7 @@ class MailViewer(QMainWindow):
         self.compose_menu.addAction("Reply").triggered.connect(lambda: self.show_mock_action("Reply to be implemented"))
         self.compose_menu.addAction("Reply All").triggered.connect(lambda: self.show_mock_action("Reply All to be implemented"))
         self.compose_menu.addAction("Forward").triggered.connect(lambda: self.show_mock_action("Forward to be implemented"))
+        self.compose_menu.addAction("Reply to Selected").triggered.connect(self.reply_to_selected)
         self.compose_menu.addSeparator()
         self.compose_menu.addAction("Compose New").triggered.connect(lambda: self.show_mock_action("Compose new mail to be implemented"))
         self.compose_button.setMenu(self.compose_menu)
@@ -95,18 +133,12 @@ class MailViewer(QMainWindow):
         self.splitter = QSplitter(Qt.Orientation.Vertical)
         main_layout.addWidget(self.splitter)
 
-        # Mail Headers section
-        self.headers_content = QTextEdit()
-        self.headers_content.setReadOnly(True)
-        self.headers_content.setFixedHeight(120)
-        self.headers_content.setMinimumHeight(80)
-        self.headers_content.setFont(config.interface_font)
-        self.splitter.addWidget(self.headers_content)
+        # Mail Headers section as a GroupBox
+        self.headers_group_box = QGroupBox()
+        self.headers_layout = QFormLayout(self.headers_group_box)
+        self.headers_group_box.setStyleSheet("QGroupBox { border: 1px solid gray; }")
+        self.splitter.addWidget(self.headers_group_box)
         
-        # Header context menu
-        self.headers_content.setContextMenuPolicy(Qt.CustomContextMenu)
-        self.headers_content.customContextMenuRequested.connect(self.show_header_context_menu)
-
         # Mail Content area
         self.mail_content = QTextEdit()
         self.mail_content.setReadOnly(True)
@@ -134,25 +166,51 @@ class MailViewer(QMainWindow):
         if not self.message:
             return
 
-        # Display headers
-        headers_text = ""
-        for name in ["From", "To", "Subject", "Date", "Cc"]:
-            if self.message.get(name):
-                headers_text += f"{name}: {self.message.get(name)}\n"
-        self.headers_content.setPlainText(headers_text)
+        # Clear existing header widgets
+        while self.headers_layout.rowCount() > 0:
+            self.headers_layout.removeRow(0)
+
+        # Populate headers
+        header_fields = {"From": self.message.get("From"),
+                         "To": self.message.get("To"),
+                         "Cc": self.message.get("Cc"),
+                         "Subject": self.message.get("Subject"),
+                         "Date": self.message.get("Date")}
+
+        for field, value in header_fields.items():
+            if value:
+                label = QLabel(f"<b>{field}:</b>")
+                label.setFont(config.interface_font)
+                
+                # Create a widget for addresses
+                addresses_widget = QWidget()
+                addresses_layout = QHBoxLayout(addresses_widget)
+                addresses_layout.setContentsMargins(0, 0, 0, 0)
+                
+                # Parse and add clickable labels for addresses
+                if field in ["From", "To", "Cc"]:
+                    addresses = getaddresses([value])
+                    for name, address in addresses:
+                        display_text = f"{name} &lt;{address}&gt;" if name else address
+                        addr_label = ClickableLabel(display_text, address)
+                        addr_label.clicked.connect(self.handle_address_selection)
+                        addresses_layout.addWidget(addr_label)
+                else:
+                    addresses_layout.addWidget(QLabel(value))
+                
+                addresses_layout.addStretch()
+                self.headers_layout.addRow(label, addresses_widget)
 
         # Find the plain text or HTML body of the email
         body_text = ""
         self.attachments.clear()
         for part in self.message.walk():
-            # Check for attachments
             if part.get_content_disposition() == 'attachment':
                 filename = part.get_filename()
                 if filename:
                     self.attachments.append(part)
                     self.attachments_list.addItem(f"Attachment: {filename}")
                     
-            # Prioritize plain text over HTML
             if part.get_content_type() == 'text/plain':
                 body_text = part.get_content()
                 self.mail_content.setHtml("")
@@ -162,6 +220,20 @@ class MailViewer(QMainWindow):
             if part.get_content_type() == 'text/html' and not body_text:
                 body_text = part.get_content()
                 self.mail_content.setHtml(body_text)
+
+    def handle_address_selection(self, address, is_selected):
+        if is_selected:
+            self.selected_addresses.add(address)
+        else:
+            self.selected_addresses.discard(address)
+        print(f"Selected Addresses: {self.selected_addresses}")
+
+    def reply_to_selected(self):
+        if self.selected_addresses:
+            addresses_str = ", ".join(self.selected_addresses)
+            self.show_mock_action(f"Replying to selected addresses: {addresses_str}")
+        else:
+            self.show_mock_action("No addresses selected.")
 
     def handle_attachment_click(self, item):
         """Saves the attachment to a temporary file and opens it."""
@@ -204,36 +276,6 @@ class MailViewer(QMainWindow):
 
         QTextEdit.keyPressEvent(self.mail_content, event)
 
-    def show_header_context_menu(self, pos):
-        """Mocks a context menu for header fields."""
-        menu = QMenu(self)
-        
-        # Get the cursor position and try to find an email address
-        cursor = self.headers_content.cursorForPosition(pos)
-        cursor.select(cursor.SelectionType.WordUnderCursor)
-        selected_text = cursor.selectedText().strip()
-        
-        # Regex to find a valid email address
-        email_regex = r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}"
-        match = re.search(email_regex, selected_text)
-        
-        if match:
-            email_address = match.group(0)
-            
-            add_contact_action = QAction(f"Add {email_address} to Contacts", self)
-            add_contact_action.triggered.connect(lambda: self.show_mock_action(f"Adding '{email_address}' to contacts."))
-            menu.addAction(add_contact_action)
-            
-            new_mail_action = QAction(f"Compose new mail to {email_address}", self)
-            new_mail_action.triggered.connect(lambda: self.show_mock_action(f"Composing new mail to '{email_address}'."))
-            menu.addAction(new_mail_action)
-            
-            search_action = QAction(f"Search for mail from {email_address}", self)
-            search_action.triggered.connect(lambda: self.show_mock_action(f"Searching for mail from '{email_address}'."))
-            menu.addAction(search_action)
-
-        menu.exec(self.headers_content.mapToGlobal(pos))
-        
     def show_mock_action(self, message):
         QMessageBox.information(self, "Action Mocked", message)
 
