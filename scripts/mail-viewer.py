@@ -12,7 +12,7 @@ from pathlib import Path
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QTextEdit, QHBoxLayout,
     QPushButton, QListWidget, QSplitter, QMessageBox, QMenu, QGroupBox,
-    QFormLayout, QLabel, QInputDialog, QScrollArea
+    QFormLayout, QLabel, QInputDialog, QScrollArea, QDialog, QDialogButtonBox
 )
 from PySide6.QtCore import Qt, QSize, Signal
 from PySide6.QtGui import QFont, QKeySequence, QAction
@@ -23,6 +23,27 @@ from config import config
 
 # Set up basic logging to console
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+# Custom dialog for displaying copyable error messages
+class CopyableErrorDialog(QDialog):
+    def __init__(self, title, message, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(title)
+        self.setMinimumWidth(500)
+        
+        layout = QVBoxLayout(self)
+        
+        label = QLabel("The following error occurred:")
+        layout.addWidget(label)
+        
+        self.text_edit = QTextEdit()
+        self.text_edit.setReadOnly(True)
+        self.text_edit.setPlainText(message)
+        layout.addWidget(self.text_edit)
+        
+        button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok)
+        button_box.accepted.connect(self.accept)
+        layout.addWidget(button_box)
 
 # Custom widget for clickable email addresses
 class ClickableLabel(QLabel):
@@ -69,6 +90,8 @@ class MailViewer(QMainWindow):
         self.attachments = []
         self.selected_addresses = set()
         self.tags = []
+        
+        self.notmuch_enabled = self.check_notmuch()
 
         if not self.message:
             QMessageBox.critical(self, "Error", "Could not load or parse the mail file.")
@@ -76,6 +99,20 @@ class MailViewer(QMainWindow):
 
         self.setup_ui()
         self.display_message()
+
+    def check_notmuch(self):
+        """Checks if the notmuch command is available."""
+        try:
+            subprocess.run(['notmuch', '--version'], check=True, capture_output=True)
+            return True
+        except (subprocess.CalledProcessError, FileNotFoundError) as e:
+            dialog = CopyableErrorDialog(
+                "Notmuch Not Found",
+                f"The 'notmuch' command was not found or is not executable.\n"
+                f"Tag-related functionality will be disabled.\n\nError: {e}"
+            )
+            dialog.exec()
+            return False
 
     def parse_mail_file(self):
         """Parses a real email file from the local filesystem."""
@@ -120,6 +157,8 @@ class MailViewer(QMainWindow):
         self.tags_menu.addSeparator()
         self.tags_menu.addAction("Edit All Tags").triggered.connect(lambda: self.show_mock_action("Full tag management to be implemented."))
         self.tags_button.setMenu(self.tags_menu)
+        if not self.notmuch_enabled:
+            self.tags_button.setDisabled(True)
         top_bar_layout.addWidget(self.tags_button)
 
         self.delete_button = QPushButton("Delete")
@@ -137,13 +176,17 @@ class MailViewer(QMainWindow):
         self.tags_scroll_area.setWidgetResizable(True)
         self.tags_scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.tags_scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        
+        self.tags_scroll_area.setFixedHeight(40) # Set a fixed, minimal height
+
         tags_container = QWidget()
         self.tags_layout = QHBoxLayout(tags_container)
         self.tags_layout.setContentsMargins(0, 0, 0, 0)
         self.tags_scroll_area.setWidget(tags_container)
         
-        main_layout.addWidget(self.tags_scroll_area)
+        if self.notmuch_enabled:
+            main_layout.addWidget(self.tags_scroll_area)
+        else:
+            self.tags_scroll_area.hide()
 
         # Splitter for Headers, Content, and Attachments
         self.splitter = QSplitter(Qt.Orientation.Vertical)
@@ -182,7 +225,8 @@ class MailViewer(QMainWindow):
         if not self.message:
             return
 
-        self.update_tags_ui()
+        if self.notmuch_enabled:
+            self.update_tags_ui()
 
         # Clear existing header widgets
         while self.headers_layout.rowCount() > 0:
@@ -256,14 +300,19 @@ class MailViewer(QMainWindow):
                 self.tags = data[0]['tags'] if data and 'tags' in data[0] else []
             else:
                 self.tags = []
-        except FileNotFoundError:
-            QMessageBox.critical(self, "Error", "The 'notmuch' command was not found. Please ensure it is installed and in your PATH.")
-            self.tags = []
         except subprocess.CalledProcessError as e:
-            QMessageBox.critical(self, "Error", f"An error occurred while running notmuch: {e.stderr}")
+            dialog = CopyableErrorDialog(
+                "Notmuch Command Failed",
+                f"An error occurred while running notmuch:\n\n{e.stderr}"
+            )
+            dialog.exec()
             self.tags = []
         except json.JSONDecodeError as e:
-            QMessageBox.critical(self, "Error", f"Failed to parse notmuch output as JSON: {e}")
+            dialog = CopyableErrorDialog(
+                "Notmuch Output Error",
+                f"Failed to parse notmuch output as JSON:\n\n{e}"
+            )
+            dialog.exec()
             self.tags = []
         
         self.tags = sorted(self.tags)
@@ -305,9 +354,11 @@ class MailViewer(QMainWindow):
             logging.info(f"Tag '{tag}' removed successfully.")
             self.update_tags_ui() # Refresh the UI to reflect the change
         except subprocess.CalledProcessError as e:
-            QMessageBox.critical(self, "Error", f"Failed to remove tag '{tag}': {e.stderr}")
+            dialog = CopyableErrorDialog("Failed to Remove Tag", f"Failed to remove tag '{tag}':\n\n{e.stderr}")
+            dialog.exec()
         except FileNotFoundError:
-            QMessageBox.critical(self, "Error", "The 'notmuch' command was not found. Please ensure it is installed and in your PATH.")
+            dialog = CopyableErrorDialog("Notmuch Not Found", "The 'notmuch' command was not found. Please ensure it is installed and in your PATH.")
+            dialog.exec()
     
     def add_tag(self):
         """Mock function for adding a new tag."""
@@ -320,9 +371,8 @@ class MailViewer(QMainWindow):
                     subprocess.run(command, check=True, capture_output=True, text=True)
                     logging.info(f"Tag '{tag}' added successfully.")
                 except subprocess.CalledProcessError as e:
-                    QMessageBox.critical(self, "Error", f"Failed to add tag '{tag}': {e.stderr}")
-                except FileNotFoundError:
-                    QMessageBox.critical(self, "Error", "The 'notmuch' command was not found. Please ensure it is installed and in your PATH.")
+                    dialog = CopyableErrorDialog("Failed to Add Tag", f"Failed to add tag '{tag}':\n\n{e.stderr}")
+                    dialog.exec()
             self.update_tags_ui()
 
 
