@@ -12,7 +12,7 @@ from pathlib import Path
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QTextEdit, QHBoxLayout,
     QPushButton, QListWidget, QSplitter, QMessageBox, QMenu, QGroupBox,
-    QFormLayout, QLabel, QInputDialog
+    QFormLayout, QLabel, QInputDialog, QScrollArea
 )
 from PySide6.QtCore import Qt, QSize, Signal
 from PySide6.QtGui import QFont, QKeySequence, QAction
@@ -132,12 +132,18 @@ class MailViewer(QMainWindow):
         
         top_bar_layout.addStretch()
 
-        # Tags display area
-        self.tags_widget = QWidget()
-        self.tags_layout = QHBoxLayout(self.tags_widget)
+        # Tags display area in a horizontal scroll area
+        self.tags_scroll_area = QScrollArea()
+        self.tags_scroll_area.setWidgetResizable(True)
+        self.tags_scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.tags_scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        
+        tags_container = QWidget()
+        self.tags_layout = QHBoxLayout(tags_container)
         self.tags_layout.setContentsMargins(0, 0, 0, 0)
-        main_layout.addWidget(self.tags_widget)
-        self.tags_layout.addStretch() # Push buttons to the left
+        self.tags_scroll_area.setWidget(tags_container)
+        
+        main_layout.addWidget(self.tags_scroll_area)
 
         # Splitter for Headers, Content, and Attachments
         self.splitter = QSplitter(Qt.Orientation.Vertical)
@@ -281,12 +287,14 @@ class MailViewer(QMainWindow):
             tag_button.clicked.connect(lambda checked, t=tag: self.remove_tag(t))
             self.tags_layout.addWidget(tag_button)
 
+        # Add stretch to push the next button to the right
+        self.tags_layout.addStretch()
+
         # Add "Add tags" button
         add_tag_button = QPushButton("Add tags")
         add_tag_button.clicked.connect(self.add_tag)
         self.tags_layout.addWidget(add_tag_button)
 
-        self.tags_layout.addStretch() # Push buttons to the left
 
     def remove_tag(self, tag):
         """Removes a tag from the current mail using the notmuch command."""
