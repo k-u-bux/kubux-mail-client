@@ -284,7 +284,13 @@ class MailViewer(QMainWindow):
 
             if part.get_content_type() == 'text/html' and not body_text:
                 body_text = part.get_content()
-                self.mail_content.setHtml(body_text)
+                sanitized_html = self.sanitize_html_fonts(body_text)
+                self.mail_content.setHtml(sanitized_html)
+
+    def sanitize_html_fonts(self, html_content: str) -> str:
+        """Removes hardcoded font-size declarations from HTML to allow Qt to scale the font."""
+        # This regex finds any font-size declaration in a style attribute and removes it.
+        return re.sub(r'font-size:\s*[^;"]+;?', '', html_content, flags=re.IGNORECASE)
 
     def get_tags(self):
         """Queries the notmuch database for tags of the current mail file."""
