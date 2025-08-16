@@ -2,13 +2,14 @@
 
 # This script is a wrapper for the `notmuch` post-new hook.
 # It reads a list of filenames from stdin and passes them to the
-# `ai_classify.py` script as command-line arguments.
+# `ai_classify.py` script. It then processes the output and
+# applies the predicted tags to the messages.
 
 # Exit immediately if a command exits with a non-zero status.
 set -e
 
 # Define the directory where your scripts are located
-# This assumes the ai_classify.py script is in the same directory as this hook.
+# This assumes the ai_classify.py script and the model are in the same directory as this hook.
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 AI_CLASSIFY_SCRIPT="${SCRIPT_DIR}/ai_classify.py"
 MODEL_PATH="${SCRIPT_DIR}/my_model.pkl"
@@ -22,10 +23,43 @@ if [ ${#mail_files[@]} -eq 0 ]; then
     exit 0
 fi
 
-# Call the AI classifier script with the list of files as arguments.
-# We also need to pass the model path.
-# Use the full path to the Python interpreter from the Nix development shell
-# to ensure all required packages are available.
-# The `exec` command replaces the shell process with the python process,
-# which is slightly more efficient.
-exec python3 "$AI_CLASSIFY_SCRIPT" --model "$MODEL_PATH" "${mail_files[@]}"
+# Create an associative array to map filenames back to full paths
+declare -A file_map
+for full_path in "${mail_files[@]}"; do
+    file_name=$(basename "$full_path")
+    file_map["$file_name"]="$full_path"
+done
+
+# Call the AI classifier script and pipe its output to a while loop
+# The output is expected to be one line per file: "filename tag1 tag2 tag3"
+python3 "$AI_CLASSIFY_SCRIPT" --model "$MODEL_PATH" "${mail_files[@]}" | while read -r line; do
+    # Read the filename and tags from the line
+    filename_and_tags=($line)
+    file_name="${filename_and_tags[0]}"
+
+    # Remove the first element to get just the tags
+    predicted_tags=("${filename_and_tags[@]:1}")
+
+    # Find the full path from our map
+    full_path="${file_map[$file_name]}"
+
+    # Use notmuch search to get the message ID from the file path
+    # We use --format=text0 to handle any special characters in the message ID
+    message_id=$(notmuch search --output=messages --format=text0 "path:$full_path" | tr -d '\0')
+
+    if [[ -n "$message_id" ]]; then
+        # Apply the predicted tags to the message using its ID
+        if [ ${#predicted_tags[@]} -gt 0 ]; then
+            tags_to_add=""
+            for tag in "${predicted_tags[@]}"; do
+                tags_to_add+=" +$tag"
+            done
+            notmuch tag $tags_to_add -- "id:$message_id"
+            echo "Applied tags '$tags_to_add' to message with ID: $message_id"
+        else
+            echo "No tags predicted for message: $message_id"
+        fi
+    else
+        echo "Could not find message ID for file: $full_path"
+    fi
+done

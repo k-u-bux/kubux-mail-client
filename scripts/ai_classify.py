@@ -70,7 +70,9 @@ def main():
         predictions = classifier.predict(X_test_vectorized)
         predicted_tags = [tag_list[i] for i, pred in enumerate(predictions[0]) if pred == 1]
 
-        print(f"{mail_file.name} {' '.join(predicted_tags)}")
+        classified_mail = f"{mail_file.name} {' '.join(predicted_tags)}"
+        print( classified_mail )
+        print( classified_mail, file=sys.stderr )
 
 if __name__ == "__main__":
     main()
