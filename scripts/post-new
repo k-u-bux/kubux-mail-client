@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+
+# This script is a wrapper for the `notmuch` post-new hook.
+# It reads a list of filenames from stdin and passes them to the
+# `ai_classify.py` script as command-line arguments.
+
+# Exit immediately if a command exits with a non-zero status.
+set -e
+
+# Define the directory where your scripts are located
+# This assumes the ai_classify.py script is in the same directory as this hook.
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+AI_CLASSIFY_SCRIPT="${SCRIPT_DIR}/ai_classify.py"
+MODEL_PATH="${SCRIPT_DIR}/my_model.pkl"
+
+# Read the list of mail files from stdin into an array
+readarray -t mail_files
+
+# Check if there are any files to process
+if [ ${#mail_files[@]} -eq 0 ]; then
+    echo "No new messages to classify. Exiting."
+    exit 0
+fi
+
+# Call the AI classifier script with the list of files as arguments.
+# We also need to pass the model path.
+# Use the full path to the Python interpreter from the Nix development shell
+# to ensure all required packages are available.
+# The `exec` command replaces the shell process with the python process,
+# which is slightly more efficient.
+exec python3 "$AI_CLASSIFY_SCRIPT" --model "$MODEL_PATH" "${mail_files[@]}"
