@@ -10,12 +10,12 @@ import re
 from pathlib import Path
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QTextEdit, QHBoxLayout,
-    QPushButton, QListWidget, QSplitter, QMessageBox, QMenu, QWidgetAction, QAction
+    QPushButton, QListWidget, QSplitter, QMessageBox, QMenu, QWidgetAction
 )
 from PySide6.QtCore import Qt, QSize
-from PySide6.QtGui import QFont, QKeySequence
+from PySide6.QtGui import QFont, QKeySequence, QAction, QGuiApplication
 import logging
-from config import config  # Import the shared config object
+from config import config
 
 # Set up basic logging to console
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
