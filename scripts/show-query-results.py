@@ -5,6 +5,7 @@ import argparse
 import subprocess
 import json
 import os
+import tempfile
 from pathlib import Path
 from email.utils import getaddresses
 import re
@@ -55,7 +56,7 @@ class QueryResultsViewer(QMainWindow):
 
         self.notmuch_enabled = self.check_notmuch()
 
-        self.view_mode = "threads" # or "mails"
+        self.view_mode = "threads" # or "messages"
         self.current_query = query_string
         self.results = []
 
@@ -66,7 +67,8 @@ class QueryResultsViewer(QMainWindow):
     def check_notmuch(self):
         """Checks if the notmuch command is available."""
         try:
-            subprocess.run(['notmuch', '--version'], check=True, capture_output=True)
+            # We explicitly ignore stderr to prevent warnings from corrupting the stdout stream
+            subprocess.run(['notmuch', '--version'], check=True, capture_output=True, stderr=subprocess.DEVNULL)
             return True
         except (subprocess.CalledProcessError, FileNotFoundError) as e:
             dialog = CopyableErrorDialog(
@@ -151,7 +153,7 @@ class QueryResultsViewer(QMainWindow):
 
     def toggle_view_mode(self):
         if self.view_mode == "threads":
-            self.view_mode = "mails"
+            self.view_mode = "messages" # Changed from "mails"
             self.view_mode_button.setText("Thread View")
         else:
             self.view_mode = "threads"
@@ -183,7 +185,8 @@ class QueryResultsViewer(QMainWindow):
                 self.current_query
             ]
             
-            result = subprocess.run(command, check=True, capture_output=True, text=True)
+            # Explicitly redirect stderr to DEVNULL to prevent warnings from corrupting JSON output
+            result = subprocess.run(command, check=True, capture_output=True, text=True, stderr=subprocess.DEVNULL)
             self.results = json.loads(result.stdout)
             self.update_results_table(my_email_addresses)
 
@@ -203,7 +206,7 @@ class QueryResultsViewer(QMainWindow):
             dialog.exec()
             self.results = []
             self.results_table.setRowCount(0)
-
+            
     def update_results_table(self, my_email_addresses):
         """Populates the table with the new query results."""
         self.results_table.setRowCount(len(self.results))
