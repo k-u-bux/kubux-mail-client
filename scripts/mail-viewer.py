@@ -20,10 +20,17 @@ from PySide6.QtGui import QFont, QKeySequence, QAction
 import logging
 import subprocess
 import json
+import textwrap
 from config import config
 
 # Set up basic logging to console
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+# --- CONFIGURATION (PLACEHOLDER) ---
+# NOTE: Replace this with your actual email address.
+# In a future version, this should be loaded from the config file.
+MY_EMAIL_ADDRESS = "your.email@example.com"
+
 
 # Custom dialog for displaying copyable error messages
 class CopyableErrorDialog(QDialog):
@@ -143,8 +150,8 @@ class MailViewer(QMainWindow):
         # Compose button with menu
         self.compose_button = QPushButton("Compose")
         self.compose_menu = QMenu(self)
-        self.compose_menu.addAction("Reply").triggered.connect(lambda: self.show_mock_action("Reply to be implemented"))
-        self.compose_menu.addAction("Reply All").triggered.connect(lambda: self.show_mock_action("Reply All to be implemented"))
+        self.compose_menu.addAction("Reply").triggered.connect(self.reply)
+        self.compose_menu.addAction("Reply All").triggered.connect(self.reply_all)
         self.compose_menu.addAction("Forward").triggered.connect(lambda: self.show_mock_action("Forward to be implemented"))
         self.compose_menu.addAction("Reply to Selected").triggered.connect(self.reply_to_selected)
         self.compose_menu.addSeparator()
@@ -237,8 +244,8 @@ class MailViewer(QMainWindow):
         actions = {
             "quit": self.close,
             "close_viewer": self.close,
-            "reply": lambda: self.show_mock_action("Reply action triggered by key binding."),
-            "reply_all": lambda: self.show_mock_action("Reply All action triggered by key binding."),
+            "reply": self.reply,
+            "reply_all": self.reply_all,
             "forward": lambda: self.show_mock_action("Forward action triggered by key binding."),
             "edit_tags": lambda: self.show_mock_action("Edit Tags action triggered by key binding."),
             "zoom_in": lambda: self.mail_content.zoomIn(1),
@@ -441,12 +448,123 @@ class MailViewer(QMainWindow):
             self.selected_addresses.discard(address)
         print(f"Selected Addresses: {self.selected_addresses}")
 
-    def reply_to_selected(self):
-        if self.selected_addresses:
-            addresses_str = ", ".join(self.selected_addresses)
-            self.show_mock_action(f"Replying to selected addresses: {addresses_str}")
+    def _create_draft_and_open_editor(self, to_addrs, cc_addrs, subject_text):
+        """
+        Creates a new mail draft and opens it in the external editor.
+        """
+        if not self.message:
+            return
+
+        from email.message import EmailMessage
+
+        msg = EmailMessage()
+        msg['From'] = MY_EMAIL_ADDRESS
+        msg['To'] = ", ".join(to_addrs)
+        if cc_addrs:
+            msg['Cc'] = ", ".join(cc_addrs)
+
+        msg['Subject'] = subject_text
+        msg['In-Reply-To'] = self.message.get('Message-ID')
+
+        original_body = ""
+        for part in self.message.walk():
+            if part.get_content_type() == 'text/plain':
+                original_body = part.get_content()
+                break
+
+        quoted_body = textwrap.indent(original_body, '> ')
+        msg.set_content(f"\n\n{quoted_body}")
+        
+        try:
+            with tempfile.NamedTemporaryFile(mode='w+', delete=False, suffix=".eml") as temp_file:
+                temp_file.write(msg.as_string())
+                temp_path = temp_file.name
+
+            # Assuming mail-editor.py is in the same directory.
+            # You might need to adjust this path based on your project structure.
+            editor_path = os.path.join(os.path.dirname(__file__), "mail-editor.py")
+            if not os.path.exists(editor_path):
+                QMessageBox.critical(self, "Error", f"Could not find mail editor at {editor_path}")
+                return
+
+            subprocess.Popen(["python3", editor_path, "--mail-file", temp_path])
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to create or open draft: {e}")
+
+    def reply(self):
+        """
+        Creates a reply draft for the single sender.
+        """
+        if not self.message:
+            return
+        
+        sender = self.message.get("From")
+        sender_addr = getaddresses([sender])[0][1] if sender else ""
+        
+        # To: original sender, Cc: me
+        to_list = [sender_addr]
+        cc_list = [MY_EMAIL_ADDRESS]
+        
+        original_subject = self.message.get("Subject", "")
+        if not original_subject.lower().startswith("re:"):
+            subject = f"Re: {original_subject}"
         else:
-            self.show_mock_action("No addresses selected.")
+            subject = original_subject
+            
+        self._create_draft_and_open_editor(to_list, cc_list, subject)
+
+    def reply_all(self):
+        """
+        Creates a reply-all draft for all original recipients and me.
+        """
+        if not self.message:
+            return
+        
+        sender = self.message.get("From")
+        sender_addr = getaddresses([sender])[0][1] if sender else ""
+        
+        original_to = self.message.get("To", "")
+        original_cc = self.message.get("Cc", "")
+        
+        # Get all original recipients, including the sender
+        all_recipients = {addr for name, addr in getaddresses([original_to, original_cc])}
+        all_recipients.add(sender_addr)
+        
+        # To: original sender
+        to_list = [sender_addr]
+
+        # Cc: all others, excluding me if I'm already in the list
+        all_recipients.discard(sender_addr)
+        all_recipients.discard(MY_EMAIL_ADDRESS)
+        cc_list = list(all_recipients)
+        
+        original_subject = self.message.get("Subject", "")
+        if not original_subject.lower().startswith("re:"):
+            subject = f"Re: {original_subject}"
+        else:
+            subject = original_subject
+
+        self._create_draft_and_open_editor(to_list, cc_list, subject)
+
+    def reply_to_selected(self):
+        """
+        Creates a reply draft for currently selected addresses.
+        """
+        if not self.selected_addresses:
+            QMessageBox.warning(self, "No Addresses Selected", "Please click on at least one address to select it before replying.")
+            return
+
+        # To: selected addresses, Cc: me
+        to_list = list(self.selected_addresses)
+        cc_list = [MY_EMAIL_ADDRESS]
+        
+        original_subject = self.message.get("Subject", "")
+        if not original_subject.lower().startswith("re:"):
+            subject = f"Re: {original_subject}"
+        else:
+            subject = original_subject
+            
+        self._create_draft_and_open_editor(to_list, cc_list, subject)
 
     def show_attachment_context_menu(self, pos):
         """Shows a context menu with actions for the clicked attachment."""
