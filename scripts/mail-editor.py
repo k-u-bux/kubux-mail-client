@@ -8,6 +8,7 @@ from email.message import EmailMessage
 from email.utils import formataddr, getaddresses
 from email import policy
 from pathlib import Path
+import tempfile
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QTextEdit, QHBoxLayout,
     QPushButton, QLineEdit, QListWidget, QSplitter, QMessageBox, QDialog,
@@ -51,9 +52,10 @@ class MailEditor(QMainWindow):
         self.setMinimumSize(QSize(800, 600))
         
         self.attachments = []
-        self.draft_message = self.parse_draft_mail(mail_file_path) if mail_file_path else None
+        self.mail_file_path = Path(mail_file_path).expanduser() if mail_file_path else None
+        self.draft_message = self.parse_draft_mail(self.mail_file_path) if self.mail_file_path else None
         
-        if self.draft_message is None and mail_file_path:
+        if self.draft_message is None and self.mail_file_path and self.mail_file_path.exists():
             self.close()
             return
             
@@ -62,14 +64,11 @@ class MailEditor(QMainWindow):
 
     def parse_draft_mail(self, mail_file_path):
         """Parses an email file to get headers and content for drafting."""
-        mail_path = Path(mail_file_path).expanduser()
-        if not mail_path.exists():
-            dialog = CopyableErrorDialog("Draft Mail File Not Found", f"Draft mail file not found: {mail_path}")
-            dialog.exec()
+        if not mail_file_path or not mail_file_path.exists():
             return None
         
         try:
-            with open(mail_path, 'rb') as f:
+            with open(mail_file_path, 'rb') as f:
                 return email.message_from_binary_file(f, policy=policy.default)
         except Exception as e:
             logging.error(f"Failed to parse draft mail file: {e}")
@@ -289,15 +288,56 @@ class MailEditor(QMainWindow):
             del self.attachments[row]
             self.attachments_list.takeItem(row)
 
+    def save_message(self):
+        """Saves the current message content as a draft to the mail-file."""
+        if not self.mail_file_path:
+            dialog = CopyableErrorDialog("Save Error", "No mail file specified to save draft.")
+            dialog.exec()
+            return
+
+        try:
+            draft = email.message.EmailMessage()
+            
+            # Set headers
+            draft['From'] = self.from_combo.currentText()
+            if self.to_edit.text():
+                draft['To'] = self.to_edit.text()
+            if self.cc_edit.text():
+                draft['Cc'] = self.cc_edit.text()
+            if self.bcc_edit.text():
+                draft['Bcc'] = self.bcc_edit.text()
+            if self.reply_to_edit.text():
+                draft['Reply-To'] = self.reply_to_edit.text()
+            if self.subject_edit.text():
+                draft['Subject'] = self.subject_edit.text()
+
+            # Set the body
+            draft.set_content(self.body_edit.toPlainText())
+
+            # Add attachments
+            for part in self.attachments:
+                draft.attach(part)
+            
+            # Write to a temporary file
+            with tempfile.NamedTemporaryFile(mode='wb', delete=False) as tmp_file:
+                tmp_file.write(draft.as_bytes())
+                tmp_path = Path(tmp_file.name)
+
+            # Atomically rename to the final destination
+            tmp_path.rename(self.mail_file_path)
+
+            dialog = QMessageBox()
+            dialog.setWindowTitle("Draft Saved")
+            dialog.setText("Draft saved successfully.")
+            dialog.exec()
+            
+        except Exception as e:
+            dialog = CopyableErrorDialog("Save Error", f"Failed to save draft:\n{e}")
+            dialog.exec()
+
     def send_message(self):
         """Mocks the send action and quits."""
         dialog = CopyableErrorDialog("Action Mocked", "Sending mail...")
-        dialog.exec()
-        self.close()
-
-    def save_message(self):
-        """Mocks the save action and quits."""
-        dialog = CopyableErrorDialog("Action Mocked", "Saving mail as draft...")
         dialog.exec()
         self.close()
 
