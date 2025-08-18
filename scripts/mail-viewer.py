@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QTextEdit, QHBoxLayout,
     QPushButton, QListWidget, QSplitter, QMessageBox, QMenu, QGroupBox,
     QFormLayout, QLabel, QInputDialog, QScrollArea, QDialog, QDialogButtonBox,
-    QFileDialog
+    QFileDialog, QSizePolicy
 )
 from PySide6.QtCore import Qt, QSize, Signal
 from PySide6.QtGui import QFont, QKeySequence, QAction
@@ -101,6 +101,7 @@ class MailViewer(QMainWindow):
             sys.exit(1)
 
         self.setup_ui()
+        self.setup_key_bindings()
         self.display_message()
 
     def check_notmuch(self):
@@ -210,15 +211,12 @@ class MailViewer(QMainWindow):
         # Mail Content area
         self.mail_content = QTextEdit()
         self.mail_content.setReadOnly(True)
-        self.mail_content.setFont(config.text_font)
+        self.mail_content.setFont(config.get_font("text"))
         self.splitter.addWidget(self.mail_content)
         
         # Add a context menu for clipboard actions and view raw
         self.mail_content.setContextMenuPolicy(Qt.CustomContextMenu)
         self.mail_content.customContextMenuRequested.connect(self.show_content_context_menu)
-
-        # Add a key press event handler for dynamic font sizing
-        self.mail_content.keyPressEvent = self.mail_content_keyPressEvent
 
         # Attachments list
         self.attachments_list = QListWidget()
@@ -232,14 +230,29 @@ class MailViewer(QMainWindow):
 
         # Set initial sizes
         self.splitter.setSizes([100, 500, 50])
-        
-        # Add the quit action to the main window
-        # Get key binding from the new config logic
-        quit_key = config.get_setting("bindings", "quit_action") or "Ctrl+Q"
-        quit_action = QAction("Quit", self)
-        quit_action.setShortcut(QKeySequence(quit_key))
-        quit_action.triggered.connect(self.close)
-        self.addAction(quit_action)
+
+    def setup_key_bindings(self):
+        """Sets up key bindings based on the config file."""
+        # Core viewer actions
+        actions = {
+            "quit": self.close,
+            "close_viewer": self.close,
+            "reply": lambda: self.show_mock_action("Reply action triggered by key binding."),
+            "reply_all": lambda: self.show_mock_action("Reply All action triggered by key binding."),
+            "forward": lambda: self.show_mock_action("Forward action triggered by key binding."),
+            "edit_tags": lambda: self.show_mock_action("Edit Tags action triggered by key binding."),
+            "zoom_in": lambda: self.mail_content.zoomIn(1),
+            "zoom_out": lambda: self.mail_content.zoomOut(1),
+            "select_all": self.mail_content.selectAll
+        }
+
+        for name, func in actions.items():
+            key_seq = config.get_keybinding(name)
+            if key_seq:
+                action = QAction(self)
+                action.setShortcut(QKeySequence(key_seq))
+                action.triggered.connect(func)
+                self.addAction(action)
 
     def display_message(self):
         if not self.message:
@@ -272,7 +285,7 @@ class MailViewer(QMainWindow):
         for field, value in header_fields.items():
             if value:
                 label = QLabel(f"<b>{field}:</b>")
-                label.setFont(config.interface_font)
+                label.setFont(config.get_font("interface"))
                 
                 # Create a widget for addresses
                 addresses_widget = QWidget()
@@ -504,18 +517,6 @@ class MailViewer(QMainWindow):
 
         menu.exec(self.mail_content.mapToGlobal(pos))
         
-    def mail_content_keyPressEvent(self, event):
-        """Handles key press events for the mail content area."""
-        if event.modifiers() == Qt.KeyboardModifier.ControlModifier:
-            if event.key() in (Qt.Key.Key_Plus, Qt.Key.Key_Equal):
-                self.mail_content.zoomIn()
-                return
-            elif event.key() == Qt.Key.Key_Minus:
-                self.mail_content.zoomOut()
-                return
-
-        QTextEdit.keyPressEvent(self.mail_content, event)
-
     def show_mock_action(self, message):
         QMessageBox.information(self, "Action Mocked", message)
 
