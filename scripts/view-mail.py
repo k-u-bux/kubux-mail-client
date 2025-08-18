@@ -469,9 +469,9 @@ class MailViewer(QMainWindow):
                 temp_file.write(msg.as_string())
                 temp_path = temp_file.name
 
-            # Assuming mail-editor.py is in the same directory.
+            # Assuming edit-mail.py is in the same directory.
             # You might need to adjust this path based on your project structure.
-            editor_path = os.path.join(os.path.dirname(__file__), "mail-editor.py")
+            editor_path = os.path.join(os.path.dirname(__file__), "edit-mail.py")
             if not os.path.exists(editor_path):
                 QMessageBox.critical(self, "Error", f"Could not find mail editor at {editor_path}")
                 return
