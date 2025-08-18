@@ -60,6 +60,10 @@ class EmailAddressLineEdit(QLineEdit):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setDragEnabled(True)
+        # Initialize drag-related attributes to prevent AttributeError
+        self.dragged_address = None
+        self.dragged_start = -1
+        self.dragged_end = -1
 
     def mousePressEvent(self, event):
         """Starts a drag operation if a full address is clicked."""
