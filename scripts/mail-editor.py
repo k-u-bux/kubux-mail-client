@@ -9,14 +9,15 @@ from email.utils import formataddr, getaddresses
 from email import policy
 from pathlib import Path
 import tempfile
+import re
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QTextEdit, QHBoxLayout,
     QPushButton, QLineEdit, QListWidget, QSplitter, QMessageBox, QDialog,
     QFormLayout, QLabel, QFileDialog, QSizePolicy, QMenu, QComboBox,
     QDialogButtonBox, QGroupBox
 )
-from PySide6.QtCore import Qt, QSize, QUrl
-from PySide6.QtGui import QFont, QAction, QKeySequence
+from PySide6.QtCore import Qt, QSize, QUrl, QMimeData
+from PySide6.QtGui import QFont, QAction, QKeySequence, QDrag
 import logging
 import mimetypes
 import subprocess
@@ -26,7 +27,8 @@ from config import config
 # Set up basic logging to console
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# Custom dialog for displaying copyable error messages
+# --- Custom Widgets ---
+
 class CopyableErrorDialog(QDialog):
     def __init__(self, title, message, parent=None):
         super().__init__(parent)
@@ -46,6 +48,86 @@ class CopyableErrorDialog(QDialog):
         button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok)
         button_box.accepted.connect(self.accept)
         layout.addWidget(button_box)
+
+class EmailAddressLineEdit(QLineEdit):
+    """
+    A QLineEdit subclass that handles email addresses as draggable units.
+    It supports moving a full email address from one field to another.
+    """
+    # Regex to find an email address with or without a name
+    ADDRESS_REGEX = re.compile(r'[^,<>]+<[^,<>]+>|[^,<>]+@\S+')
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setDragEnabled(True)
+
+    def mousePressEvent(self, event):
+        """Starts a drag operation if a full address is clicked."""
+        if event.button() == Qt.MouseButton.LeftButton:
+            text = self.text()
+            cursor_pos = self.cursorPosition()
+            
+            # Find the address under the cursor
+            for match in self.ADDRESS_REGEX.finditer(text):
+                if match.start() <= cursor_pos <= match.end():
+                    self.dragged_address = match.group().strip()
+                    self.dragged_start = match.start()
+                    self.dragged_end = match.end()
+                    break
+            else:
+                self.dragged_address = None
+                self.dragged_start = -1
+                self.dragged_end = -1
+                
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        """Executes the drag if a valid address was clicked and the mouse moved."""
+        if self.dragged_address and (event.buttons() & Qt.MouseButton.LeftButton):
+            drag = QDrag(self)
+            mime_data = QMimeData()
+            mime_data.setText(self.dragged_address)
+            drag.setMimeData(mime_data)
+            
+            # Start the drag and get the final drop action
+            drop_action = drag.exec(Qt.MoveAction)
+            
+            # If the drop was a move action, remove the address from this field
+            if drop_action == Qt.MoveAction:
+                current_text = self.text()
+                # Remove the address and any surrounding comma/whitespace
+                new_text = (current_text[:self.dragged_start].rstrip(' ,') + 
+                            current_text[self.dragged_end:].lstrip(' ,'))
+                
+                # Clean up multiple spaces or commas
+                new_text = re.sub(r', *', ', ', new_text)
+                new_text = new_text.strip(' ,')
+                
+                self.setText(new_text)
+                self.dragged_address = None
+                
+        super().mouseMoveEvent(event)
+
+    def dropEvent(self, event):
+        """Handles dropping an address into this field."""
+        if event.mimeData().hasText():
+            dropped_text = event.mimeData().text()
+            if self.ADDRESS_REGEX.fullmatch(dropped_text.strip()):
+                # It's a valid email address, insert it
+                current_text = self.text()
+                if current_text and not current_text.endswith(','):
+                    self.setText(current_text + ', ' + dropped_text)
+                else:
+                    self.setText(current_text + dropped_text)
+                
+                # Accept the event as a move action to signal the source to clear
+                event.acceptProposedAction()
+                event.setDropAction(Qt.MoveAction)
+                return
+
+        super().dropEvent(event)
+
+# --- Mail Editor Main Class ---
 
 class MailEditor(QMainWindow):
     def __init__(self, parent=None, mail_file_path=None):
@@ -84,24 +166,20 @@ class MailEditor(QMainWindow):
         self.setCentralWidget(central_widget)
         main_layout = QVBoxLayout(central_widget)
 
-        # Top section for action buttons and attachments
         top_bar = QWidget()
         top_bar_layout = QHBoxLayout(top_bar)
         main_layout.addWidget(top_bar)
 
-        # Attachments button (left)
         self.add_attachment_button = QPushButton("Attachments")
         self.add_attachment_button.clicked.connect(self.add_attachment)
         top_bar_layout.addWidget(self.add_attachment_button)
         
-        # More Headers button
         self.more_headers_button = QPushButton("More Headers")
         self.more_headers_button.clicked.connect(self.toggle_more_headers)
         top_bar_layout.addWidget(self.more_headers_button)
 
         top_bar_layout.addStretch()
 
-        # Control buttons (right)
         self.send_button = QPushButton("Send")
         self.save_button = QPushButton("Save")
         self.discard_button = QPushButton("Discard")
@@ -114,31 +192,29 @@ class MailEditor(QMainWindow):
         top_bar_layout.addWidget(self.save_button)
         top_bar_layout.addWidget(self.discard_button)
 
-        # Header fields
         headers_group_box = QWidget()
         self.headers_layout = QFormLayout(headers_group_box)
         
         self.from_combo = QComboBox()
         self.populate_from_field()
-        self.to_edit = QLineEdit()
-        self.cc_edit = QLineEdit()
-        self.bcc_edit = QLineEdit() # Bcc needs to be initialized here as well
+        
+        # Use our new custom widget for the address fields
+        self.to_edit = EmailAddressLineEdit()
+        self.cc_edit = EmailAddressLineEdit()
         self.subject_edit = QLineEdit()
-
-        # Enable dragging for address fields
-        self.to_edit.setDragEnabled(True)
-        self.cc_edit.setDragEnabled(True)
-        self.bcc_edit.setDragEnabled(True)
         
         self.headers_layout.addRow("From:", self.from_combo)
         self.headers_layout.addRow("To:", self.to_edit)
         self.headers_layout.addRow("Cc:", self.cc_edit)
         self.headers_layout.addRow("Subject:", self.subject_edit)
 
-        # Additional headers, initially hidden
         self.more_headers_group = QGroupBox()
         self.more_headers_layout = QFormLayout(self.more_headers_group)
+        
+        # Use the custom widget for Bcc as well
+        self.bcc_edit = EmailAddressLineEdit()
         self.reply_to_edit = QLineEdit()
+        
         self.more_headers_layout.addRow("Bcc:", self.bcc_edit)
         self.more_headers_layout.addRow("Reply-To:", self.reply_to_edit)
         self.more_headers_group.setVisible(False)
@@ -146,16 +222,13 @@ class MailEditor(QMainWindow):
         main_layout.addWidget(headers_group_box)
         main_layout.addWidget(self.more_headers_group)
         
-        # Splitter for Body and Attachments
         self.splitter = QSplitter(Qt.Orientation.Vertical)
         main_layout.addWidget(self.splitter)
 
-        # Body text editor
         self.body_edit = QTextEdit()
         self.body_edit.setFont(config.text_font)
         self.splitter.addWidget(self.body_edit)
 
-        # Attachment section
         attachments_group = QWidget()
         attachments_layout = QVBoxLayout(attachments_group)
         attachments_layout.setContentsMargins(0, 0, 0, 0)
@@ -172,7 +245,6 @@ class MailEditor(QMainWindow):
         self.splitter.addWidget(attachments_group)
         self.splitter.setSizes([400, 100])
 
-        # Set stretch factors to make the body editor take up all extra space
         self.splitter.setStretchFactor(0, 1)
         self.splitter.setStretchFactor(1, 0)
         
@@ -181,8 +253,6 @@ class MailEditor(QMainWindow):
         self.attachments_list.dropEvent = self.dropEvent
 
     def setup_key_bindings(self):
-        """Sets up key bindings based on the config file."""
-        # Action mappings for QTextEdit
         actions = {
             "undo": self.body_edit.undo,
             "redo": self.body_edit.redo,
@@ -194,7 +264,6 @@ class MailEditor(QMainWindow):
             "zoom_out": lambda: self.body_edit.zoomOut(1),
         }
 
-        # Create QActions and set shortcuts based on config
         for name, func in actions.items():
             key_seq = config.get_keybinding(name)
             if key_seq:
@@ -203,7 +272,6 @@ class MailEditor(QMainWindow):
                 action.triggered.connect(func)
                 self.addAction(action)
 
-        # Discard draft action
         discard_key_seq = config.get_keybinding("quit_action")
         if discard_key_seq:
             discard_action = QAction("Discard", self)
@@ -212,7 +280,6 @@ class MailEditor(QMainWindow):
             self.addAction(discard_action)
             
     def populate_from_draft(self, draft_message=None):
-        """Populates the editor with content from a pre-drafted message."""
         if not draft_message and not self.draft_message:
             return
 
@@ -222,7 +289,6 @@ class MailEditor(QMainWindow):
         self.cc_edit.setText(message.get('Cc', ''))
         self.subject_edit.setText(message.get('Subject', ''))
         
-        # Set BCC and Reply-To if they exist, and show the extra headers group
         bcc = message.get('Bcc', '')
         reply_to = message.get('Reply-To', '')
         if bcc or reply_to:
@@ -241,11 +307,9 @@ class MailEditor(QMainWindow):
             if part.get_content_disposition() == 'attachment':
                 filename = part.get_filename()
                 if filename:
-                    # We can't save the actual file, so just add the name for display purposes
                     self.attachments_list.addItem(filename)
 
     def populate_from_field(self):
-        """Populates the From: QComboBox with identities from the config file."""
         identities = config.get_setting("email_identities", "identities", [])
         for identity in identities:
             if isinstance(identity, dict) and "name" in identity and "email" in identity:
@@ -255,7 +319,6 @@ class MailEditor(QMainWindow):
                 self.from_combo.addItem(identity, identity)
 
     def toggle_more_headers(self):
-        """Toggles the visibility of the additional headers section."""
         is_visible = self.more_headers_group.isVisible()
         self.more_headers_group.setVisible(not is_visible)
         self.more_headers_button.setText("Less Headers" if not is_visible else "More Headers")
@@ -285,7 +348,6 @@ class MailEditor(QMainWindow):
             menu.exec(self.attachments_list.mapToGlobal(pos))
 
     def add_attachment(self, file_path=None):
-        """Opens a file dialog to add an attachment, or adds a dropped file."""
         if not file_path:
             file_path, _ = QFileDialog.getOpenFileName(self, "Add Attachment")
             if not file_path:
@@ -309,18 +371,15 @@ class MailEditor(QMainWindow):
             dialog.exec()
 
     def remove_attachment(self, item):
-        """Removes the selected attachment from the list and internal storage."""
         row = self.attachments_list.row(item)
         if 0 <= row < len(self.attachments):
             del self.attachments[row]
             self.attachments_list.takeItem(row)
 
     def _create_draft_file(self):
-        """Creates a temporary mail file from the current editor content and returns its path."""
         try:
             draft = email.message.EmailMessage()
             
-            # Preserve In-Reply-To and References from the original draft
             if self.draft_message:
                 in_reply_to = self.draft_message.get('In-Reply-To')
                 if in_reply_to:
@@ -329,12 +388,10 @@ class MailEditor(QMainWindow):
                 if references:
                     draft['References'] = references
 
-            # Generate a new, unique Message-ID
             from_address = email.utils.parseaddr(self.from_combo.currentText())[1]
             domain = from_address.split('@')[1] if '@' in from_address else 'local.machine'
             draft['Message-ID'] = email.utils.make_msgid(domain=domain)
             
-            # Set headers
             draft['From'] = self.from_combo.currentText()
             if self.to_edit.text():
                 draft['To'] = self.to_edit.text()
@@ -347,19 +404,15 @@ class MailEditor(QMainWindow):
             if self.subject_edit.text():
                 draft['Subject'] = self.subject_edit.text()
 
-            # Set the body
             draft.set_content(self.body_edit.toPlainText())
 
-            # Add attachments
             for part in self.attachments:
                 draft.attach(part)
             
-            # Write to a temporary file in the same directory as the mail file
             with tempfile.NamedTemporaryFile(mode='wb', delete=False, dir=self.mail_file_path.parent) as tmp_file:
                 tmp_file.write(draft.as_bytes())
                 tmp_path = Path(tmp_file.name)
             
-            # Atomically rename to the final destination
             if self.mail_file_path:
                 tmp_path.rename(self.mail_file_path)
                 return self.mail_file_path
@@ -371,20 +424,16 @@ class MailEditor(QMainWindow):
             dialog.exec()
             return None
 
-
     def save_message(self):
-        """Saves the current message content as a draft to the mail-file."""
         if self._create_draft_file():
             self.close()
 
     def send_message(self):
-        """Saves the draft and then calls the external send-mail.py script."""
         draft_path = self._create_draft_file()
         if not draft_path:
             return
 
         try:
-            # Assuming send-mail.py is in the same directory as mail-editor.py
             send_mail_path = Path(__file__).parent / "send-mail.py"
             if not send_mail_path.exists():
                 QMessageBox.critical(self, "Error", f"Could not find send mail script at {send_mail_path}")
@@ -397,7 +446,6 @@ class MailEditor(QMainWindow):
             QMessageBox.critical(self, "Send Error", f"Failed to send mail: {e}")
 
     def discard_draft(self):
-        """Discards the draft by deleting the mail file and quitting."""
         if self.mail_file_path and self.mail_file_path.exists():
             try:
                 os.remove(self.mail_file_path)
