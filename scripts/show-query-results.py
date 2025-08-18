@@ -14,9 +14,9 @@ from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLineEdit, QPushButton, QTableWidget, QTableWidgetItem, QHeaderView,
     QMessageBox, QDialog, QDialogButtonBox, QLabel, QTextEdit,
-    QCheckBox, QAbstractItemView, QMenu, QSplitter
+    QCheckBox, QAbstractItemView, QMenu
 )
-from PySide6.QtCore import Qt, QSize, QDateTime
+from PySide6.QtCore import Qt, QSize
 from PySide6.QtGui import QFont, QKeySequence, QAction
 import logging
 
@@ -80,9 +80,11 @@ class QueryResultsViewer(QMainWindow):
         self.execute_query()
 
     def get_notmuch_config_path(self):
-        """Fetches the notmuch config path from the shared config file."""
-        # Using a hardcoded path if config is not properly integrated
-        return Path("~/.config/notmuch-config").expanduser()
+        """
+        Fetches the notmuch config path from the default location.
+        The default is ~/.config/kubux-mail-client/config
+        """
+        return Path("~/.config/kubux-mail-client/config").expanduser()
 
     def check_notmuch(self):
         """Checks if the notmuch command and the config file are available."""
@@ -111,35 +113,34 @@ class QueryResultsViewer(QMainWindow):
         self.setCentralWidget(central_widget)
         main_layout = QVBoxLayout(central_widget)
 
-        # Top bar with UI elements
+        # a) Top row: quit button right, on the left two buttons "refresh" and a button that changes
         top_bar_layout = QHBoxLayout()
         main_layout.addLayout(top_bar_layout)
-
-        # The query edit field
-        self.query_edit = QLineEdit(self.current_query)
-        self.query_edit.returnPressed.connect(self.execute_query)
-        top_bar_layout.addWidget(self.query_edit)
-
-        # View mode toggle
-        self.view_mode_toggle = QCheckBox("Thread View")
-        self.view_mode_toggle.setChecked(self.view_mode == "threads")
-        self.view_mode_toggle.stateChanged.connect(self.toggle_view_mode)
-        top_bar_layout.addWidget(self.view_mode_toggle)
-
+        
         # Refresh button
         self.refresh_button = QPushButton("Refresh")
         self.refresh_button.clicked.connect(self.execute_query)
         top_bar_layout.addWidget(self.refresh_button)
 
+        # View mode toggle button
+        self.view_mode_button = QPushButton("Mail View")
+        self.view_mode_button.clicked.connect(self.toggle_view_mode)
+        top_bar_layout.addWidget(self.view_mode_button)
+
+        # Spacer to push the quit button to the right
+        top_bar_layout.addStretch()
+        
         # Quit button
         self.quit_button = QPushButton("Quit")
         self.quit_button.clicked.connect(self.close)
         top_bar_layout.addWidget(self.quit_button)
         
-        # Spacer
-        top_bar_layout.addStretch()
+        # b) below the top row: an edit box for the query.
+        self.query_edit = QLineEdit(self.current_query)
+        self.query_edit.returnPressed.connect(self.execute_query)
+        main_layout.addWidget(self.query_edit)
 
-        # Results table
+        # c) I like the table below.
         self.results_table = QTableWidget()
         self.results_table.setColumnCount(3)
         self.results_table.setHorizontalHeaderLabels(["Date", "Subject", "Sender/Receiver"])
@@ -171,8 +172,13 @@ class QueryResultsViewer(QMainWindow):
                 action.triggered.connect(func)
                 self.addAction(action)
 
-    def toggle_view_mode(self, state):
-        self.view_mode = "threads" if state == Qt.CheckState.Checked else "mails"
+    def toggle_view_mode(self):
+        if self.view_mode == "threads":
+            self.view_mode = "mails"
+            self.view_mode_button.setText("Thread View")
+        else:
+            self.view_mode = "threads"
+            self.view_mode_button.setText("Mail View")
         self.execute_query()
 
     def get_my_email_address(self):
@@ -192,11 +198,9 @@ class QueryResultsViewer(QMainWindow):
         self.current_query = self.query_edit.text()
         logging.info(f"Executing query: '{self.current_query}' in '{self.view_mode}' mode.")
         
-        # We'll use the get_my_email_address method to determine the user's primary email.
         my_email_address = self.get_my_email_address()
 
         try:
-            # Notmuch command to get messages in JSON format
             command = [
                 'notmuch',
                 '--config', str(self.notmuch_config_path),
@@ -239,8 +243,6 @@ class QueryResultsViewer(QMainWindow):
     def _update_row_for_thread(self, row_idx, thread, my_email_address):
         """Helper to populate a row for a thread item."""
         
-        # Use the thread's new-style `newest_date_utc` and `oldest_date_utc` fields.
-        # Fallback to `newest_date` if not available.
         date_stamp = thread.get("newest_date_utc", thread.get("newest_date"))
         date_item = self._create_date_item(date_stamp)
         self.results_table.setItem(row_idx, 0, date_item)
@@ -253,7 +255,6 @@ class QueryResultsViewer(QMainWindow):
         sender_receiver_item = QTableWidgetItem(sender_receiver_text)
         self.results_table.setItem(row_idx, 2, sender_receiver_item)
         
-        # Store the full thread object for later retrieval
         self.results_table.item(row_idx, 0).setData(Qt.ItemDataRole.UserRole, thread)
 
     def _update_row_for_mail(self, row_idx, mail, my_email_address):
@@ -270,36 +271,31 @@ class QueryResultsViewer(QMainWindow):
         sender_receiver_item = QTableWidgetItem(sender_receiver_text)
         self.results_table.setItem(row_idx, 2, sender_receiver_item)
         
-        # Store the full mail object for later retrieval
         self.results_table.item(row_idx, 0).setData(Qt.ItemDataRole.UserRole, mail)
         
     def _create_date_item(self, timestamp):
         """Creates a sortable QTableWidgetItem for the date."""
         if not isinstance(timestamp, (int, float)):
-            # Fallback for older notmuch versions or malformed data
             timestamp = 0
             
         dt = datetime.fromtimestamp(timestamp, tz=timezone.utc).astimezone()
         date_string = dt.strftime("%Y-%m-%d %H:%M")
         
         item = QTableWidgetItem(date_string)
-        item.setData(Qt.ItemDataRole.UserRole, timestamp) # Store timestamp for sorting
+        item.setData(Qt.ItemDataRole.UserRole, timestamp)
         return item
         
     def _get_sender_receiver(self, authors_string, my_email):
         """Extracts the sender/receiver based on my email address."""
         addresses = getaddresses([authors_string])
         
-        # If there's only one address and it's mine, it's a message I sent.
         if len(addresses) == 1 and addresses[0][1] == my_email:
             return "To: (You)"
 
-        # Find the first address that is not mine.
         for name, addr in addresses:
             if addr != my_email:
                 return name if name else addr
                 
-        # If all addresses are mine, return a default like "Me" or "You"
         return "You"
 
     def open_selected_item(self, index):
@@ -315,8 +311,6 @@ class QueryResultsViewer(QMainWindow):
             if thread_id:
                 logging.info(f"Launching thread viewer for thread ID: {thread_id}")
                 # Placeholder for the command to launch thread viewer
-                # This needs to be replaced with the actual command for `view-thread.py`
-                # subprocess.Popen(["python3", "view-thread.py", "--thread-id", thread_id])
                 QMessageBox.information(self, "Action Mocked", f"Launching thread viewer for thread ID: {thread_id}")
             else:
                 logging.warning("Could not find thread ID for selected row.")
@@ -325,9 +319,8 @@ class QueryResultsViewer(QMainWindow):
             if mail_file_path:
                 logging.info(f"Launching mail viewer for file: {mail_file_path}")
                 try:
-                    # Assumes view-mail.py is in the same directory
                     viewer_path = os.path.join(os.path.dirname(__file__), "view-mail.py")
-                    subprocess.Popen(["python3", viewer_path, "--mail-file", mail_file_path])
+                    subprocess.Popen(["python3", viewer_path, mail_file_path])
                 except Exception as e:
                     QMessageBox.critical(self, "Error", f"Could not launch mail viewer: {e}")
             else:
