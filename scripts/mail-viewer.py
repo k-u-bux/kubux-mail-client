@@ -91,6 +91,7 @@ class MailViewer(QMainWindow):
         self.attachments = []
         self.selected_addresses = set()
         self.tags = []
+        self.message_id = None
         
         self.notmuch_enabled = self.check_notmuch()
 
@@ -243,6 +244,12 @@ class MailViewer(QMainWindow):
         if not self.message:
             return
 
+        # Get the message ID, as it is needed for notmuch queries
+        self.message_id = self.message.get("Message-ID")
+        if not self.message_id:
+            logging.warning("Message-ID not found for this mail. Tag functionality will not work.")
+            self.notmuch_enabled = False
+
         if self.notmuch_enabled:
             self.update_tags_ui()
 
@@ -311,21 +318,22 @@ class MailViewer(QMainWindow):
         return re.sub(r'font-size:\s*[^;"]+;?', '', html_content, flags=re.IGNORECASE)
 
     def get_tags(self):
-        """Queries the notmuch database for tags of the current mail file."""
+        """Queries the notmuch database for tags of the current mail's message ID."""
+        if not self.message_id:
+            print("no message id")
+            return []
+        
         try:
-            # Use a more compatible format that should work on older versions of notmuch
-            command = ['notmuch', 'search', '--output=tags', '--format=text', f'filename:{self.mail_file_path}']
+            command = ['notmuch', 'search', '--output=tags', '--format=text', f'id:{self.message_id}']
             result = subprocess.run(command, capture_output=True, text=True, check=True)
             
-            # The output is a simple list of tags, one per line.
-            # We filter out any empty lines.
             tags_list = [tag.strip() for tag in result.stdout.strip().split('\n') if tag.strip()]
+            print(f"tags for message {self.message_id} obtained: {tags_list}")
             self.tags = sorted(tags_list)
-
         except subprocess.CalledProcessError as e:
             dialog = CopyableErrorDialog(
                 "Notmuch Command Failed",
-                f"An error occurred while running notmuch:\n\n{e.stderr}"
+                f"An error occurred while running notmuch:\n\n{e.stderr}\n\nCommand was: {' '.join(command)}"
             )
             dialog.exec()
             self.tags = []
@@ -362,8 +370,8 @@ class MailViewer(QMainWindow):
     def remove_tag(self, tag):
         """Removes a tag from the current mail using the notmuch command."""
         try:
-            # Use the full path with the 'filename:' query term.
-            command = ['notmuch', 'tag', f'-{tag}', f'filename:{self.mail_file_path}']
+            # Use the more reliable id:<message-id> query
+            command = ['notmuch', 'tag', f'-{tag}', f'id:{self.message_id}']
             subprocess.run(command, check=True, capture_output=True, text=True)
             logging.info(f"Tag '{tag}' removed successfully.")
             self.update_tags_ui() # Refresh the UI to reflect the change
@@ -375,13 +383,14 @@ class MailViewer(QMainWindow):
             dialog.exec()
     
     def add_tag(self):
-        """Mock function for adding a new tag."""
+        """Adds a new tag to the current mail."""
         text, ok = QInputDialog.getText(self, "Add Tags", "Enter tag(s) to add (comma-separated):")
         if ok and text:
             new_tags = [t.strip() for t in text.split(',')]
             for tag in new_tags:
                 try:
-                    command = ['notmuch', 'tag', f'+{tag}', f'filename:{self.mail_file_path}']
+                    # Use the more reliable id:<message-id> query
+                    command = ['notmuch', 'tag', f'+{tag}', f'id:{self.message_id}']
                     subprocess.run(command, check=True, capture_output=True, text=True)
                     logging.info(f"Tag '{tag}' added successfully.")
                 except subprocess.CalledProcessError as e:
