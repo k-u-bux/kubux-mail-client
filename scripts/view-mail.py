@@ -107,6 +107,8 @@ class MailViewer(QMainWindow):
             QMessageBox.critical(self, "Error", "Could not load or parse the mail file.")
             sys.exit(1)
 
+        self.get_message_id()
+        self.process_initial_tags()
         self.setup_ui()
         self.setup_key_bindings()
         self.display_message()
@@ -124,6 +126,32 @@ class MailViewer(QMainWindow):
             )
             dialog.exec()
             return False
+
+    def get_message_id(self):
+        """Gets the message ID, as it is needed for notmuch queries."""
+        self.message_id = self.message.get("Message-ID")
+        if self.message_id:
+            self.message_id = self.message_id.strip('<>')
+        if not self.message_id:
+            logging.warning("Message-ID not found for this mail. Tag functionality will not work.")
+            self.notmuch_enabled = False
+
+    def process_initial_tags(self):
+        """
+        Manages initial tag state. If a mail has the $new tag,
+        it is silently replaced with the $unseen tag.
+        """
+        if not self.notmuch_enabled:
+            return
+        
+        current_tags = self.get_tags()
+        if '$new' in current_tags:
+            logging.info("Found '$new' tag. Silently replacing with '$unseen'.")
+            try:
+                command = ['notmuch', 'tag', '-new', '+unseen', f'id:{self.message_id}']
+                subprocess.run(command, check=True, capture_output=True, text=True)
+            except subprocess.CalledProcessError as e:
+                logging.error(f"Failed to process initial tags: {e.stderr}")
 
     def parse_mail_file(self):
         """Parses a real email file from the local filesystem."""
@@ -265,16 +293,6 @@ class MailViewer(QMainWindow):
         if not self.message:
             return
 
-        # Get the message ID, as it is needed for notmuch queries
-        self.message_id = self.message.get("Message-ID")
-        if self.message_id:
-            # Strip the surrounding angle brackets from the message ID
-            self.message_id = self.message_id.strip('<>')
-
-        if not self.message_id:
-            logging.warning("Message-ID not found for this mail. Tag functionality will not work.")
-            self.notmuch_enabled = False
-
         if self.notmuch_enabled:
             self.update_tags_ui()
 
@@ -373,7 +391,8 @@ class MailViewer(QMainWindow):
         
         # Fetch the latest tags
         current_tags = set(self.get_tags())
-        all_tags = set(self.tags_state.keys()).union(current_tags)
+        # Filter out special tags starting with '$'
+        all_tags = {tag for tag in set(self.tags_state.keys()).union(current_tags) if not tag.startswith('$')}
         self.tags_state = {tag: tag in current_tags for tag in sorted(list(all_tags))}
 
         # Add a button for each tag, styled by its state

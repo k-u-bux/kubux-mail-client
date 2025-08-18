@@ -27,21 +27,34 @@ process_batch() {
     local batch=("$@")
     # Create an associative array to map filenames back to full paths for the current batch
     declare -A file_map
+    local message_ids=()
+    
     for full_path in "${batch[@]}"; do
         file_name=$(basename "$full_path")
         file_map["$file_name"]="$full_path"
+        message_id=$( python3 "$GET_MESSAGE_ID_SCRIPT" "$full_path" )
+        if [[ -n "$message_id" ]]; then
+            message_ids+=("id:$message_id")
+        else
+            echo "Could not find message ID for file: $full_path"
+        fi
     done
+
+    # Add the '$new' tag to all messages in the batch
+    if [ ${#message_ids[@]} -gt 0 ]; then
+        notmuch tag +$new -- "${message_ids[@]}"
+        echo "Applied tag '$new' to ${#message_ids[@]} new messages."
+    fi
 
     # Call the AI classifier script and process its output
     python3 "$AI_CLASSIFY_SCRIPT" --model "$MODEL_PATH" "${batch[@]}" | while IFS= read -r line; do
         filename_and_tags=($line)
-        file_name="${filename_and_tags[0]}"
+        filename=${filename_and_tags[0]}
+        # The remaining elements are the predicted tags
         predicted_tags=("${filename_and_tags[@]:1}")
-        full_path="${file_map[$file_name]}"
-
-        # Use notmuch show with JSON output to robustly get the message ID
-        # This avoids the fragile regex parsing of the 'path:' search term
-        message_id=$( python $GET_MESSAGE_ID_SCRIPT "$full_path" );
+        full_path="${file_map[$filename]}"
+        
+        message_id=$( python3 "$GET_MESSAGE_ID_SCRIPT" "$full_path" );
 
         if [[ -n "$message_id" ]]; then
             if [ ${#predicted_tags[@]} -gt 0 ]; then
@@ -54,8 +67,6 @@ process_batch() {
             else
                 echo "No tags predicted for message: $message_id"
             fi
-        else
-            echo "Could not find message ID for file: $full_path"
         fi
     done
 }
@@ -84,7 +95,7 @@ if [ ${#batch[@]} -gt 0 ]; then
 fi
 
 if [ "$total_files" -gt 0 ]; then
-    echo "Classification complete. Processed a total of ${total_files} new files."
+    echo "Processing complete. Classified $total_files new messages."
 else
-    echo "No new messages found with 'tag:unread'. Exiting."
+    echo "No new messages to classify."
 fi
