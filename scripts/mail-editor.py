@@ -19,6 +19,7 @@ from PySide6.QtCore import Qt, QSize, QUrl
 from PySide6.QtGui import QFont, QAction, QKeySequence
 import logging
 import mimetypes
+import subprocess
 from config import config
 
 # Set up basic logging to console
@@ -204,31 +205,33 @@ class MailEditor(QMainWindow):
             discard_action.triggered.connect(self.discard_draft)
             self.addAction(discard_action)
             
-    def populate_from_draft(self):
+    def populate_from_draft(self, draft_message=None):
         """Populates the editor with content from a pre-drafted message."""
-        if not self.draft_message:
+        if not draft_message and not self.draft_message:
             return
 
-        self.to_edit.setText(self.draft_message.get('To', ''))
-        self.cc_edit.setText(self.draft_message.get('Cc', ''))
-        self.subject_edit.setText(self.draft_message.get('Subject', ''))
+        message = draft_message or self.draft_message
+
+        self.to_edit.setText(message.get('To', ''))
+        self.cc_edit.setText(message.get('Cc', ''))
+        self.subject_edit.setText(message.get('Subject', ''))
         
         # Set BCC and Reply-To if they exist, and show the extra headers group
-        bcc = self.draft_message.get('Bcc', '')
-        reply_to = self.draft_message.get('Reply-To', '')
+        bcc = message.get('Bcc', '')
+        reply_to = message.get('Reply-To', '')
         if bcc or reply_to:
             self.bcc_edit.setText(bcc)
             self.reply_to_edit.setText(reply_to)
             self.toggle_more_headers()
 
         plain_text_body = ""
-        for part in self.draft_message.walk():
+        for part in message.walk():
             if part.get_content_type() == 'text/plain':
                 plain_text_body = part.get_content()
                 break
         self.body_edit.setPlainText(plain_text_body)
 
-        for part in self.draft_message.walk():
+        for part in message.walk():
             if part.get_content_disposition() == 'attachment':
                 filename = part.get_filename()
                 if filename:
@@ -306,13 +309,8 @@ class MailEditor(QMainWindow):
             del self.attachments[row]
             self.attachments_list.takeItem(row)
 
-    def save_message(self):
-        """Saves the current message content as a draft to the mail-file."""
-        if not self.mail_file_path:
-            dialog = CopyableErrorDialog("Save Error", "No mail file specified to save draft.")
-            dialog.exec()
-            return
-
+    def _create_draft_file(self):
+        """Creates a temporary mail file from the current editor content and returns its path."""
         try:
             draft = email.message.EmailMessage()
             
@@ -340,21 +338,43 @@ class MailEditor(QMainWindow):
             with tempfile.NamedTemporaryFile(mode='wb', delete=False, dir=self.mail_file_path.parent) as tmp_file:
                 tmp_file.write(draft.as_bytes())
                 tmp_path = Path(tmp_file.name)
-
+            
             # Atomically rename to the final destination
-            tmp_path.rename(self.mail_file_path)
-            
-            self.close()
-            
+            if self.mail_file_path:
+                tmp_path.rename(self.mail_file_path)
+                return self.mail_file_path
+            else:
+                return tmp_path
+
         except Exception as e:
-            dialog = CopyableErrorDialog("Save Error", f"Failed to save draft:\n{e}")
+            dialog = CopyableErrorDialog("Draft Creation Error", f"Failed to create draft file:\n{e}")
             dialog.exec()
+            return None
+
+
+    def save_message(self):
+        """Saves the current message content as a draft to the mail-file."""
+        if self._create_draft_file():
+            self.close()
 
     def send_message(self):
-        """Mocks the send action and quits."""
-        dialog = CopyableErrorDialog("Action Mocked", "Sending mail...")
-        dialog.exec()
-        self.close()
+        """Saves the draft and then calls the external send-mail.py script."""
+        draft_path = self._create_draft_file()
+        if not draft_path:
+            return
+
+        try:
+            # Assuming send-mail.py is in the same directory as mail-editor.py
+            send_mail_path = Path(__file__).parent / "send-mail.py"
+            if not send_mail_path.exists():
+                QMessageBox.critical(self, "Error", f"Could not find send mail script at {send_mail_path}")
+                return
+
+            subprocess.Popen([sys.executable, str(send_mail_path), str(draft_path)])
+            self.close()
+
+        except Exception as e:
+            QMessageBox.critical(self, "Send Error", f"Failed to send mail: {e}")
 
     def discard_draft(self):
         """Discards the draft by deleting the mail file and quitting."""
