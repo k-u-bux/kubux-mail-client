@@ -1,65 +1,90 @@
 #!/usr/bin/env bash
 
 # This script is a wrapper for the `notmuch` post-new hook.
-# It reads a list of filenames from stdin and passes them to the
-# `ai_classify.py` script. It then processes the output and
-# applies the predicted tags to the messages.
+# It queries the notmuch database for newly imported messages (those with the 'unread' tag),
+# processes them in batches, and applies additional tags based on a classifier.
 
 # Exit immediately if a command exits with a non-zero status.
 set -e
 
 # Define the directory where your scripts are located
-# This assumes the ai_classify.py script and the model are in the same directory as this hook.
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+SCRIPT_DIR=$( dirname $( realpath "${BASH_SOURCE[0]}" ) )
 AI_CLASSIFY_SCRIPT="${SCRIPT_DIR}/ai_classify.py"
-MODEL_PATH="${SCRIPT_DIR}/my_model.pkl"
+GET_MESSAGE_ID_SCRIPT="${SCRIPT_DIR}/get_message_id.py"
+MODEL_PATH="${SCRIPT_DIR}/classify.pkl"
 
-# Read the list of mail files from stdin into an array
-readarray -t mail_files
+# Set the batch size
+BATCH_SIZE=100
 
-# Check if there are any files to process
-if [ ${#mail_files[@]} -eq 0 ]; then
-    echo "No new messages to classify. Exiting."
-    exit 0
+# Check for the required 'jq' command
+if ! command -v jq &> /dev/null; then
+    echo "Error: 'jq' is not installed. Please install it to parse JSON output." >&2
+    exit 1
 fi
 
-# Create an associative array to map filenames back to full paths
-declare -A file_map
-for full_path in "${mail_files[@]}"; do
-    file_name=$(basename "$full_path")
-    file_map["$file_name"]="$full_path"
-done
+# Function to process a batch of files
+process_batch() {
+    local batch=("$@")
+    # Create an associative array to map filenames back to full paths for the current batch
+    declare -A file_map
+    for full_path in "${batch[@]}"; do
+        file_name=$(basename "$full_path")
+        file_map["$file_name"]="$full_path"
+    done
 
-# Call the AI classifier script and pipe its output to a while loop
-# The output is expected to be one line per file: "filename tag1 tag2 tag3"
-python3 "$AI_CLASSIFY_SCRIPT" --model "$MODEL_PATH" "${mail_files[@]}" | while read -r line; do
-    # Read the filename and tags from the line
-    filename_and_tags=($line)
-    file_name="${filename_and_tags[0]}"
+    # Call the AI classifier script and process its output
+    python3 "$AI_CLASSIFY_SCRIPT" --model "$MODEL_PATH" "${batch[@]}" | while IFS= read -r line; do
+        filename_and_tags=($line)
+        file_name="${filename_and_tags[0]}"
+        predicted_tags=("${filename_and_tags[@]:1}")
+        full_path="${file_map[$file_name]}"
 
-    # Remove the first element to get just the tags
-    predicted_tags=("${filename_and_tags[@]:1}")
+        # Use notmuch show with JSON output to robustly get the message ID
+        # This avoids the fragile regex parsing of the 'path:' search term
+        message_id=$( python $GET_MESSAGE_ID_SCRIPT "$full_path" );
 
-    # Find the full path from our map
-    full_path="${file_map[$file_name]}"
-
-    # Use notmuch search to get the message ID from the file path
-    # We use --format=text0 to handle any special characters in the message ID
-    message_id=$(notmuch search --output=messages --format=text0 "path:$full_path" | tr -d '\0')
-
-    if [[ -n "$message_id" ]]; then
-        # Apply the predicted tags to the message using its ID
-        if [ ${#predicted_tags[@]} -gt 0 ]; then
-            tags_to_add=""
-            for tag in "${predicted_tags[@]}"; do
-                tags_to_add+=" +$tag"
-            done
-            notmuch tag $tags_to_add -- "id:$message_id"
-            echo "Applied tags '$tags_to_add' to message with ID: $message_id"
+        if [[ -n "$message_id" ]]; then
+            if [ ${#predicted_tags[@]} -gt 0 ]; then
+                tags_to_add=""
+                for tag in "${predicted_tags[@]}"; do
+                    tags_to_add+=" +$tag"
+                done
+                notmuch tag $tags_to_add -- "id:$message_id"
+                echo "Applied tags '$tags_to_add' to message ID: $message_id"
+            else
+                echo "No tags predicted for message: $message_id"
+            fi
         else
-            echo "No tags predicted for message: $message_id"
+            echo "Could not find message ID for file: $full_path"
         fi
-    else
-        echo "Could not find message ID for file: $full_path"
+    done
+}
+
+echo "Starting mail classification..."
+
+# Initialize a counter for total files and an array for the current batch
+total_files=0
+batch=()
+
+# Get the list of new mail files and process them in batches
+# Correctly using 'tag:unread'
+notmuch search --output=files "tag:unread" | while IFS= read -r full_path; do
+    total_files=$((total_files + 1))
+    batch+=("$full_path")
+    # Process the batch if it reaches the batch size
+    if [ ${#batch[@]} -ge $BATCH_SIZE ]; then
+        process_batch "${batch[@]}"
+        batch=() # Clear the array for the next batch
     fi
 done
+
+# Process any remaining files in the last batch
+if [ ${#batch[@]} -gt 0 ]; then
+    process_batch "${batch[@]}"
+fi
+
+if [ "$total_files" -gt 0 ]; then
+    echo "Classification complete. Processed a total of ${total_files} new files."
+else
+    echo "No new messages found with 'tag:unread'. Exiting."
+fi

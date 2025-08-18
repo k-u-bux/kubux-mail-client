@@ -72,7 +72,7 @@ def main():
 
         classified_mail = f"{mail_file.name} {' '.join(predicted_tags)}"
         print( classified_mail )
-        print( classified_mail, file=sys.stderr )
+        # print( classified_mail, file=sys.stderr )
 
 if __name__ == "__main__":
     main()

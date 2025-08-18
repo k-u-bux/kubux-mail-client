@@ -53,6 +53,7 @@
         pkgs.notmuch
         pkgs.gnupg
         pkgs.msmtp
+        pkgs.jq
       ];
 
       shellHook = ''
