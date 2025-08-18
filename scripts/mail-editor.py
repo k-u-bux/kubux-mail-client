@@ -12,10 +12,10 @@ from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QTextEdit, QHBoxLayout,
     QPushButton, QLineEdit, QListWidget, QSplitter, QMessageBox, QDialog,
     QFormLayout, QLabel, QFileDialog, QSizePolicy, QMenu, QComboBox,
-    QDialogButtonBox, QAction, QGroupBox
+    QDialogButtonBox, QGroupBox
 )
 from PySide6.QtCore import Qt, QSize, QUrl
-from PySide6.QtGui import QFont, QKeySequence
+from PySide6.QtGui import QFont, QAction, QKeySequence
 import logging
 import mimetypes
 from config import config
@@ -174,7 +174,7 @@ class MailEditor(QMainWindow):
 
     def populate_from_field(self):
         """Populates the From: QComboBox with identities from the config file."""
-        identities = config.get("email_identities", "identities", [])
+        identities = config.get_setting("email_identities", "identities", [])
         for identity in identities:
             if isinstance(identity, dict) and "name" in identity and "email" in identity:
                 display_text = f"{identity['name']} <{identity['email']}>"
