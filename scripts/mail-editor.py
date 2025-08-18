@@ -17,6 +17,7 @@ from PySide6.QtCore import Qt, QSize, QUrl
 from PySide6.QtGui import QFont, QAction
 import logging
 from config import config
+import mimetypes # Import the mimetypes library
 
 # Set up basic logging to console
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -244,9 +245,16 @@ class MailEditor(QMainWindow):
 
         file_path = Path(file_path)
         try:
+            # Determine the maintype and subtype from the file extension
+            mimetype, _ = mimetypes.guess_type(file_path)
+            if mimetype is None:
+                mimetype = 'application/octet-stream'  # Default for unknown file types
+            maintype, subtype = mimetype.split('/')
+            
             with open(file_path, 'rb') as f:
                 part = email.message.EmailMessage()
-                part.set_content(f.read())
+                # Set content with the determined MIME type
+                part.set_content(f.read(), maintype=maintype, subtype=subtype)
                 part.add_header('Content-Disposition', 'attachment', filename=file_path.name)
                 self.attachments.append(part)
                 self.attachments_list.addItem(file_path.name)
