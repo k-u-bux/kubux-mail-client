@@ -122,7 +122,13 @@ class MailEditor(QMainWindow):
         self.populate_from_field()
         self.to_edit = QLineEdit()
         self.cc_edit = QLineEdit()
+        self.bcc_edit = QLineEdit() # Bcc needs to be initialized here as well
         self.subject_edit = QLineEdit()
+
+        # Enable dragging for address fields
+        self.to_edit.setDragEnabled(True)
+        self.cc_edit.setDragEnabled(True)
+        self.bcc_edit.setDragEnabled(True)
         
         self.headers_layout.addRow("From:", self.from_combo)
         self.headers_layout.addRow("To:", self.to_edit)
@@ -132,7 +138,6 @@ class MailEditor(QMainWindow):
         # Additional headers, initially hidden
         self.more_headers_group = QGroupBox()
         self.more_headers_layout = QFormLayout(self.more_headers_group)
-        self.bcc_edit = QLineEdit()
         self.reply_to_edit = QLineEdit()
         self.more_headers_layout.addRow("Bcc:", self.bcc_edit)
         self.more_headers_layout.addRow("Reply-To:", self.reply_to_edit)
