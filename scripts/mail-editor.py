@@ -166,6 +166,10 @@ class MailEditor(QMainWindow):
         
         self.splitter.addWidget(attachments_group)
         self.splitter.setSizes([400, 100])
+
+        # Set stretch factors to make the body editor take up all extra space
+        self.splitter.setStretchFactor(0, 1)
+        self.splitter.setStretchFactor(1, 0)
         
         self.attachments_list.dragEnterEvent = self.dragEnterEvent
         self.attachments_list.dragMoveEvent = self.dragMoveEvent
