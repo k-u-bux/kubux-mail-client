@@ -67,6 +67,7 @@ class EmailAddressLineEdit(QLineEdit):
 
     def mousePressEvent(self, event):
         """Finds the address to be dragged when the mouse is pressed."""
+        super().mousePressEvent(event)
         if event.button() == Qt.MouseButton.LeftButton:
             text = self.text()
             cursor_pos = self.cursorPosition()
@@ -82,8 +83,6 @@ class EmailAddressLineEdit(QLineEdit):
                 self.dragged_address = None
                 self.dragged_start = -1
                 self.dragged_end = -1
-                
-        super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event):
         """Executes the drag if a valid address was selected and the mouse moved."""
