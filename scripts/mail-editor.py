@@ -15,7 +15,7 @@ from PySide6.QtWidgets import (
     QFormLayout, QLabel, QFileDialog, QSizePolicy, QMenu, QComboBox,
     QDialogButtonBox, QGroupBox
 )
-from PySide6.QtCore import Qt, QSize, QUrl
+from PySide6.QtCore import Qt, QSize, QUrl, QKeySequence
 from PySide6.QtGui import QFont, QAction, QKeySequence
 import logging
 import mimetypes
@@ -60,6 +60,7 @@ class MailEditor(QMainWindow):
             return
             
         self.setup_ui()
+        self.setup_key_bindings()
         self.populate_from_draft()
 
     def parse_draft_mail(self, mail_file_path):
@@ -145,7 +146,6 @@ class MailEditor(QMainWindow):
         # Body text editor
         self.body_edit = QTextEdit()
         self.body_edit.setFont(config.text_font)
-        self.body_edit.keyPressEvent = self.body_edit_keyPressEvent
         self.splitter.addWidget(self.body_edit)
 
         # Attachment section
@@ -173,6 +173,37 @@ class MailEditor(QMainWindow):
         self.attachments_list.dragMoveEvent = self.dragMoveEvent
         self.attachments_list.dropEvent = self.dropEvent
 
+    def setup_key_bindings(self):
+        """Sets up key bindings based on the config file."""
+        # Action mappings for QTextEdit
+        actions = {
+            "undo": self.body_edit.undo,
+            "redo": self.body_edit.redo,
+            "cut": self.body_edit.cut,
+            "copy": self.body_edit.copy,
+            "paste": self.body_edit.paste,
+            "select_all": self.body_edit.selectAll,
+            "zoom_in": lambda: self.body_edit.zoomIn(1),
+            "zoom_out": lambda: self.body_edit.zoomOut(1),
+        }
+
+        # Create QActions and set shortcuts based on config
+        for name, func in actions.items():
+            key_seq = config.get_keybinding(name)
+            if key_seq:
+                action = QAction(self)
+                action.setShortcut(QKeySequence(key_seq))
+                action.triggered.connect(func)
+                self.addAction(action)
+
+        # Discard draft action
+        discard_key_seq = config.get_keybinding("quit_action")
+        if discard_key_seq:
+            discard_action = QAction("Discard", self)
+            discard_action.setShortcut(QKeySequence(discard_key_seq))
+            discard_action.triggered.connect(self.discard_draft)
+            self.addAction(discard_action)
+            
     def populate_from_draft(self):
         """Populates the editor with content from a pre-drafted message."""
         if not self.draft_message:
@@ -220,19 +251,6 @@ class MailEditor(QMainWindow):
         self.more_headers_group.setVisible(not is_visible)
         self.more_headers_button.setText("Less Headers" if not is_visible else "More Headers")
         
-    def body_edit_keyPressEvent(self, event):
-        """Handles key press events for the mail content area for font zooming."""
-        if event.modifiers() == Qt.KeyboardModifier.ControlModifier:
-            if event.key() in (Qt.Key.Key_Plus, Qt.Key.Key_Equal):
-                self.body_edit.zoomIn(1)
-                return
-            elif event.key() == Qt.Key.Key_Minus:
-                self.body_edit.zoomOut(1)
-                return
-        
-        QTextEdit.keyPressEvent(self.body_edit, event)
-
-
     def dragEnterEvent(self, event):
         if event.mimeData().hasUrls():
             event.acceptProposedAction()
