@@ -1,0 +1,20 @@
+# send-mail-config.toml
+
+# Each section [from."your.email@example.com"] corresponds to a sender address.
+# The script will match the From: header of the email file to a section here.
+
+[from."your.email@example.com"]
+smtp_server = "smtp.your-provider.com"
+smtp_port = 587
+username = "your.email@example.com"
+password = "your-app-password"
+sent_dir = "~/.local/share/notmuch-client/mail/Sent"
+failed_dir = "~/.local/share/notmuch-client/mail/Failed"
+
+[from."another.email@example.net"]
+smtp_server = "smtp.other-provider.net"
+smtp_port = 465
+username = "another.email@example.net"
+password = "another-app-password"
+sent_dir = "~/.local/share/notmuch-client/mail/archive.sent"
+failed_dir = "~/.local/share/notmuch-client/mail/failed"
