@@ -53,7 +53,6 @@ class QueryResultsViewer(QMainWindow):
         self.setWindowTitle("Kubux Notmuch Mail Client - Queries")
         self.setMinimumSize(QSize(1024, 768))
 
-        self.notmuch_config_path = self.get_notmuch_config_path()
         self.notmuch_enabled = self.check_notmuch()
 
         self.view_mode = "threads" # or "mails"
@@ -64,25 +63,10 @@ class QueryResultsViewer(QMainWindow):
         self.setup_key_bindings()
         self.execute_query()
 
-    def get_notmuch_config_path(self):
-        """
-        Fetches the notmuch config path from the default location.
-        The default is ~/.config/kubux-mail-client/config.toml
-        """
-        return Path("~/.config/kubux-mail-client/config.toml").expanduser()
-
     def check_notmuch(self):
-        """Checks if the notmuch command and the config file are available."""
+        """Checks if the notmuch command is available."""
         try:
             subprocess.run(['notmuch', '--version'], check=True, capture_output=True)
-            if not self.notmuch_config_path.exists():
-                dialog = CopyableErrorDialog(
-                    "Notmuch Config Not Found",
-                    f"Notmuch config file not found at: {self.notmuch_config_path}\n"
-                    f"Queries will not work."
-                )
-                dialog.exec()
-                return False
             return True
         except (subprocess.CalledProcessError, FileNotFoundError) as e:
             dialog = CopyableErrorDialog(
@@ -174,10 +158,9 @@ class QueryResultsViewer(QMainWindow):
             self.view_mode_button.setText("Mail View")
         self.execute_query()
 
-    def get_my_email_address(self):
+    def get_my_email_addresses(self):
         """
         Retrieves the user's email addresses from the shared config.
-        We now use the config file as the source of truth for identities.
         """
         identities = config.get_identities()
         return [i['email'] for i in identities]
@@ -189,12 +172,11 @@ class QueryResultsViewer(QMainWindow):
         self.current_query = self.query_edit.text()
         logging.info(f"Executing query: '{self.current_query}' in '{self.view_mode}' mode.")
         
-        my_email_addresses = self.get_my_email_address()
+        my_email_addresses = self.get_my_email_addresses()
 
         try:
             command = [
                 'notmuch',
-                '--config', str(self.notmuch_config_path),
                 'search',
                 '--format=json',
                 f'--output={self.view_mode}',
@@ -280,16 +262,13 @@ class QueryResultsViewer(QMainWindow):
         """Extracts the sender/receiver based on my email addresses."""
         addresses = getaddresses([authors_string])
         
-        # If all addresses are mine, it's a message I sent.
         if all(addr in my_email_addresses for _, addr in addresses):
             return "You"
 
-        # Find the first address that is not mine.
         for name, addr in addresses:
             if addr not in my_email_addresses:
                 return name if name else addr
                 
-        # Fallback if no external address is found (e.g., self-sent email not in my_email_addresses)
         return "Unknown"
 
     def open_selected_item(self, index):
