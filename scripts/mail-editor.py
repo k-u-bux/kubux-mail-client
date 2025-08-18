@@ -45,27 +45,26 @@ class CopyableErrorDialog(QDialog):
         layout.addWidget(button_box)
 
 class MailEditor(QMainWindow):
-    def __init__(self, parent=None, action=None, mail_file_path=None):
+    def __init__(self, parent=None, mail_file_path=None):
         super().__init__(parent)
         self.setWindowTitle("Kubux Notmuch Mail Client - Composer")
         self.setMinimumSize(QSize(800, 600))
         
         self.attachments = []
-        self.draft_action = action
-        self.original_message = self.parse_original_mail(mail_file_path) if mail_file_path else None
+        self.draft_message = self.parse_draft_mail(mail_file_path) if mail_file_path else None
         
-        if self.original_message is None and mail_file_path:
+        if self.draft_message is None and mail_file_path:
             self.close()
             return
             
         self.setup_ui()
-        self.draft_message()
+        self.populate_from_draft()
 
-    def parse_original_mail(self, mail_file_path):
+    def parse_draft_mail(self, mail_file_path):
         """Parses an email file to get headers and content for drafting."""
         mail_path = Path(mail_file_path).expanduser()
         if not mail_path.exists():
-            dialog = CopyableErrorDialog("Original Mail File Not Found", f"Original mail file not found: {mail_path}")
+            dialog = CopyableErrorDialog("Draft Mail File Not Found", f"Draft mail file not found: {mail_path}")
             dialog.exec()
             return None
         
@@ -73,8 +72,8 @@ class MailEditor(QMainWindow):
             with open(mail_path, 'rb') as f:
                 return email.message_from_binary_file(f, policy=policy.default)
         except Exception as e:
-            logging.error(f"Failed to parse original mail file: {e}")
-            dialog = CopyableErrorDialog("Parsing Error", f"Failed to parse original mail file:\n{e}")
+            logging.error(f"Failed to parse draft mail file: {e}")
+            dialog = CopyableErrorDialog("Parsing Error", f"Failed to parse draft mail file:\n{e}")
             dialog.exec()
             return None
 
@@ -175,6 +174,37 @@ class MailEditor(QMainWindow):
         self.attachments_list.dragMoveEvent = self.dragMoveEvent
         self.attachments_list.dropEvent = self.dropEvent
 
+    def populate_from_draft(self):
+        """Populates the editor with content from a pre-drafted message."""
+        if not self.draft_message:
+            return
+
+        self.to_edit.setText(self.draft_message.get('To', ''))
+        self.cc_edit.setText(self.draft_message.get('Cc', ''))
+        self.subject_edit.setText(self.draft_message.get('Subject', ''))
+        
+        # Set BCC and Reply-To if they exist, and show the extra headers group
+        bcc = self.draft_message.get('Bcc', '')
+        reply_to = self.draft_message.get('Reply-To', '')
+        if bcc or reply_to:
+            self.bcc_edit.setText(bcc)
+            self.reply_to_edit.setText(reply_to)
+            self.toggle_more_headers()
+
+        plain_text_body = ""
+        for part in self.draft_message.walk():
+            if part.get_content_type() == 'text/plain':
+                plain_text_body = part.get_content()
+                break
+        self.body_edit.setPlainText(plain_text_body)
+
+        for part in self.draft_message.walk():
+            if part.get_content_disposition() == 'attachment':
+                filename = part.get_filename()
+                if filename:
+                    # We can't save the actual file, so just add the name for display purposes
+                    self.attachments_list.addItem(filename)
+
     def populate_from_field(self):
         """Populates the From: QComboBox with identities from the config file."""
         identities = config.get_setting("email_identities", "identities", [])
@@ -228,64 +258,6 @@ class MailEditor(QMainWindow):
             menu.addAction(remove_action)
             menu.exec(self.attachments_list.mapToGlobal(pos))
 
-    def draft_message(self):
-        """Initializes the editor with content based on the draft action."""
-        if not self.original_message or not self.draft_action:
-            return
-
-        subject = self.original_message.get('Subject', '')
-        from_addr = self.original_message.get('From', '')
-        to_addrs = self.original_message.get('To', '')
-        cc_addrs = self.original_message.get('Cc', '')
-
-        original_body = ""
-        for part in self.original_message.walk():
-            if part.get_content_type() == 'text/plain':
-                original_body = part.get_content()
-                break
-
-        if self.draft_action == 'reply':
-            self.to_edit.setText(from_addr)
-            self.subject_edit.setText(f"Re: {subject}")
-            quoted_text = self.quote_message(original_body, from_addr)
-            self.body_edit.setPlainText(f"\n\n{quoted_text}")
-        
-        elif self.draft_action == 'reply-all':
-            all_recipients = getaddresses([to_addrs]) + getaddresses([cc_addrs])
-            recipients = [addr for name, addr in all_recipients if addr != from_addr]
-            self.to_edit.setText(', '.join(recipients))
-            self.cc_edit.setText(from_addr)
-            self.subject_edit.setText(f"Re: {subject}")
-            quoted_text = self.quote_message(original_body, from_addr)
-            self.body_edit.setPlainText(f"\n\n{quoted_text}")
-
-        elif self.draft_action == 'forward':
-            self.subject_edit.setText(f"Fwd: {subject}")
-            
-            quoted_headers = []
-            quoted_headers.append(f"From: {self.original_message.get('From', 'N/A')}")
-            quoted_headers.append(f"Date: {self.original_message.get('Date', 'N/A')}")
-            quoted_headers.append(f"Subject: {self.original_message.get('Subject', 'N/A')}")
-            quoted_headers.append(f"To: {self.original_message.get('To', 'N/A')}")
-            if self.original_message.get('Cc'):
-                 quoted_headers.append(f"Cc: {self.original_message.get('Cc', 'N/A')}")
-            
-            forward_text = f"\n-------- Original Message --------\n{''.join(line + '\\n' for line in quoted_headers)}\n{original_body}"
-            self.body_edit.setPlainText(forward_text)
-            
-            for part in self.original_message.walk():
-                if part.get_content_disposition() == 'attachment':
-                    filename = part.get_filename()
-                    if filename:
-                        self.attachments.append(part)
-                        self.attachments_list.addItem(filename)
-
-    def quote_message(self, body, from_addr):
-        """Formats the original message body for a reply."""
-        prefix = f"On {self.original_message.get('Date', 'a date')}, {from_addr} wrote:\n"
-        quoted_lines = [f"> {line}" for line in body.splitlines()]
-        return prefix + "\n".join(quoted_lines)
-
     def add_attachment(self, file_path=None):
         """Opens a file dialog to add an attachment, or adds a dropped file."""
         if not file_path:
@@ -335,13 +307,12 @@ class MailEditor(QMainWindow):
 
 # --- Main Entry Point ---
 def main():
-    parser = argparse.ArgumentParser(description="Compose or draft a new email.")
-    parser.add_argument("--action", choices=['new', 'reply', 'reply-all', 'forward'], default='new', help="Type of mail to draft.")
-    parser.add_argument("--mail-file", help="The full path to the mail file to reference for reply/forward actions.")
+    parser = argparse.ArgumentParser(description="Edit a pre-drafted email.")
+    parser.add_argument("--mail-file", required=True, help="The full path to the mail file containing the pre-drafted email.")
     args = parser.parse_args()
     
     app = QApplication(sys.argv)
-    editor = MailEditor(action=args.action, mail_file_path=args.mail_file)
+    editor = MailEditor(mail_file_path=args.mail_file)
     editor.show()
     sys.exit(app.exec())
 
