@@ -67,8 +67,13 @@ class QueryResultsViewer(QMainWindow):
     def check_notmuch(self):
         """Checks if the notmuch command is available."""
         try:
-            # We explicitly ignore stderr to prevent warnings from corrupting the stdout stream
-            subprocess.run(['notmuch', '--version'], check=True, capture_output=True, stderr=subprocess.DEVNULL)
+            # Fix: replaced capture_output=True with explicit stdout/stderr
+            subprocess.run(
+                ['notmuch', '--version'],
+                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL
+            )
             return True
         except (subprocess.CalledProcessError, FileNotFoundError) as e:
             dialog = CopyableErrorDialog(
@@ -153,7 +158,7 @@ class QueryResultsViewer(QMainWindow):
 
     def toggle_view_mode(self):
         if self.view_mode == "threads":
-            self.view_mode = "messages" # Changed from "mails"
+            self.view_mode = "messages" # Corrected to "messages"
             self.view_mode_button.setText("Thread View")
         else:
             self.view_mode = "threads"
@@ -175,8 +180,9 @@ class QueryResultsViewer(QMainWindow):
         logging.info(f"Executing query: '{self.current_query}' in '{self.view_mode}' mode.")
         
         my_email_addresses = self.get_my_email_addresses()
-
+        
         try:
+            # Step 1: Get list of thread IDs or message IDs
             command = [
                 'notmuch',
                 'search',
@@ -184,10 +190,56 @@ class QueryResultsViewer(QMainWindow):
                 f'--output={self.view_mode}',
                 self.current_query
             ]
+            result = subprocess.run(
+                command,
+                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+                text=True
+            )
+            ids = json.loads(result.stdout)
             
-            # Explicitly redirect stderr to DEVNULL to prevent warnings from corrupting JSON output
-            result = subprocess.run(command, check=True, capture_output=True, text=True, stderr=subprocess.DEVNULL)
-            self.results = json.loads(result.stdout)
+            # Step 2: For each ID, get the full JSON details
+            self.results = []
+            for item_id in ids:
+                if self.view_mode == "threads":
+                    detail_command = [
+                        'notmuch',
+                        'search',
+                        '--format=json',
+                        '--output=threads',
+                        f'id:{item_id}'
+                    ]
+                else: # messages mode
+                    detail_command = [
+                        'notmuch',
+                        'search',
+                        '--format=json',
+                        '--output=messages',
+                        f'id:{item_id}'
+                    ]
+
+                detail_result = subprocess.run(
+                    detail_command,
+                    check=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.DEVNULL,
+                    text=True
+                )
+                
+                # Check for empty output
+                if not detail_result.stdout.strip():
+                    logging.warning(f"No details found for ID: {item_id}")
+                    continue
+
+                # The `detail_result` will be an array with a single item
+                detail = json.loads(detail_result.stdout)
+                if detail and isinstance(detail[0], dict):
+                    self.results.append(detail[0])
+                else:
+                    # Crash fast if we get unexpected data, as per your philosophy
+                    raise TypeError(f"Expected a list containing a dictionary, but received: {detail}")
+
             self.update_results_table(my_email_addresses)
 
         except subprocess.CalledProcessError as e:
@@ -213,7 +265,7 @@ class QueryResultsViewer(QMainWindow):
         for row_idx, item in enumerate(self.results):
             if self.view_mode == "threads":
                 self._update_row_for_thread(row_idx, item, my_email_addresses)
-            else: # mails mode
+            else: # messages mode
                 self._update_row_for_mail(row_idx, item, my_email_addresses)
 
     def _update_row_for_thread(self, row_idx, thread, my_email_addresses):
@@ -290,7 +342,7 @@ class QueryResultsViewer(QMainWindow):
                 QMessageBox.information(self, "Action Mocked", f"Launching thread viewer for thread ID: {thread_id}")
             else:
                 logging.warning("Could not find thread ID for selected row.")
-        else: # mails mode
+        else: # messages mode
             mail_file_path = item_data.get("filename")
             if mail_file_path:
                 logging.info(f"Launching mail viewer for file: {mail_file_path}")
