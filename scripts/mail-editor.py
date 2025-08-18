@@ -10,14 +10,15 @@ from email import policy
 from pathlib import Path
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QTextEdit, QHBoxLayout,
-    QPushButton, QLineEdit, QListWidget, QSplitter, QDialog,
-    QFormLayout, QLabel, QFileDialog, QSizePolicy, QMenu, QDialogButtonBox
+    QPushButton, QLineEdit, QListWidget, QSplitter, QMessageBox, QDialog,
+    QFormLayout, QLabel, QFileDialog, QSizePolicy, QMenu, QComboBox,
+    QDialogButtonBox, QAction, QGroupBox
 )
 from PySide6.QtCore import Qt, QSize, QUrl
-from PySide6.QtGui import QFont, QAction
+from PySide6.QtGui import QFont, QKeySequence
 import logging
+import mimetypes
 from config import config
-import mimetypes # Import the mimetypes library
 
 # Set up basic logging to console
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -54,8 +55,6 @@ class MailEditor(QMainWindow):
         self.original_message = self.parse_original_mail(mail_file_path) if mail_file_path else None
         
         if self.original_message is None and mail_file_path:
-            # The parse_original_mail method will have already shown an error dialog.
-            # We just need to exit gracefully.
             self.close()
             return
             
@@ -94,6 +93,11 @@ class MailEditor(QMainWindow):
         self.add_attachment_button.clicked.connect(self.add_attachment)
         top_bar_layout.addWidget(self.add_attachment_button)
         
+        # More Headers button
+        self.more_headers_button = QPushButton("More Headers")
+        self.more_headers_button.clicked.connect(self.toggle_more_headers)
+        top_bar_layout.addWidget(self.more_headers_button)
+
         top_bar_layout.addStretch()
 
         # Control buttons (right)
@@ -111,17 +115,30 @@ class MailEditor(QMainWindow):
 
         # Header fields
         headers_group_box = QWidget()
-        headers_layout = QFormLayout(headers_group_box)
+        self.headers_layout = QFormLayout(headers_group_box)
         
+        self.from_combo = QComboBox()
+        self.populate_from_field()
         self.to_edit = QLineEdit()
         self.cc_edit = QLineEdit()
         self.subject_edit = QLineEdit()
         
-        headers_layout.addRow("To:", self.to_edit)
-        headers_layout.addRow("Cc:", self.cc_edit)
-        headers_layout.addRow("Subject:", self.subject_edit)
+        self.headers_layout.addRow("From:", self.from_combo)
+        self.headers_layout.addRow("To:", self.to_edit)
+        self.headers_layout.addRow("Cc:", self.cc_edit)
+        self.headers_layout.addRow("Subject:", self.subject_edit)
+
+        # Additional headers, initially hidden
+        self.more_headers_group = QGroupBox()
+        self.more_headers_layout = QFormLayout(self.more_headers_group)
+        self.bcc_edit = QLineEdit()
+        self.reply_to_edit = QLineEdit()
+        self.more_headers_layout.addRow("Bcc:", self.bcc_edit)
+        self.more_headers_layout.addRow("Reply-To:", self.reply_to_edit)
+        self.more_headers_group.setVisible(False)
         
         main_layout.addWidget(headers_group_box)
+        main_layout.addWidget(self.more_headers_group)
         
         # Splitter for Body and Attachments
         self.splitter = QSplitter(Qt.Orientation.Vertical)
@@ -130,6 +147,7 @@ class MailEditor(QMainWindow):
         # Body text editor
         self.body_edit = QTextEdit()
         self.body_edit.setFont(config.text_font)
+        self.body_edit.keyPressEvent = self.body_edit_keyPressEvent
         self.splitter.addWidget(self.body_edit)
 
         # Attachment section
@@ -153,6 +171,35 @@ class MailEditor(QMainWindow):
         self.attachments_list.dragEnterEvent = self.dragEnterEvent
         self.attachments_list.dragMoveEvent = self.dragMoveEvent
         self.attachments_list.dropEvent = self.dropEvent
+
+    def populate_from_field(self):
+        """Populates the From: QComboBox with identities from the config file."""
+        identities = config.get("email_identities", "identities", [])
+        for identity in identities:
+            if isinstance(identity, dict) and "name" in identity and "email" in identity:
+                display_text = f"{identity['name']} <{identity['email']}>"
+                self.from_combo.addItem(display_text, identity['email'])
+            elif isinstance(identity, str):
+                self.from_combo.addItem(identity, identity)
+
+    def toggle_more_headers(self):
+        """Toggles the visibility of the additional headers section."""
+        is_visible = self.more_headers_group.isVisible()
+        self.more_headers_group.setVisible(not is_visible)
+        self.more_headers_button.setText("Less Headers" if not is_visible else "More Headers")
+        
+    def body_edit_keyPressEvent(self, event):
+        """Handles key press events for the mail content area for font zooming."""
+        if event.modifiers() == Qt.KeyboardModifier.ControlModifier:
+            if event.key() in (Qt.Key.Key_Plus, Qt.Key.Key_Equal):
+                self.body_edit.zoomIn(1)
+                return
+            elif event.key() == Qt.Key.Key_Minus:
+                self.body_edit.zoomOut(1)
+                return
+        
+        QTextEdit.keyPressEvent(self.body_edit, event)
+
 
     def dragEnterEvent(self, event):
         if event.mimeData().hasUrls():
@@ -245,15 +292,13 @@ class MailEditor(QMainWindow):
 
         file_path = Path(file_path)
         try:
-            # Determine the maintype and subtype from the file extension
             mimetype, _ = mimetypes.guess_type(file_path)
             if mimetype is None:
-                mimetype = 'application/octet-stream'  # Default for unknown file types
+                mimetype = 'application/octet-stream'
             maintype, subtype = mimetype.split('/')
             
             with open(file_path, 'rb') as f:
                 part = email.message.EmailMessage()
-                # Set content with the determined MIME type
                 part.set_content(f.read(), maintype=maintype, subtype=subtype)
                 part.add_header('Content-Disposition', 'attachment', filename=file_path.name)
                 self.attachments.append(part)
