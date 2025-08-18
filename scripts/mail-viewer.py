@@ -351,7 +351,7 @@ class MailViewer(QMainWindow):
             if item.widget():
                 item.widget().deleteLater()
         
-        # Fetch the latest tags and update the state dictionary
+        # Fetch the latest tags
         current_tags = set(self.get_tags())
         all_tags = set(self.tags_state.keys()).union(current_tags)
         self.tags_state = {tag: tag in current_tags for tag in sorted(list(all_tags))}
@@ -367,11 +367,14 @@ class MailViewer(QMainWindow):
             tag_button.clicked.connect(lambda checked, t=tag: self.toggle_tag(t))
             self.tags_layout.addWidget(tag_button)
 
+        # Add stretch to push the next button to the right
+        self.tags_layout.addStretch()
+
         # Add a button to add new tags
         add_tag_button = QPushButton("Add tags")
         add_tag_button.clicked.connect(self.add_tag_dialog)
         self.tags_layout.addWidget(add_tag_button)
-        self.tags_layout.addStretch() # Add stretch to push the next button to the right
+
 
     def toggle_tag(self, tag):
         """Toggles a tag's state (add or remove)."""
@@ -390,6 +393,7 @@ class MailViewer(QMainWindow):
             new_tags = [t.strip() for t in text.split(',')]
             for tag in new_tags:
                 self.add_tag(tag)
+            self.update_tags_ui()
 
     def remove_tag(self, tag):
         """Removes a tag from the current mail using the notmuch command."""
