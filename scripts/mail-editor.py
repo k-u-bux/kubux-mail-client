@@ -15,7 +15,7 @@ from PySide6.QtWidgets import (
     QFormLayout, QLabel, QFileDialog, QSizePolicy, QMenu, QComboBox,
     QDialogButtonBox, QGroupBox
 )
-from PySide6.QtCore import Qt, QSize, QUrl, QKeySequence
+from PySide6.QtCore import Qt, QSize, QUrl
 from PySide6.QtGui import QFont, QAction, QKeySequence
 import logging
 import mimetypes
@@ -286,7 +286,7 @@ class MailEditor(QMainWindow):
         try:
             mimetype, _ = mimetypes.guess_type(file_path)
             if mimetype is None:
-                mimetype = 'application/octet-stream'
+                mimetype = 'application/octet-s'
             maintype, subtype = mimetype.split('/')
             
             with open(file_path, 'rb') as f:
