@@ -1,0 +1,348 @@
+#!/usr/bin/env python3
+
+import sys
+import argparse
+import subprocess
+import json
+import os
+from pathlib import Path
+from email.utils import getaddresses
+import re
+from datetime import datetime, timezone
+
+from PySide6.QtWidgets import (
+    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
+    QLineEdit, QPushButton, QTableWidget, QTableWidgetItem, QHeaderView,
+    QMessageBox, QDialog, QDialogButtonBox, QLabel, QTextEdit,
+    QCheckBox, QAbstractItemView, QMenu, QSplitter
+)
+from PySide6.QtCore import Qt, QSize, QDateTime
+from PySide6.QtGui import QFont, QKeySequence, QAction
+import logging
+
+# Set up basic logging to console
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+# Assuming a config module similar to the other scripts
+try:
+    from config import config
+except ImportError:
+    # A simple mock for demonstration purposes if config.py is not available
+    class MockConfig:
+        def get_font(self, section):
+            if section == "text":
+                return QFont("monospace", 10)
+            return QFont("sans-serif", 10)
+        def get_keybinding(self, action):
+            bindings = {
+                "refresh": "F5",
+                "quit": "Ctrl+Q"
+            }
+            return bindings.get(action)
+    config = MockConfig()
+
+# Custom dialog for displaying copyable error messages
+class CopyableErrorDialog(QDialog):
+    def __init__(self, title, message, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(title)
+        self.setMinimumWidth(500)
+        
+        layout = QVBoxLayout(self)
+        
+        label = QLabel("The following error occurred:")
+        layout.addWidget(label)
+        
+        self.text_edit = QTextEdit()
+        self.text_edit.setReadOnly(True)
+        self.text_edit.setPlainText(message)
+        layout.addWidget(self.text_edit)
+        
+        button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok)
+        button_box.accepted.connect(self.accept)
+        layout.addWidget(button_box)
+
+class QueryResultsViewer(QMainWindow):
+    def __init__(self, query_string="tag:inbox or tag:unread", parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Kubux Notmuch Mail Client - Queries")
+        self.setMinimumSize(QSize(1024, 768))
+
+        self.notmuch_config_path = self.get_notmuch_config_path()
+        self.notmuch_enabled = self.check_notmuch()
+
+        self.view_mode = "threads" # or "mails"
+        self.current_query = query_string
+        self.results = []
+
+        self.setup_ui()
+        self.setup_key_bindings()
+        self.execute_query()
+
+    def get_notmuch_config_path(self):
+        """Fetches the notmuch config path from the shared config file."""
+        # Using a hardcoded path if config is not properly integrated
+        return Path("~/.config/notmuch-config").expanduser()
+
+    def check_notmuch(self):
+        """Checks if the notmuch command and the config file are available."""
+        try:
+            subprocess.run(['notmuch', '--version'], check=True, capture_output=True)
+            if not self.notmuch_config_path.exists():
+                dialog = CopyableErrorDialog(
+                    "Notmuch Config Not Found",
+                    f"Notmuch config file not found at: {self.notmuch_config_path}\n"
+                    f"Queries will not work."
+                )
+                dialog.exec()
+                return False
+            return True
+        except (subprocess.CalledProcessError, FileNotFoundError) as e:
+            dialog = CopyableErrorDialog(
+                "Notmuch Not Found",
+                f"The 'notmuch' command was not found or is not executable.\n"
+                f"Query-related functionality will be disabled.\n\nError: {e}"
+            )
+            dialog.exec()
+            return False
+
+    def setup_ui(self):
+        central_widget = QWidget()
+        self.setCentralWidget(central_widget)
+        main_layout = QVBoxLayout(central_widget)
+
+        # Top bar with UI elements
+        top_bar_layout = QHBoxLayout()
+        main_layout.addLayout(top_bar_layout)
+
+        # The query edit field
+        self.query_edit = QLineEdit(self.current_query)
+        self.query_edit.returnPressed.connect(self.execute_query)
+        top_bar_layout.addWidget(self.query_edit)
+
+        # View mode toggle
+        self.view_mode_toggle = QCheckBox("Thread View")
+        self.view_mode_toggle.setChecked(self.view_mode == "threads")
+        self.view_mode_toggle.stateChanged.connect(self.toggle_view_mode)
+        top_bar_layout.addWidget(self.view_mode_toggle)
+
+        # Refresh button
+        self.refresh_button = QPushButton("Refresh")
+        self.refresh_button.clicked.connect(self.execute_query)
+        top_bar_layout.addWidget(self.refresh_button)
+
+        # Quit button
+        self.quit_button = QPushButton("Quit")
+        self.quit_button.clicked.connect(self.close)
+        top_bar_layout.addWidget(self.quit_button)
+        
+        # Spacer
+        top_bar_layout.addStretch()
+
+        # Results table
+        self.results_table = QTableWidget()
+        self.results_table.setColumnCount(3)
+        self.results_table.setHorizontalHeaderLabels(["Date", "Subject", "Sender/Receiver"])
+        self.results_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+        self.results_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        self.results_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.results_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        
+        # Sort by date descending by default
+        self.results_table.setSortingEnabled(True)
+        self.results_table.sortByColumn(0, Qt.SortOrder.DescendingOrder)
+
+        main_layout.addWidget(self.results_table)
+        
+        # Connect click to action
+        self.results_table.doubleClicked.connect(self.open_selected_item)
+
+    def setup_key_bindings(self):
+        """Sets up key bindings based on the config file."""
+        actions = {
+            "quit": self.close,
+            "refresh": self.execute_query
+        }
+        for name, func in actions.items():
+            key_seq = config.get_keybinding(name)
+            if key_seq:
+                action = QAction(self)
+                action.setShortcut(QKeySequence(key_seq))
+                action.triggered.connect(func)
+                self.addAction(action)
+
+    def toggle_view_mode(self, state):
+        self.view_mode = "threads" if state == Qt.CheckState.Checked else "mails"
+        self.execute_query()
+
+    def get_my_email_address(self):
+        """Retrieves the user's email address from notmuch config."""
+        try:
+            command = ['notmuch', '--config', str(self.notmuch_config_path), 'config', 'get', 'user.primary_email']
+            result = subprocess.run(command, check=True, capture_output=True, text=True)
+            return result.stdout.strip()
+        except subprocess.CalledProcessError as e:
+            logging.error(f"Failed to get primary email from notmuch config: {e.stderr}")
+            return None
+    
+    def execute_query(self):
+        if not self.notmuch_enabled:
+            return
+
+        self.current_query = self.query_edit.text()
+        logging.info(f"Executing query: '{self.current_query}' in '{self.view_mode}' mode.")
+        
+        # We'll use the get_my_email_address method to determine the user's primary email.
+        my_email_address = self.get_my_email_address()
+
+        try:
+            # Notmuch command to get messages in JSON format
+            command = [
+                'notmuch',
+                '--config', str(self.notmuch_config_path),
+                'search',
+                '--format=json',
+                f'--output={self.view_mode}',
+                self.current_query
+            ]
+            
+            result = subprocess.run(command, check=True, capture_output=True, text=True)
+            self.results = json.loads(result.stdout)
+            self.update_results_table(my_email_address)
+
+        except subprocess.CalledProcessError as e:
+            dialog = CopyableErrorDialog(
+                "Notmuch Query Failed",
+                f"An error occurred while running notmuch:\n\n{e.stderr}"
+            )
+            dialog.exec()
+            self.results = []
+            self.results_table.setRowCount(0)
+        except json.JSONDecodeError as e:
+            dialog = CopyableErrorDialog(
+                "Notmuch Output Error",
+                f"Failed to parse JSON output from notmuch:\n\n{e}"
+            )
+            dialog.exec()
+            self.results = []
+            self.results_table.setRowCount(0)
+
+    def update_results_table(self, my_email_address):
+        """Populates the table with the new query results."""
+        self.results_table.setRowCount(len(self.results))
+        for row_idx, item in enumerate(self.results):
+            if self.view_mode == "threads":
+                self._update_row_for_thread(row_idx, item, my_email_address)
+            else: # mails mode
+                self._update_row_for_mail(row_idx, item, my_email_address)
+
+    def _update_row_for_thread(self, row_idx, thread, my_email_address):
+        """Helper to populate a row for a thread item."""
+        
+        # Use the thread's new-style `newest_date_utc` and `oldest_date_utc` fields.
+        # Fallback to `newest_date` if not available.
+        date_stamp = thread.get("newest_date_utc", thread.get("newest_date"))
+        date_item = self._create_date_item(date_stamp)
+        self.results_table.setItem(row_idx, 0, date_item)
+        
+        subject_text = f"{thread.get('subject')} ({thread.get('total_messages')})"
+        subject_item = QTableWidgetItem(subject_text)
+        self.results_table.setItem(row_idx, 1, subject_item)
+        
+        sender_receiver_text = self._get_sender_receiver(thread.get("authors", ""), my_email_address)
+        sender_receiver_item = QTableWidgetItem(sender_receiver_text)
+        self.results_table.setItem(row_idx, 2, sender_receiver_item)
+        
+        # Store the full thread object for later retrieval
+        self.results_table.item(row_idx, 0).setData(Qt.ItemDataRole.UserRole, thread)
+
+    def _update_row_for_mail(self, row_idx, mail, my_email_address):
+        """Helper to populate a row for a mail item."""
+        
+        date_stamp = mail.get("date_utc", mail.get("date"))
+        date_item = self._create_date_item(date_stamp)
+        self.results_table.setItem(row_idx, 0, date_item)
+        
+        subject_item = QTableWidgetItem(mail.get("subject"))
+        self.results_table.setItem(row_idx, 1, subject_item)
+        
+        sender_receiver_text = self._get_sender_receiver(mail.get("authors", ""), my_email_address)
+        sender_receiver_item = QTableWidgetItem(sender_receiver_text)
+        self.results_table.setItem(row_idx, 2, sender_receiver_item)
+        
+        # Store the full mail object for later retrieval
+        self.results_table.item(row_idx, 0).setData(Qt.ItemDataRole.UserRole, mail)
+        
+    def _create_date_item(self, timestamp):
+        """Creates a sortable QTableWidgetItem for the date."""
+        if not isinstance(timestamp, (int, float)):
+            # Fallback for older notmuch versions or malformed data
+            timestamp = 0
+            
+        dt = datetime.fromtimestamp(timestamp, tz=timezone.utc).astimezone()
+        date_string = dt.strftime("%Y-%m-%d %H:%M")
+        
+        item = QTableWidgetItem(date_string)
+        item.setData(Qt.ItemDataRole.UserRole, timestamp) # Store timestamp for sorting
+        return item
+        
+    def _get_sender_receiver(self, authors_string, my_email):
+        """Extracts the sender/receiver based on my email address."""
+        addresses = getaddresses([authors_string])
+        
+        # If there's only one address and it's mine, it's a message I sent.
+        if len(addresses) == 1 and addresses[0][1] == my_email:
+            return "To: (You)"
+
+        # Find the first address that is not mine.
+        for name, addr in addresses:
+            if addr != my_email:
+                return name if name else addr
+                
+        # If all addresses are mine, return a default like "Me" or "You"
+        return "You"
+
+    def open_selected_item(self, index):
+        """Launches the appropriate viewer based on the selected item."""
+        if not self.notmuch_enabled:
+            return
+            
+        row = index.row()
+        item_data = self.results_table.item(row, 0).data(Qt.ItemDataRole.UserRole)
+        
+        if self.view_mode == "threads":
+            thread_id = item_data.get("id")
+            if thread_id:
+                logging.info(f"Launching thread viewer for thread ID: {thread_id}")
+                # Placeholder for the command to launch thread viewer
+                # This needs to be replaced with the actual command for `view-thread.py`
+                # subprocess.Popen(["python3", "view-thread.py", "--thread-id", thread_id])
+                QMessageBox.information(self, "Action Mocked", f"Launching thread viewer for thread ID: {thread_id}")
+            else:
+                logging.warning("Could not find thread ID for selected row.")
+        else: # mails mode
+            mail_file_path = item_data.get("filename")
+            if mail_file_path:
+                logging.info(f"Launching mail viewer for file: {mail_file_path}")
+                try:
+                    # Assumes view-mail.py is in the same directory
+                    viewer_path = os.path.join(os.path.dirname(__file__), "view-mail.py")
+                    subprocess.Popen(["python3", viewer_path, "--mail-file", mail_file_path])
+                except Exception as e:
+                    QMessageBox.critical(self, "Error", f"Could not launch mail viewer: {e}")
+            else:
+                logging.warning("Could not find mail file path for selected row.")
+
+# --- Main Entry Point ---
+def main():
+    parser = argparse.ArgumentParser(description="View notmuch query results in a list.")
+    parser.add_argument("--query", help="The notmuch query to display.", default="tag:inbox or tag:unread")
+    args = parser.parse_args()
+    
+    app = QApplication(sys.argv)
+    viewer = QueryResultsViewer(args.query)
+    viewer.show()
+    sys.exit(app.exec())
+
+if __name__ == "__main__":
+    main()
