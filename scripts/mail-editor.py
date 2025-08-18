@@ -100,16 +100,16 @@ class MailEditor(QMainWindow):
 
         # Control buttons (right)
         self.send_button = QPushButton("Send")
-        self.save_button = QPushButton("Save Draft")
-        self.cancel_button = QPushButton("Cancel")
+        self.save_button = QPushButton("Save")
+        self.discard_button = QPushButton("Discard")
         
         self.send_button.clicked.connect(self.send_message)
         self.save_button.clicked.connect(self.save_message)
-        self.cancel_button.clicked.connect(self.cancel)
+        self.discard_button.clicked.connect(self.discard_draft)
         
         top_bar_layout.addWidget(self.send_button)
         top_bar_layout.addWidget(self.save_button)
-        top_bar_layout.addWidget(self.cancel_button)
+        top_bar_layout.addWidget(self.discard_button)
 
         # Header fields
         headers_group_box = QWidget()
@@ -325,11 +325,8 @@ class MailEditor(QMainWindow):
 
             # Atomically rename to the final destination
             tmp_path.rename(self.mail_file_path)
-
-            dialog = QMessageBox()
-            dialog.setWindowTitle("Draft Saved")
-            dialog.setText("Draft saved successfully.")
-            dialog.exec()
+            
+            self.close()
             
         except Exception as e:
             dialog = CopyableErrorDialog("Save Error", f"Failed to save draft:\n{e}")
@@ -341,8 +338,17 @@ class MailEditor(QMainWindow):
         dialog.exec()
         self.close()
 
-    def cancel(self):
-        """Mocks the cancel action and quits."""
+    def discard_draft(self):
+        """Discards the draft by deleting the mail file and quitting."""
+        if self.mail_file_path and self.mail_file_path.exists():
+            try:
+                os.remove(self.mail_file_path)
+            except Exception as e:
+                logging.error(f"Failed to delete draft file: {e}")
+                dialog = CopyableErrorDialog("Discard Error", f"Failed to delete draft file:\n{e}")
+                dialog.exec()
+                return
+        
         self.close()
 
 # --- Main Entry Point ---
