@@ -162,7 +162,6 @@ class MailEditor(QMainWindow):
         self.attachments_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.attachments_list.customContextMenuRequested.connect(self.show_attachment_context_menu)
         
-        attachments_layout.addWidget(QLabel("Attachments:"))
         attachments_layout.addWidget(self.attachments_list)
         
         self.splitter.addWidget(attachments_group)
