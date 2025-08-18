@@ -318,8 +318,8 @@ class MailEditor(QMainWindow):
             for part in self.attachments:
                 draft.attach(part)
             
-            # Write to a temporary file
-            with tempfile.NamedTemporaryFile(mode='wb', delete=False) as tmp_file:
+            # Write to a temporary file in the same directory as the mail file
+            with tempfile.NamedTemporaryFile(mode='wb', delete=False, dir=self.mail_file_path.parent) as tmp_file:
                 tmp_file.write(draft.as_bytes())
                 tmp_path = Path(tmp_file.name)
 
