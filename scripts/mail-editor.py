@@ -20,6 +20,7 @@ from PySide6.QtGui import QFont, QAction, QKeySequence
 import logging
 import mimetypes
 import subprocess
+import email.utils
 from config import config
 
 # Set up basic logging to console
@@ -313,6 +314,20 @@ class MailEditor(QMainWindow):
         """Creates a temporary mail file from the current editor content and returns its path."""
         try:
             draft = email.message.EmailMessage()
+            
+            # Preserve In-Reply-To and References from the original draft
+            if self.draft_message:
+                in_reply_to = self.draft_message.get('In-Reply-To')
+                if in_reply_to:
+                    draft['In-Reply-To'] = in_reply_to
+                references = self.draft_message.get('References')
+                if references:
+                    draft['References'] = references
+
+            # Generate a new, unique Message-ID
+            from_address = email.utils.parseaddr(self.from_combo.currentText())[1]
+            domain = from_address.split('@')[1] if '@' in from_address else 'local.machine'
+            draft['Message-ID'] = email.utils.make_msgid(domain=domain)
             
             # Set headers
             draft['From'] = self.from_combo.currentText()
