@@ -66,18 +66,18 @@ class EmailAddressLineEdit(QLineEdit):
         self.dragged_end = -1
 
     def mousePressEvent(self, event):
-        """Starts a drag operation if a full address is clicked."""
+        """Finds the address to be dragged when the mouse is pressed."""
         if event.button() == Qt.MouseButton.LeftButton:
             text = self.text()
             cursor_pos = self.cursorPosition()
             
-            # Find the address under the cursor
-            for match in self.ADDRESS_REGEX.finditer(text):
-                if match.start() <= cursor_pos <= match.end():
-                    self.dragged_address = match.group().strip()
-                    self.dragged_start = match.start()
-                    self.dragged_end = match.end()
-                    break
+            # Find the address that contains the cursor position
+            match = self.find_address_at_pos(text, cursor_pos)
+            
+            if match:
+                self.dragged_address = match.group().strip()
+                self.dragged_start = match.start()
+                self.dragged_end = match.end()
             else:
                 self.dragged_address = None
                 self.dragged_start = -1
@@ -86,7 +86,7 @@ class EmailAddressLineEdit(QLineEdit):
         super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event):
-        """Executes the drag if a valid address was clicked and the mouse moved."""
+        """Executes the drag if a valid address was selected and the mouse moved."""
         if self.dragged_address and (event.buttons() & Qt.MouseButton.LeftButton):
             drag = QDrag(self)
             mime_data = QMimeData()
@@ -98,16 +98,7 @@ class EmailAddressLineEdit(QLineEdit):
             
             # If the drop was a move action, remove the address from this field
             if drop_action == Qt.MoveAction:
-                current_text = self.text()
-                # Remove the address and any surrounding comma/whitespace
-                new_text = (current_text[:self.dragged_start].rstrip(' ,') + 
-                            current_text[self.dragged_end:].lstrip(' ,'))
-                
-                # Clean up multiple spaces or commas
-                new_text = re.sub(r', *', ', ', new_text)
-                new_text = new_text.strip(' ,')
-                
-                self.setText(new_text)
+                self.remove_address()
                 self.dragged_address = None
                 
         super().mouseMoveEvent(event)
@@ -116,13 +107,15 @@ class EmailAddressLineEdit(QLineEdit):
         """Handles dropping an address into this field."""
         if event.mimeData().hasText():
             dropped_text = event.mimeData().text()
+            # Ensure the dropped text is a valid email address
             if self.ADDRESS_REGEX.fullmatch(dropped_text.strip()):
-                # It's a valid email address, insert it
                 current_text = self.text()
-                if current_text and not current_text.endswith(','):
-                    self.setText(current_text + ', ' + dropped_text)
+                if current_text:
+                    new_text = f"{current_text}, {dropped_text}"
                 else:
-                    self.setText(current_text + dropped_text)
+                    new_text = dropped_text
+                
+                self.setText(new_text)
                 
                 # Accept the event as a move action to signal the source to clear
                 event.acceptProposedAction()
@@ -130,6 +123,32 @@ class EmailAddressLineEdit(QLineEdit):
                 return
 
         super().dropEvent(event)
+
+    def find_address_at_pos(self, text, pos):
+        """Helper to find the regex match at a specific cursor position."""
+        for match in self.ADDRESS_REGEX.finditer(text):
+            if match.start() <= pos <= match.end():
+                return match
+        return None
+
+    def remove_address(self):
+        """Removes the last dragged address from the line edit."""
+        current_text = self.text()
+        if self.dragged_start != -1 and self.dragged_end != -1:
+            # Remove the address and any leading/trailing comma/whitespace
+            prefix = current_text[:self.dragged_start].rstrip(' ,')
+            suffix = current_text[self.dragged_end:].lstrip(' ,')
+            
+            if prefix and suffix:
+                new_text = f"{prefix},{suffix}"
+            elif prefix:
+                new_text = prefix
+            elif suffix:
+                new_text = suffix
+            else:
+                new_text = ""
+                
+            self.setText(new_text)
 
 # --- Mail Editor Main Class ---
 
