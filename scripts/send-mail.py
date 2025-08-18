@@ -134,7 +134,7 @@ class SendMail:
 def main():
     parser = argparse.ArgumentParser(description="Send one or more mail files via SMTP.")
     parser.add_argument("mail_files", nargs='+', help="One or more paths to mail files to send.")
-    parser.add_argument("--config", default="~/.config/notmuch-client/send-mail-config.toml",
+    parser.add_argument("--config", default="~/.config/kubux-mail-client/send-mail-config.toml",
                         help="Path to the configuration file.")
     args = parser.parse_args()
 
