@@ -91,6 +91,7 @@ class MailViewer(QMainWindow):
         self.attachments = []
         self.selected_addresses = set()
         self.tags = []
+        self.tags_state = {}
         self.message_id = None
         
         self.notmuch_enabled = self.check_notmuch()
@@ -246,6 +247,10 @@ class MailViewer(QMainWindow):
 
         # Get the message ID, as it is needed for notmuch queries
         self.message_id = self.message.get("Message-ID")
+        if self.message_id:
+            # Strip the surrounding angle brackets from the message ID
+            self.message_id = self.message_id.strip('<>')
+
         if not self.message_id:
             logging.warning("Message-ID not found for this mail. Tag functionality will not work.")
             self.notmuch_enabled = False
@@ -320,7 +325,6 @@ class MailViewer(QMainWindow):
     def get_tags(self):
         """Queries the notmuch database for tags of the current mail's message ID."""
         if not self.message_id:
-            print("no message id")
             return []
         
         try:
@@ -328,7 +332,6 @@ class MailViewer(QMainWindow):
             result = subprocess.run(command, capture_output=True, text=True, check=True)
             
             tags_list = [tag.strip() for tag in result.stdout.strip().split('\n') if tag.strip()]
-            print(f"tags for message {self.message_id} obtained: {tags_list}")
             self.tags = sorted(tags_list)
         except subprocess.CalledProcessError as e:
             dialog = CopyableErrorDialog(
@@ -341,31 +344,52 @@ class MailViewer(QMainWindow):
         return self.tags
 
     def update_tags_ui(self):
-        """Clears and rebuilds the UI to display the current tags."""
+        """Clears and rebuilds the UI to display the current tags and their states."""
         # Clear existing tag widgets
         while self.tags_layout.count():
             item = self.tags_layout.takeAt(0)
             if item.widget():
                 item.widget().deleteLater()
         
-        # Fetch the latest tags
-        self.tags = self.get_tags()
-        
-        # Add a button for each tag
-        for tag in self.tags:
+        # Fetch the latest tags and update the state dictionary
+        current_tags = set(self.get_tags())
+        all_tags = set(self.tags_state.keys()).union(current_tags)
+        self.tags_state = {tag: tag in current_tags for tag in sorted(list(all_tags))}
+
+        # Add a button for each tag, styled by its state
+        for tag, is_attached in self.tags_state.items():
             tag_button = QPushButton(tag)
-            # Use lambda to pass the tag name to the slot
-            tag_button.clicked.connect(lambda checked, t=tag: self.remove_tag(t))
+            if not is_attached:
+                # Greys out the button for detached tags
+                tag_button.setStyleSheet("QPushButton { color: gray; }")
+            
+            # Connect the button click to the toggle function
+            tag_button.clicked.connect(lambda checked, t=tag: self.toggle_tag(t))
             self.tags_layout.addWidget(tag_button)
 
-        # Add stretch to push the next button to the right
-        self.tags_layout.addStretch()
-
-        # Add "Add tags" button
+        # Add a button to add new tags
         add_tag_button = QPushButton("Add tags")
-        add_tag_button.clicked.connect(self.add_tag)
+        add_tag_button.clicked.connect(self.add_tag_dialog)
         self.tags_layout.addWidget(add_tag_button)
+        self.tags_layout.addStretch() # Add stretch to push the next button to the right
 
+    def toggle_tag(self, tag):
+        """Toggles a tag's state (add or remove)."""
+        is_attached = self.tags_state.get(tag, False)
+        if is_attached:
+            self.remove_tag(tag)
+        else:
+            self.add_tag(tag)
+
+        self.update_tags_ui() # Refresh the UI to reflect the change
+
+    def add_tag_dialog(self):
+        """Opens a dialog to add new tags."""
+        text, ok = QInputDialog.getText(self, "Add Tags", "Enter tag(s) to add (comma-separated):")
+        if ok and text:
+            new_tags = [t.strip() for t in text.split(',')]
+            for tag in new_tags:
+                self.add_tag(tag)
 
     def remove_tag(self, tag):
         """Removes a tag from the current mail using the notmuch command."""
@@ -374,7 +398,6 @@ class MailViewer(QMainWindow):
             command = ['notmuch', 'tag', f'-{tag}', f'id:{self.message_id}']
             subprocess.run(command, check=True, capture_output=True, text=True)
             logging.info(f"Tag '{tag}' removed successfully.")
-            self.update_tags_ui() # Refresh the UI to reflect the change
         except subprocess.CalledProcessError as e:
             dialog = CopyableErrorDialog("Failed to Remove Tag", f"Failed to remove tag '{tag}':\n\n{e.stderr}")
             dialog.exec()
@@ -382,21 +405,16 @@ class MailViewer(QMainWindow):
             dialog = CopyableErrorDialog("Notmuch Not Found", "The 'notmuch' command was not found. Please ensure it is installed and in your PATH.")
             dialog.exec()
     
-    def add_tag(self):
+    def add_tag(self, tag):
         """Adds a new tag to the current mail."""
-        text, ok = QInputDialog.getText(self, "Add Tags", "Enter tag(s) to add (comma-separated):")
-        if ok and text:
-            new_tags = [t.strip() for t in text.split(',')]
-            for tag in new_tags:
-                try:
-                    # Use the more reliable id:<message-id> query
-                    command = ['notmuch', 'tag', f'+{tag}', f'id:{self.message_id}']
-                    subprocess.run(command, check=True, capture_output=True, text=True)
-                    logging.info(f"Tag '{tag}' added successfully.")
-                except subprocess.CalledProcessError as e:
-                    dialog = CopyableErrorDialog("Failed to Add Tag", f"Failed to add tag '{tag}':\n\n{e.stderr}")
-                    dialog.exec()
-            self.update_tags_ui()
+        try:
+            # Use the more reliable id:<message-id> query
+            command = ['notmuch', 'tag', f'+{tag}', f'id:{self.message_id}']
+            subprocess.run(command, check=True, capture_output=True, text=True)
+            logging.info(f"Tag '{tag}' added successfully.")
+        except subprocess.CalledProcessError as e:
+            dialog = CopyableErrorDialog("Failed to Add Tag", f"Failed to add tag '{tag}':\n\n{e.stderr}")
+            dialog.exec()
 
 
     def handle_address_selection(self, address, is_selected):
