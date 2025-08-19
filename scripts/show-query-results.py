@@ -63,13 +63,10 @@ class CopyableErrorDialog(QDialog):
         layout.addWidget(button_box)
 
 class QueryResultsViewer(QMainWindow):
-    def __init__(self, query_string="tag:inbox or tag:unread", parent=None):
+    def __init__(self, query_string="tag:inbox and tag:unread", parent=None):
         super().__init__(parent)
         self.setWindowTitle("Kubux Notmuch Mail Client - Queries")
         self.setMinimumSize(QSize(1024, 768))
-
-        self.notmuch_config_path = self.get_notmuch_config_path()
-        self.notmuch_enabled = self.check_notmuch()
 
         self.view_mode = "threads" # or "mails"
         self.current_query = query_string
@@ -78,35 +75,6 @@ class QueryResultsViewer(QMainWindow):
         self.setup_ui()
         self.setup_key_bindings()
         self.execute_query()
-
-    def get_notmuch_config_path(self):
-        """
-        Fetches the notmuch config path from the default location.
-        The default is ~/.config/kubux-mail-client/config
-        """
-        return Path("~/.config/kubux-mail-client/config").expanduser()
-
-    def check_notmuch(self):
-        """Checks if the notmuch command and the config file are available."""
-        try:
-            subprocess.run(['notmuch', '--version'], check=True, capture_output=True)
-            if not self.notmuch_config_path.exists():
-                dialog = CopyableErrorDialog(
-                    "Notmuch Config Not Found",
-                    f"Notmuch config file not found at: {self.notmuch_config_path}\n"
-                    f"Queries will not work."
-                )
-                dialog.exec()
-                return False
-            return True
-        except (subprocess.CalledProcessError, FileNotFoundError) as e:
-            dialog = CopyableErrorDialog(
-                "Notmuch Not Found",
-                f"The 'notmuch' command was not found or is not executable.\n"
-                f"Query-related functionality will be disabled.\n\nError: {e}"
-            )
-            dialog.exec()
-            return False
 
     def setup_ui(self):
         central_widget = QWidget()
@@ -184,7 +152,7 @@ class QueryResultsViewer(QMainWindow):
     def get_my_email_address(self):
         """Retrieves the user's email address from notmuch config."""
         try:
-            command = ['notmuch', '--config', str(self.notmuch_config_path), 'config', 'get', 'user.primary_email']
+            command = ['notmuch', 'config', 'get', 'user.primary_email']
             result = subprocess.run(command, check=True, capture_output=True, text=True)
             return result.stdout.strip()
         except subprocess.CalledProcessError as e:
@@ -220,9 +188,6 @@ class QueryResultsViewer(QMainWindow):
             return []
     
     def execute_query(self):
-        if not self.notmuch_enabled:
-            return
-
         self.current_query = self.query_edit.text()
         logging.info(f"Executing query: '{self.current_query}' in '{self.view_mode}' mode.")
         
@@ -234,22 +199,20 @@ class QueryResultsViewer(QMainWindow):
         if self.view_mode == "threads":
             command = [
                 'notmuch',
-                '--config', str(self.notmuch_config_path),
                 'search',
                 '--format=json',
                 '--output=summary',
-                f'--sort=newest-first',
+                '--sort=newest-first',
                 self.current_query
             ]
             self.results = self._run_notmuch_command(command)
         else: # mails mode
             command = [
                 'notmuch',
-                '--config', str(self.notmuch_config_path),
                 'show',
                 '--format=json',
                 '--body=false',
-                f'--sort=newest-first',
+                '--sort=newest-first',
                 self.current_query
             ]
             # notmuch show returns a nested list, we need to flatten it.
@@ -354,9 +317,6 @@ class QueryResultsViewer(QMainWindow):
 
     def open_selected_item(self, index):
         """Launches the appropriate viewer based on the selected item."""
-        if not self.notmuch_enabled:
-            return
-            
         row = index.row()
         item_data = self.results_table.item(row, 0).data(Qt.ItemDataRole.UserRole)
         
@@ -384,7 +344,7 @@ class QueryResultsViewer(QMainWindow):
 # --- Main Entry Point ---
 def main():
     parser = argparse.ArgumentParser(description="View notmuch query results in a list.")
-    parser.add_argument("--query", help="The notmuch query to display.", default="tag:inbox or tag:unread")
+    parser.add_argument("--query", help="The notmuch query to display.", default="tag:inbox and tag:unread")
     args = parser.parse_args()
     
     app = QApplication(sys.argv)
