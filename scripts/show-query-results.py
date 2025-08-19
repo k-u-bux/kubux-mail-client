@@ -284,8 +284,8 @@ class QueryResultsViewer(QMainWindow):
         subject_item = QTableWidgetItem(subject_text)
         self.results_table.setItem(row_idx, 1, subject_item)
         
-        sender_receiver_text = self._get_sender_receiver(thread.get("authors", ""), my_email_address)
-        sender_receiver_item = QTableWidgetItem(sender_receiver_text)
+        # Directly use the authors field from the thread summary
+        sender_receiver_item = QTableWidgetItem(thread.get("authors", "Unknown"))
         self.results_table.setItem(row_idx, 2, sender_receiver_item)
         
         # Store the entire thread object in the first column's user data
