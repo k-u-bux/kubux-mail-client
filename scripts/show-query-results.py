@@ -7,11 +7,12 @@ import subprocess
 import json
 import logging
 import textwrap
+import email
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QTableWidget, QTableWidgetItem, QHeaderView, QLineEdit,
     QPushButton, QAbstractItemView, QMessageBox, QDialog, QDialogButtonBox,
-    QLabel, QSplitter, QComboBox
+    QLabel, QSplitter, QComboBox, QTextEdit
 )
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QFont, QFontMetrics, QAction
@@ -168,8 +169,19 @@ class QueryResultsViewer(QMainWindow):
                 )
                 
                 # The output is a JSON array of message objects for a thread
-                messages = json.loads(show_result.stdout)
+                nested_messages = json.loads(show_result.stdout)
                 
+                # Flatten the nested list to a single list of message objects
+                messages = []
+                def flatten(l):
+                    for el in l:
+                        if isinstance(el, list):
+                            flatten(el)
+                        else:
+                            messages.append(el)
+                
+                flatten(nested_messages)
+
                 # Extract summary info for the thread from the message list
                 if self.view_mode == "threads":
                     if messages:
