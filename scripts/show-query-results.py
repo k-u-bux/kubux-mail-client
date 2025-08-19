@@ -59,7 +59,6 @@ class QueryResultsViewer(QMainWindow):
         self.setWindowTitle("Kubux Notmuch Mail Client - Queries")
         self.setMinimumSize(QSize(1024, 768))
 
-        self.notmuch_config_path = self.get_notmuch_config_path()
         self.notmuch_enabled = self.check_notmuch()
 
         self.view_mode = "threads" # or "mails"
@@ -70,15 +69,8 @@ class QueryResultsViewer(QMainWindow):
         self.setup_key_bindings()
         self.execute_query()
 
-    def get_notmuch_config_path(self):
-        """
-        Fetches the notmuch config path from the default location.
-        The default is ~/.config/kubux-mail-client/config.toml
-        """
-        return Path("~/.config/kubux-mail-client/config.toml").expanduser()
-
     def check_notmuch(self):
-        """Checks if the notmuch command and the config file are available."""
+        """Checks if the notmuch Python bindings are available."""
         if not NOTMUCH_BINDINGS_AVAILABLE:
             dialog = CopyableErrorDialog(
                 "Notmuch Bindings Not Found",
@@ -87,15 +79,6 @@ class QueryResultsViewer(QMainWindow):
             dialog.exec()
             return False
             
-        # Check for the client's own config file
-        if not self.notmuch_config_path.exists():
-            dialog = CopyableErrorDialog(
-                "Client Config Not Found",
-                f"Client config file not found at: {self.notmuch_config_path}\n"
-                f"Queries will work, but some client settings may be missing."
-            )
-            dialog.exec()
-        
         return True
 
     def setup_ui(self):
