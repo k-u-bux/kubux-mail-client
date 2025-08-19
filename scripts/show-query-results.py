@@ -158,80 +158,92 @@ class QueryResultsViewer(QMainWindow):
         except subprocess.CalledProcessError as e:
             logging.error(f"Failed to get primary email from notmuch config: {e.stderr}")
             return None
-    
-    def _run_notmuch_command(self, command):
-        """
-        Executes a notmuch command and handles errors with a GUI dialog.
-        
-        Args:
-            command (list): The command and its arguments.
-        
-        Returns:
-            dict or list: The JSON output from notmuch.
-        """
+
+    def notmuch_show(self, query, sort):
         try:
+            command = [
+                'notmuch',
+                'show',
+                '--format=json',
+                '--body=false',
+                f'--sort={sort}',
+                query
+            ]
+            
             result = subprocess.run(command, check=True, capture_output=True, text=True)
             return json.loads(result.stdout)
+
         except subprocess.CalledProcessError as e:
             dialog = CopyableErrorDialog(
                 "Notmuch Query Failed",
                 f"An error occurred while running notmuch:\n\n{e.stderr}"
             )
             dialog.exec()
-            return []
+            os.exit(1)
+
         except json.JSONDecodeError as e:
             dialog = CopyableErrorDialog(
                 "Notmuch Output Error",
                 f"Failed to parse JSON output from notmuch:\n\n{e}"
             )
             dialog.exec()
-            return []
+            os.exit(1)
 
-    def _find_matching_threads(self, query):
-        """Finds threads matching the query using `notmuch search --output=summary`."""
-        command = [
-            'notmuch',
-            'search',
-            '--format=json',
-            '--output=summary',
-            '--sort=newest-first',
-            query
-        ]
-        return self._run_notmuch_command(command)
+    def flatten_message_tree(self, list_of_groups_of_messages):
+        message_list = []
+        def flatten_message_pair(the_pair):
+            # a pair is a message (dict) followed by a list of message pairs
+            message_list.append(the_pair[0])
+            for msg in the_pair[1]:
+                flatten_message_pair(msg)
+        for thread in list_of_groups_of_messages:
+            for message_pair in thread:
+                flatten_message_pair(message_pair)
+        return message_list
 
-    def _find_matching_messages(self, query):
-        """
-        Finds individual messages matching the query using `notmuch show`,
-        and flattens the output.
-        """
-        command = [
-            'notmuch',
-            'show',
-            '--format=json',
-            '--body=false',
-            '--sort=newest-first',
-            query
-        ]
-        raw_output = self._run_notmuch_command(command)
-        
-        if not raw_output:
-            return []
+    def find_matching_messages(self, query):
+        list_of_messages = self.flatten_message_tree( self.notmuch_show(query, "newest-first") )
+        result = []
+        unique_ids = set()
+        for msg in list_of_messages:
+            if msg["match"] and msg["id"] not in unique_ids:
+                result.append( msg )
+                unique_ids.add(msg["id"])
+        return result
 
-        unique_messages = {}
+    def notmuch_search(self, query, output, sort):
+        try:
+            command = [
+                'notmuch',
+                'search',
+                '--format=json',
+                f'--output={output}',
+                f'--sort={sort}',
+                query
+            ]
+            
+            result = subprocess.run(command, check=True, capture_output=True, text=True)
+            return json.loads(result.stdout)
 
-        # The notmuch show JSON output is a list of thread entries.
-        for thread_entry in raw_output:
-            # Each thread entry is a single-element list.
-            # The content of that list is another list containing a message object
-            # followed by an empty list.
-            if thread_entry and len(thread_entry) > 0 and len(thread_entry[0]) > 0:
-                message_info = thread_entry[0]
-                message_obj = message_info[0]
+        except subprocess.CalledProcessError as e:
+            dialog = CopyableErrorDialog(
+                "Notmuch Query Failed",
+                f"An error occurred while running notmuch:\n\n{e.stderr}"
+            )
+            dialog.exec()
+            os.exit(1)
 
-                if message_obj["id"] not in unique_messages:
-                    unique_messages[message_obj["id"]] = message_obj
-                    
-        return list(unique_messages.values())
+        except json.JSONDecodeError as e:
+            dialog = CopyableErrorDialog(
+                "Notmuch Output Error",
+                f"Failed to parse JSON output from notmuch:\n\n{e}"
+            )
+            dialog.exec()
+            os.exit(1)
+
+    def find_matching_threads(self, query):
+        list_of_threads = self.notmuch_search(query, "summary", "newest-first")
+        return list_of_threads
 
     def execute_query(self):
         self.current_query = self.query_edit.text()
@@ -249,14 +261,14 @@ class QueryResultsViewer(QMainWindow):
             
     def _execute_threads_query(self, my_email_address):
         """Fetches and populates the table with thread data."""
-        self.results = self._find_matching_threads(self.current_query)
+        self.results = self.find_matching_threads(self.current_query)
         self.results_table.setRowCount(len(self.results))
         for row_idx, thread in enumerate(self.results):
             self._update_row_for_thread(row_idx, thread, my_email_address)
 
     def _execute_mails_query(self, my_email_address):
         """Fetches and populates the table with mail data."""
-        self.results = self._find_matching_messages(self.current_query)
+        self.results = self.find_matching_messages(self.current_query)
         self.results_table.setRowCount(len(self.results))
         for row_idx, mail in enumerate(self.results):
             self._update_row_for_mail(row_idx, mail, my_email_address)
