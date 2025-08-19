@@ -18,12 +18,6 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QFont, QFontMetrics, QAction
 from config import Config, config
 
-try:
-    import notmuch
-    NOTMUCH_BINDINGS_AVAILABLE = True
-except ImportError:
-    NOTMUCH_BINDINGS_AVAILABLE = False
-    
 # Set up basic logging to console
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -62,6 +56,7 @@ class QueryResultsViewer(QMainWindow):
         super().__init__()
         self.setWindowTitle("Notmuch Mail Client")
         
+        self.notmuch_enabled = self.check_notmuch_status()
         self.setCentralWidget(QWidget())
         self.layout = QVBoxLayout(self.centralWidget())
         
@@ -99,6 +94,18 @@ class QueryResultsViewer(QMainWindow):
         self.results = []
         self.execute_query()
         
+    def check_notmuch_status(self):
+        try:
+            subprocess.run(['notmuch', '--version'], check=True, capture_output=True)
+            return True
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            dialog = CopyableErrorDialog(
+                "Notmuch Not Found",
+                "The 'notmuch' command was not found. Please ensure it is installed and in your PATH."
+            )
+            dialog.exec()
+            return False
+
     def update_view_mode(self, mode):
         self.view_mode = mode
         self.execute_query()
@@ -109,52 +116,106 @@ class QueryResultsViewer(QMainWindow):
         return {id['email'] for id in identities}
 
     def execute_query(self):
-        if not NOTMUCH_BINDINGS_AVAILABLE:
-            dialog = CopyableErrorDialog(
-                "Notmuch Bindings Not Found",
-                "The 'notmuch' Python bindings were not found. Please ensure they are installed."
-            )
-            dialog.exec()
+        if not self.notmuch_enabled:
             return
-            
+
         self.current_query = self.query_edit.text()
         logging.info(f"Executing query: '{self.current_query}' in '{self.view_mode}' mode.")
         
         my_email_addresses = self.get_my_email_addresses()
         
         try:
-            with notmuch.Database(mode=notmuch.Database.MODE.READ_ONLY) as db:
-                query = db.query(self.current_query)
-                self.results = []
-                
-                if self.view_mode == "threads":
-                    for thread in query.search_threads():
-                        # Get a list of messages to find oldest/newest
-                        messages = list(thread.get_messages())
-                        if messages:
-                            oldest_message = messages[0]
-                            newest_message = messages[-1]
+            # Step 1: Get list of thread or message IDs
+            if self.view_mode == "threads":
+                output_flag = '--output=threads'
+            else: # messages
+                output_flag = '--output=messages'
 
-                            thread_summary = {
-                                "id": thread.get_thread_id(),
-                                "subject": thread.get_subject(),
-                                "authors": thread.get_authors(),
-                                "oldest_date_utc": thread.get_oldest_date(),
-                                "newest_date_utc": thread.get_newest_date(),
-                                "total_messages": thread.get_total_messages(),
-                                "thread_data": messages  # Store the full thread data
-                            }
-                            self.results.append(thread_summary)
-                else: # messages mode
-                    for message in query.search_messages():
-                        self.results.append(message)
+            search_command = [
+                'notmuch',
+                'search',
+                '--format=json',
+                output_flag,
+                self.current_query
+            ]
+            
+            search_result = subprocess.run(
+                search_command,
+                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True
+            )
+            
+            # The output should be a JSON array of thread/message IDs
+            item_ids = json.loads(search_result.stdout)
+            
+            # Step 2: Get detailed data for each ID using 'notmuch show'
+            self.results = []
+            for item_id in item_ids:
+                show_command = [
+                    'notmuch',
+                    'show',
+                    '--format=json',
+                    item_id
+                ]
+                
+                show_result = subprocess.run(
+                    show_command,
+                    check=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True
+                )
+                
+                # The output is a JSON array of message objects for a thread
+                nested_messages = json.loads(show_result.stdout)
+                
+                # Flatten the nested list to a single list of message objects
+                messages = []
+                def flatten(l):
+                    for el in l:
+                        if isinstance(el, list):
+                            flatten(el)
+                        else:
+                            messages.append(el)
+                
+                flatten(nested_messages)
+
+                # Extract summary info for the thread from the message list
+                if self.view_mode == "threads":
+                    if messages:
+                        oldest_message = messages[0]
+                        newest_message = messages[-1]
+                        
+                        thread_summary = {
+                            "id": newest_message.get("thread_id"),
+                            "subject": oldest_message.get("subject"),
+                            "authors": oldest_message.get("authors"),  # Use the first message's author for OP
+                            "oldest_date_utc": oldest_message.get("date_utc"),
+                            "newest_date_utc": newest_message.get("date_utc"),
+                            "total_messages": len(messages),
+                            "thread_data": messages # Store the full thread data
+                        }
+                        self.results.append(thread_summary)
+                else: # messages mode, we expect a single message
+                    if messages:
+                        self.results.append(messages[0])
                 
             self.update_results_table(my_email_addresses)
 
-        except notmuch.NotmuchError as e:
+        except subprocess.CalledProcessError as e:
             dialog = CopyableErrorDialog(
                 "Notmuch Query Failed",
-                f"An error occurred with the notmuch bindings:\n\n{e}"
+                f"An error occurred while running notmuch:\n\n{e.stderr}"
+            )
+            dialog.exec()
+            self.results = []
+            self.results_table.setRowCount(0)
+        except json.JSONDecodeError as e:
+            dialog = CopyableErrorDialog(
+                "Notmuch Output Error",
+                f"Failed to parse JSON output from notmuch:\n\n{e}"
             )
             dialog.exec()
             self.results = []
@@ -181,7 +242,7 @@ class QueryResultsViewer(QMainWindow):
                 author_text = self.format_authors(item.get("authors", ""), my_email_addresses)
                 self.results_table.setItem(row_idx, 0, QTableWidgetItem(author_text))
                 self.results_table.setItem(row_idx, 1, QTableWidgetItem(item.get("subject", "")))
-                self.results_table.setItem(row_idx, 2, QTableWidgetItem(self.format_date(item.get("date"))))
+                self.results_table.setItem(row_idx, 2, QTableWidgetItem(self.format_date(item.get("date_utc"))))
 
         self.results_table.resizeColumnsToContents()
         self.results_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
@@ -225,7 +286,7 @@ class QueryResultsViewer(QMainWindow):
             
             # We open the first message of the thread for now.
             # In a full app, you would likely open a dedicated thread viewer.
-            first_message_id = thread_data[0].get_message_id()
+            first_message_id = thread_data[0].get("id")
             if not first_message_id:
                 QMessageBox.critical(self, "Error", "Could not get message ID for this thread.")
                 return
@@ -241,7 +302,7 @@ class QueryResultsViewer(QMainWindow):
                 QMessageBox.critical(self, "Error", f"Could not find view-mail.py at {script_path}")
                 
         else: # messages mode
-            message_id = item_data.get_message_id()
+            message_id = item_data.get("id")
             if message_id:
                 try:
                     script_path = os.path.join(os.path.dirname(__file__), "view-mail.py")
