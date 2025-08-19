@@ -111,7 +111,6 @@ class QueryResultsViewer(QMainWindow):
         # c) I like the table below.
         self.results_table = QTableWidget()
         self.results_table.setColumnCount(3)
-        self.results_table.setHorizontalHeaderLabels(["Date", "Subject", "Sender/Receiver"])
         self.results_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
         self.results_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         self.results_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
@@ -204,11 +203,10 @@ class QueryResultsViewer(QMainWindow):
     def find_matching_messages(self, query):
         list_of_messages = self.flatten_message_tree( self.notmuch_show(query, "newest-first") )
         result = []
-        unique_ids = set()
         for msg in list_of_messages:
-            if msg["match"] and msg["id"] not in unique_ids:
+            print(f"DEBUG: processing {msg}")
+            if msg["match"]:
                 result.append( msg )
-                unique_ids.add(msg["id"])
         return result
 
     def notmuch_search(self, query, output, sort):
@@ -261,6 +259,7 @@ class QueryResultsViewer(QMainWindow):
             
     def _execute_threads_query(self, my_email_address):
         """Fetches and populates the table with thread data."""
+        self.results_table.setHorizontalHeaderLabels(["Date", "Subject", "Authors"])
         self.results = self.find_matching_threads(self.current_query)
         self.results_table.setRowCount(len(self.results))
         for row_idx, thread in enumerate(self.results):
@@ -268,6 +267,7 @@ class QueryResultsViewer(QMainWindow):
 
     def _execute_mails_query(self, my_email_address):
         """Fetches and populates the table with mail data."""
+        self.results_table.setHorizontalHeaderLabels(["Date", "Subject", "Sender/Receiver"])
         self.results = self.find_matching_messages(self.current_query)
         self.results_table.setRowCount(len(self.results))
         for row_idx, mail in enumerate(self.results):
