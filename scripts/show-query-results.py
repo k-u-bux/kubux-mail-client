@@ -59,7 +59,7 @@ class QueryResultsViewer(QMainWindow):
         self.setWindowTitle("Kubux Notmuch Mail Client - Queries")
         self.setMinimumSize(QSize(1024, 768))
 
-        self.notmuch_enabled = self.check_notmuch()
+        self.notmuch_enabled = self.check_notmuch_bindings()
 
         self.view_mode = "threads" # or "mails"
         self.current_query = query_string
@@ -69,7 +69,7 @@ class QueryResultsViewer(QMainWindow):
         self.setup_key_bindings()
         self.execute_query()
 
-    def check_notmuch(self):
+    def check_notmuch_bindings(self):
         """Checks if the notmuch Python bindings are available."""
         if not NOTMUCH_BINDINGS_AVAILABLE:
             dialog = CopyableErrorDialog(
@@ -208,7 +208,10 @@ class QueryResultsViewer(QMainWindow):
         except notmuch.NotmuchError as e:
             dialog = CopyableErrorDialog(
                 "Notmuch Query Failed",
-                f"An error occurred with the notmuch bindings:\n\n{e}"
+                f"The notmuch database could not be opened. This can happen if the `notmuch` configuration file "
+                f"is not found. Please ensure your `NOTMUCH_CONFIG` environment variable is set or a valid "
+                f"configuration exists in the default locations.\n\n"
+                f"Original Error: {e}"
             )
             dialog.exec()
             self.results = []
