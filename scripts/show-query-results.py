@@ -68,6 +68,9 @@ class QueryResultsViewer(QMainWindow):
         self.setWindowTitle("Kubux Notmuch Mail Client - Queries")
         self.setMinimumSize(QSize(1024, 768))
 
+        self.notmuch_config_path = self.get_notmuch_config_path()
+        self.notmuch_enabled = self.check_notmuch()
+
         self.view_mode = "threads" # or "mails"
         self.current_query = query_string
         self.results = []
@@ -75,6 +78,35 @@ class QueryResultsViewer(QMainWindow):
         self.setup_ui()
         self.setup_key_bindings()
         self.execute_query()
+
+    def get_notmuch_config_path(self):
+        """
+        Fetches the notmuch config path from the default location.
+        The default is ~/.config/kubux-mail-client/config
+        """
+        return Path("~/.config/kubux-mail-client/config").expanduser()
+
+    def check_notmuch(self):
+        """Checks if the notmuch command and the config file are available."""
+        try:
+            subprocess.run(['notmuch', '--version'], check=True, capture_output=True)
+            if not self.notmuch_config_path.exists():
+                dialog = CopyableErrorDialog(
+                    "Notmuch Config Not Found",
+                    f"Notmuch config file not found at: {self.notmuch_config_path}\n"
+                    f"Queries will not work."
+                )
+                dialog.exec()
+                return False
+            return True
+        except (subprocess.CalledProcessError, FileNotFoundError) as e:
+            dialog = CopyableErrorDialog(
+                "Notmuch Not Found",
+                f"The 'notmuch' command was not found or is not executable.\n"
+                f"Query-related functionality will be disabled.\n\nError: {e}"
+            )
+            dialog.exec()
+            return False
 
     def setup_ui(self):
         central_widget = QWidget()
@@ -152,96 +184,104 @@ class QueryResultsViewer(QMainWindow):
     def get_my_email_address(self):
         """Retrieves the user's email address from notmuch config."""
         try:
-            command = ['notmuch', 'config', 'get', 'user.primary_email']
+            command = ['notmuch', '--config', str(self.notmuch_config_path), 'config', 'get', 'user.primary_email']
             result = subprocess.run(command, check=True, capture_output=True, text=True)
             return result.stdout.strip()
         except subprocess.CalledProcessError as e:
             logging.error(f"Failed to get primary email from notmuch config: {e.stderr}")
             return None
     
-    def notmuch_search(query, output, sort):
+    def _run_notmuch_command(self, command):
+        """
+        Executes a notmuch command and handles errors with a GUI dialog.
+        
+        Args:
+            command (list): The command and its arguments.
+        
+        Returns:
+            dict or list: The JSON output from notmuch.
+        """
         try:
-            command = [
-                'notmuch',
-                'search',
-                '--format=json',
-                f'--output={output}',
-                f'--sort={sort}'
-                query
-            ]
-            
             result = subprocess.run(command, check=True, capture_output=True, text=True)
             return json.loads(result.stdout)
-
         except subprocess.CalledProcessError as e:
             dialog = CopyableErrorDialog(
                 "Notmuch Query Failed",
                 f"An error occurred while running notmuch:\n\n{e.stderr}"
             )
             dialog.exec()
-            os.exit(1)
-
+            return []
         except json.JSONDecodeError as e:
             dialog = CopyableErrorDialog(
                 "Notmuch Output Error",
                 f"Failed to parse JSON output from notmuch:\n\n{e}"
             )
             dialog.exec()
-            os.exit(1)
+            return []
+    
+    def execute_query(self):
+        if not self.notmuch_enabled:
+            return
 
-    def find_matching_threads(query):
-        list_of_threads = notmuch_search(query, "summary", "newest-first")
-        return list_of_threads
+        self.current_query = self.query_edit.text()
+        logging.info(f"Executing query: '{self.current_query}' in '{self.view_mode}' mode.")
+        
+        self.results_table.setRowCount(0)
+        self.results_table.clearContents()
+        
+        my_email_address = self.get_my_email_address()
 
-    def notmuch_show(query, sort):
-        try:
+        if self.view_mode == "threads":
             command = [
                 'notmuch',
+                '--config', str(self.notmuch_config_path),
+                'search',
+                '--format=json',
+                '--output=summary',
+                f'--sort=newest-first',
+                self.current_query
+            ]
+            self.results = self._run_notmuch_command(command)
+        else: # mails mode
+            command = [
+                'notmuch',
+                '--config', str(self.notmuch_config_path),
                 'show',
                 '--format=json',
                 '--body=false',
-                f'--sort={sort}'
-                query
+                f'--sort=newest-first',
+                self.current_query
             ]
-            
-            result = subprocess.run(command, check=True, capture_output=True, text=True)
-            return json.loads(result.stdout)
+            # notmuch show returns a nested list, we need to flatten it.
+            raw_output = self._run_notmuch_command(command)
+            self.results = self._flatten_message_tree(raw_output)
 
-        except subprocess.CalledProcessError as e:
-            dialog = CopyableErrorDialog(
-                "Notmuch Query Failed",
-                f"An error occurred while running notmuch:\n\n{e.stderr}"
-            )
-            dialog.exec()
-            os.exit(1)
+        self.update_results_table(my_email_address)
 
-        except json.JSONDecodeError as e:
-            dialog = CopyableErrorDialog(
-                "Notmuch Output Error",
-                f"Failed to parse JSON output from notmuch:\n\n{e}"
-            )
-            dialog.exec()
-            os.exit(1)
-
-    def flatten_message_tree(list_of_groups_of_messages):
+    def _flatten_message_tree(self, list_of_groups_of_messages):
+        """
+        Flattens the nested JSON output from `notmuch show` into a simple list of message objects.
+        """
         message_list = []
-        def flatten_message_pair(the_pair):
-            # a pair is a message (dict) followed by a list of message pairs
-            message_list.append(the_pair[0])
-            for msg in the_pair[1]:
-                flatten_message_pair(msg)
-        for thread in list_of_groups_of_messages:
-            for message_pair in thread:
-                flatten_message_pair(message_pair)
-        return message_list
+        unique_ids = set()
+        
+        if not list_of_groups_of_messages:
+            return []
+            
+        # notmuch show output is a list of thread entries.
+        for thread_entry in list_of_groups_of_messages:
+            # Each thread entry is a single-element list.
+            # The content of that list is another list containing a message object
+            # followed by an empty list.
+            if thread_entry and len(thread_entry) > 0 and len(thread_entry[0]) > 0:
+                message_info = thread_entry[0]
+                message_obj = message_info[0]
 
-    def find_matching_messages(query):
-        list_of_messages = flatten_message_tree( notmuch_show(query, "newest-first") )
-        result = []
-        for msg in list_of_messages:
-            if msg["match"]:
-                result.append( msg )
-        return result
+                if message_obj["id"] not in unique_ids:
+                    message_list.append(message_obj)
+                    unique_ids.add(message_obj["id"])
+                    
+        return message_list
 
     def update_results_table(self, my_email_address):
         """Populates the table with the new query results."""
@@ -253,9 +293,9 @@ class QueryResultsViewer(QMainWindow):
                 self._update_row_for_mail(row_idx, item, my_email_address)
 
     def _update_row_for_thread(self, row_idx, thread, my_email_address):
-        """Helper to populate a row for a thread item."""
+        """Helper to populate a row for a thread item from `notmuch search --output=summary`."""
         
-        date_stamp = thread.get("newest_date_utc", thread.get("newest_date"))
+        date_stamp = thread.get("newest_date")
         date_item = self._create_date_item(date_stamp)
         self.results_table.setItem(row_idx, 0, date_item)
         
@@ -267,22 +307,24 @@ class QueryResultsViewer(QMainWindow):
         sender_receiver_item = QTableWidgetItem(sender_receiver_text)
         self.results_table.setItem(row_idx, 2, sender_receiver_item)
         
+        # Store the entire thread object in the first column's user data
         self.results_table.item(row_idx, 0).setData(Qt.ItemDataRole.UserRole, thread)
 
     def _update_row_for_mail(self, row_idx, mail, my_email_address):
-        """Helper to populate a row for a mail item."""
+        """Helper to populate a row for a mail item from `notmuch show`."""
         
-        date_stamp = mail.get("date_utc", mail.get("date"))
+        date_stamp = mail.get("timestamp")
         date_item = self._create_date_item(date_stamp)
         self.results_table.setItem(row_idx, 0, date_item)
         
-        subject_item = QTableWidgetItem(mail.get("subject"))
+        subject_item = QTableWidgetItem(mail.get("headers", {}).get("Subject", "No Subject"))
         self.results_table.setItem(row_idx, 1, subject_item)
         
-        sender_receiver_text = self._get_sender_receiver(mail.get("authors", ""), my_email_address)
+        sender_receiver_text = self._get_sender_receiver(mail.get("headers", {}).get("From", ""), my_email_address)
         sender_receiver_item = QTableWidgetItem(sender_receiver_text)
         self.results_table.setItem(row_idx, 2, sender_receiver_item)
         
+        # Store the entire mail object in the first column's user data
         self.results_table.item(row_idx, 0).setData(Qt.ItemDataRole.UserRole, mail)
         
     def _create_date_item(self, timestamp):
@@ -319,7 +361,8 @@ class QueryResultsViewer(QMainWindow):
         item_data = self.results_table.item(row, 0).data(Qt.ItemDataRole.UserRole)
         
         if self.view_mode == "threads":
-            thread_id = item_data.get("id")
+            # notmuch search with --output=summary returns a "thread" key
+            thread_id = item_data.get("thread")
             if thread_id:
                 logging.info(f"Launching thread viewer for thread ID: {thread_id}")
                 # Placeholder for the command to launch thread viewer
@@ -332,7 +375,7 @@ class QueryResultsViewer(QMainWindow):
                 logging.info(f"Launching mail viewer for file: {mail_file_path}")
                 try:
                     viewer_path = os.path.join(os.path.dirname(__file__), "view-mail.py")
-                    subprocess.Popen(["python3", viewer_path, mail_file_path])
+                    subprocess.Popen(["python3", viewer_path, mail_file_path[0]])
                 except Exception as e:
                     QMessageBox.critical(self, "Error", f"Could not launch mail viewer: {e}")
             else:
