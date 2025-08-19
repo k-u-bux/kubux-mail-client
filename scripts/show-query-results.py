@@ -186,7 +186,53 @@ class QueryResultsViewer(QMainWindow):
             )
             dialog.exec()
             return []
-    
+
+    def _find_matching_threads(self, query):
+        """Finds threads matching the query using `notmuch search --output=summary`."""
+        command = [
+            'notmuch',
+            'search',
+            '--format=json',
+            '--output=summary',
+            '--sort=newest-first',
+            query
+        ]
+        return self._run_notmuch_command(command)
+
+    def _find_matching_messages(self, query):
+        """
+        Finds individual messages matching the query using `notmuch show`,
+        and flattens the output.
+        """
+        command = [
+            'notmuch',
+            'show',
+            '--format=json',
+            '--body=false',
+            '--sort=newest-first',
+            query
+        ]
+        raw_output = self._run_notmuch_command(command)
+        
+        if not raw_output:
+            return []
+
+        unique_messages = {}
+
+        # The notmuch show JSON output is a list of thread entries.
+        for thread_entry in raw_output:
+            # Each thread entry is a single-element list.
+            # The content of that list is another list containing a message object
+            # followed by an empty list.
+            if thread_entry and len(thread_entry) > 0 and len(thread_entry[0]) > 0:
+                message_info = thread_entry[0]
+                message_obj = message_info[0]
+
+                if message_obj["id"] not in unique_messages:
+                    unique_messages[message_obj["id"]] = message_obj
+                    
+        return list(unique_messages.values())
+
     def execute_query(self):
         self.current_query = self.query_edit.text()
         logging.info(f"Executing query: '{self.current_query}' in '{self.view_mode}' mode.")
@@ -195,65 +241,25 @@ class QueryResultsViewer(QMainWindow):
         self.results_table.clearContents()
         
         my_email_address = self.get_my_email_address()
-
-        if self.view_mode == "threads":
-            command = [
-                'notmuch',
-                'search',
-                '--format=json',
-                '--output=summary',
-                '--sort=newest-first',
-                self.current_query
-            ]
-            self.results = self._run_notmuch_command(command)
-        else: # mails mode
-            command = [
-                'notmuch',
-                'show',
-                '--format=json',
-                '--body=false',
-                '--sort=newest-first',
-                self.current_query
-            ]
-            # notmuch show returns a nested list, we need to flatten it.
-            raw_output = self._run_notmuch_command(command)
-            self.results = self._flatten_message_tree(raw_output)
-
-        self.update_results_table(my_email_address)
-
-    def _flatten_message_tree(self, list_of_groups_of_messages):
-        """
-        Flattens the nested JSON output from `notmuch show` into a simple list of message objects.
-        """
-        message_list = []
-        unique_ids = set()
         
-        if not list_of_groups_of_messages:
-            return []
+        if self.view_mode == "threads":
+            self._execute_threads_query(my_email_address)
+        else: # mails mode
+            self._execute_mails_query(my_email_address)
             
-        # notmuch show output is a list of thread entries.
-        for thread_entry in list_of_groups_of_messages:
-            # Each thread entry is a single-element list.
-            # The content of that list is another list containing a message object
-            # followed by an empty list.
-            if thread_entry and len(thread_entry) > 0 and len(thread_entry[0]) > 0:
-                message_info = thread_entry[0]
-                message_obj = message_info[0]
-
-                if message_obj["id"] not in unique_ids:
-                    message_list.append(message_obj)
-                    unique_ids.add(message_obj["id"])
-                    
-        return message_list
-
-    def update_results_table(self, my_email_address):
-        """Populates the table with the new query results."""
+    def _execute_threads_query(self, my_email_address):
+        """Fetches and populates the table with thread data."""
+        self.results = self._find_matching_threads(self.current_query)
         self.results_table.setRowCount(len(self.results))
-        for row_idx, item in enumerate(self.results):
-            if self.view_mode == "threads":
-                self._update_row_for_thread(row_idx, item, my_email_address)
-            else: # mails mode
-                self._update_row_for_mail(row_idx, item, my_email_address)
+        for row_idx, thread in enumerate(self.results):
+            self._update_row_for_thread(row_idx, thread, my_email_address)
+
+    def _execute_mails_query(self, my_email_address):
+        """Fetches and populates the table with mail data."""
+        self.results = self._find_matching_messages(self.current_query)
+        self.results_table.setRowCount(len(self.results))
+        for row_idx, mail in enumerate(self.results):
+            self._update_row_for_mail(row_idx, mail, my_email_address)
 
     def _update_row_for_thread(self, row_idx, thread, my_email_address):
         """Helper to populate a row for a thread item from `notmuch search --output=summary`."""
@@ -285,7 +291,7 @@ class QueryResultsViewer(QMainWindow):
         
         sender_receiver_text = self._get_sender_receiver(mail.get("headers", {}).get("From", ""), my_email_address)
         sender_receiver_item = QTableWidgetItem(sender_receiver_text)
-        self.results_table.setItem(row_idx, 2, sender_receiver_item)
+        self.results_table.setItem(row_idx, 2, sender_receiver_text)
         
         # Store the entire mail object in the first column's user data
         self.results_table.item(row_idx, 0).setData(Qt.ItemDataRole.UserRole, mail)
