@@ -33,7 +33,7 @@ class QueryResultsViewer(QMainWindow):
     def __init__(self, query_string="tag:inbox and tag:unread", parent=None):
         super().__init__(parent)
         self.setWindowTitle("Kubux Notmuch Mail Client - Queries")
-        self.setMinimumSize(QSize(1024, 768))
+        self.resize(QSize(1024, 768))
 
         self.view_mode = "threads" # or "mails"
         self.current_query = query_string

@@ -72,7 +72,7 @@ class MailViewer(QMainWindow):
     def __init__(self, mail_file_path, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Kubux Notmuch Mail Client - Viewer")
-        self.setMinimumSize(QSize(1024, 768))
+        self.resize(QSize(1024, 768))
 
         self.mail_file_path = Path(mail_file_path).expanduser()
         self.message = self.parse_mail_file()
