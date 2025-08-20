@@ -10,7 +10,7 @@ from PySide6.QtWidgets import (
     QPushButton, QTableWidget, QTableWidgetItem, QHeaderView,
     QAbstractItemView, QMenu, QStyledItemDelegate, QLineEdit
 )
-from PySide6.QtCore import Qt, QSize, QEvent, QTimer
+from PySide6.QtCore import Qt, QSize, QEvent, QTimer, QPoint
 from PySide6.QtGui import QMouseEvent
 import logging
 
@@ -23,18 +23,20 @@ from common import display_error
 
 
 class CustomLineEdit(QLineEdit):
-    """A custom line edit that doesn't select text on focus or click."""
-    def __init__(self, parent=None):
+    """A custom line edit that handles click positions and doesn't select text."""
+    def __init__(self, parent=None, click_pos=None):
         super().__init__(parent)
+        # Store the original click position if provided
+        self.initial_click_pos = click_pos
         
     def mousePressEvent(self, event):
-        # Get cursor position at click point
+        # Remember the cursor position for this click
         cursor_pos = self.cursorPositionAt(event.pos())
         
-        # Call parent implementation which handles selection
+        # Call parent implementation
         super().mousePressEvent(event)
         
-        # Immediately clear any selection and position cursor where clicked
+        # Clear any selection and position cursor where clicked
         self.deselect()
         self.setCursorPosition(cursor_pos)
         
@@ -42,34 +44,49 @@ class CustomLineEdit(QLineEdit):
         # Call parent implementation
         super().focusInEvent(event)
         
-        # Immediately clear any selection that was made
-        cursor_pos = self.cursorPosition()
+        # Clear any selection
         self.deselect()
-        self.setCursorPosition(cursor_pos)
+        
+        # If we have an initial click position, use it
+        if self.initial_click_pos is not None:
+            cursor_pos = self.cursorPositionAt(self.initial_click_pos)
+            self.setCursorPosition(cursor_pos)
+            # Clear it so we only use it once
+            self.initial_click_pos = None
 
 
-class NoSelectTextDelegate(QStyledItemDelegate):
+class PositionAwareDelegate(QStyledItemDelegate):
     """
     A delegate that creates a custom QLineEdit for editing table cells,
-    ensuring text is never auto-selected.
+    positions the cursor at the click position, and ensures text is never auto-selected.
     """
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.click_pos = None
+    
     def createEditor(self, parent, option, index):
-        editor = CustomLineEdit(parent)
+        # Create our custom editor with the click position
+        editor = CustomLineEdit(parent, self.click_pos)
         editor.setFont(config.get_text_font())
         return editor
     
     def setEditorData(self, editor, index):
         # Get the text from the model
         text = index.model().data(index, Qt.ItemDataRole.DisplayRole)
-        # Set the text in the editor without selecting it
+        # Set the text in the editor
         editor.setText(text)
         
-        # Important: This deselects any text and moves cursor to end
+        # Ensure no text is selected
         editor.deselect()
         
-        # Schedule a second deselection after a tiny delay to handle any 
-        # platform-specific focus behaviors
-        QTimer.singleShot(0, editor.deselect)
+        # If we have a click position, use it to position the cursor
+        if self.click_pos and isinstance(editor, CustomLineEdit):
+            cursor_pos = editor.cursorPositionAt(self.click_pos)
+            editor.setCursorPosition(cursor_pos)
+    
+    def setClickPosition(self, pos):
+        """Store the click position for use when creating the editor."""
+        self.click_pos = pos
 
 
 class QueryEditor(QMainWindow):
@@ -79,6 +96,9 @@ class QueryEditor(QMainWindow):
         self.setMinimumSize(QSize(800, 600))
         
         self.query_parser = QueryParser(config.config_path.parent)
+        
+        # Create our custom delegate to track click positions
+        self.text_delegate = PositionAwareDelegate()
         
         self.setup_ui()
         self.load_queries_into_table()
@@ -118,26 +138,40 @@ class QueryEditor(QMainWindow):
         self.query_table.verticalHeader().setVisible(False)
         self.query_table.setFont(config.get_text_font())
         
-        # Critical change: Use AnyKeyPressed as a trigger, and enable SingleClicked
+        # Configure editing behavior
         self.query_table.setEditTriggers(
             QAbstractItemView.EditTrigger.AnyKeyPressed | 
-            QAbstractItemView.EditTrigger.SelectedClicked |
-            QAbstractItemView.EditTrigger.CurrentChanged
+            QAbstractItemView.EditTrigger.SelectedClicked
         )
         
-        # Use our improved delegate for editing
-        self.query_table.setItemDelegate(NoSelectTextDelegate())
+        # Use our position-aware delegate for editing
+        self.query_table.setItemDelegate(self.text_delegate)
         
         # Connect signals for saving and opening queries
         self.query_table.cellChanged.connect(self.save_queries_from_table)
         self.query_table.cellDoubleClicked.connect(self.open_query_results)
-        self.query_table.cellClicked.connect(self.activate_edit_on_click)
+        
+        # Install event filter to track mouse position
+        self.query_table.viewport().installEventFilter(self)
 
         main_layout.addWidget(self.query_table)
 
-    def activate_edit_on_click(self, row, column):
-        """Force edit mode on a single click."""
-        self.query_table.editItem(self.query_table.item(row, column))
+    def eventFilter(self, obj, event):
+        """Track mouse events to capture click position."""
+        if obj is self.query_table.viewport():
+            if event.type() == QEvent.Type.MouseButtonPress:
+                # Store the mouse position when clicking
+                self.text_delegate.setClickPosition(event.pos())
+                
+                # Get the cell at the click position
+                row = self.query_table.rowAt(event.pos().y())
+                column = self.query_table.columnAt(event.pos().x())
+                
+                if row >= 0 and column >= 0:
+                    # Activate edit mode on the clicked cell
+                    QTimer.singleShot(0, lambda: self.query_table.editItem(self.query_table.item(row, column)))
+                
+        return super().eventFilter(obj, event)
 
     def load_queries_into_table(self):
         """Loads named queries from the parser into the table."""
@@ -191,6 +225,9 @@ class QueryEditor(QMainWindow):
         query_item = QTableWidgetItem("")
         query_item.setFont(config.get_text_font())
         self.query_table.setItem(row_count, 1, query_item)
+        
+        # Select the new row
+        self.query_table.setCurrentCell(row_count, 0)
 
     def open_query_results(self, row, column):
         """Launches show-query-results.py with the selected query."""
