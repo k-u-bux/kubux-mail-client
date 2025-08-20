@@ -85,15 +85,15 @@ class QueryResultsViewer(QMainWindow):
         top_bar_layout = QHBoxLayout()
         main_layout.addLayout(top_bar_layout)
         
+        # View mode toggle button
+        self.view_mode_button = QPushButton("Thread View (toggle for mail view)")
+        self.view_mode_button.clicked.connect(self.toggle_view_mode)
+        top_bar_layout.addWidget(self.view_mode_button)
+
         # Refresh button
         self.refresh_button = QPushButton("Refresh")
         self.refresh_button.clicked.connect(self.execute_query)
         top_bar_layout.addWidget(self.refresh_button)
-
-        # View mode toggle button
-        self.view_mode_button = QPushButton("Mail View")
-        self.view_mode_button.clicked.connect(self.toggle_view_mode)
-        top_bar_layout.addWidget(self.view_mode_button)
 
         # Spacer to push the quit button to the right
         top_bar_layout.addStretch()
@@ -111,19 +111,49 @@ class QueryResultsViewer(QMainWindow):
         # c) I like the table below.
         self.results_table = QTableWidget()
         self.results_table.setColumnCount(3)
-        self.results_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
-        self.results_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        # self.results_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+        # self.results_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         self.results_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.results_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        
-        # Sort by date descending by default
+        # self.results_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        self.results_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Interactive)
+        self.results_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+        self.results_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Interactive)
+        self.results_table.verticalHeader().setVisible(False)
         self.results_table.setSortingEnabled(True)
-        self.results_table.sortByColumn(0, Qt.SortOrder.DescendingOrder)
+        # self.results_table.sortByColumn(2, Qt.SortOrder.DescendingOrder)
+        # self.results_table.sortByColumn(1, Qt.SortOrder.DescendingOrder)
+        # self.results_table.sortByColumn(0, Qt.SortOrder.DescendingOrder)
 
         main_layout.addWidget(self.results_table)
         
         # Connect click to action
         self.results_table.doubleClicked.connect(self.open_selected_item)
+
+    def showEvent(self, event):
+        """Called when the widget is shown."""
+        super().showEvent(event)
+
+        # Ensure the table is not empty to avoid errors
+        if self.results_table.rowCount() == 0:
+            return
+
+        # Get the total available width of the table
+        total_width = self.results_table.viewport().width()
+
+        # Get the width of the Date column after it has been sized to its contents
+        date_col_width = self.results_table.columnWidth(0)
+
+        # Calculate the remaining space
+        remaining_width = total_width - date_col_width
+
+        # Calculate the target widths for Subject and Sender based on 80:20 ratio
+        subject_col_width = int(remaining_width * 0.70)
+        sender_col_width = int(remaining_width * 0.30)
+
+        # Apply the new widths
+        self.results_table.setColumnWidth(1, subject_col_width)
+        self.results_table.setColumnWidth(2, sender_col_width)
 
     def setup_key_bindings(self):
         """Sets up key bindings based on the config file."""
@@ -142,10 +172,10 @@ class QueryResultsViewer(QMainWindow):
     def toggle_view_mode(self):
         if self.view_mode == "threads":
             self.view_mode = "mails"
-            self.view_mode_button.setText("Thread View")
+            self.view_mode_button.setText("Mail View (toggle for thread view)")
         else:
             self.view_mode = "threads"
-            self.view_mode_button.setText("Mail View")
+            self.view_mode_button.setText("Thread View (toggle for mail view)")
         self.execute_query()
 
     def get_my_email_address(self):
@@ -204,7 +234,6 @@ class QueryResultsViewer(QMainWindow):
         list_of_messages = self.flatten_message_tree( self.notmuch_show(query, "newest-first") )
         result = []
         for msg in list_of_messages:
-            print(f"DEBUG: processing {msg}")
             if msg["match"]:
                 result.append( msg )
         return result
@@ -259,53 +288,56 @@ class QueryResultsViewer(QMainWindow):
             
     def _execute_threads_query(self, my_email_address):
         """Fetches and populates the table with thread data."""
-        self.results_table.setHorizontalHeaderLabels(["Date", "Subject", "Authors"])
         self.results = self.find_matching_threads(self.current_query)
+        self.results_table.setHorizontalHeaderLabels(["Date", "Subject", "Authors"])
         self.results_table.setRowCount(len(self.results))
+        self.results_table.setSortingEnabled(False)
         for row_idx, thread in enumerate(self.results):
             self._update_row_for_thread(row_idx, thread, my_email_address)
+        self.results_table.setSortingEnabled(True)
 
     def _execute_mails_query(self, my_email_address):
         """Fetches and populates the table with mail data."""
-        self.results_table.setHorizontalHeaderLabels(["Date", "Subject", "Sender/Receiver"])
         self.results = self.find_matching_messages(self.current_query)
+        self.results_table.setHorizontalHeaderLabels(["Date", "Subject", "Sender/Receiver"])
         self.results_table.setRowCount(len(self.results))
+        self.results_table.setSortingEnabled(False)
         for row_idx, mail in enumerate(self.results):
             self._update_row_for_mail(row_idx, mail, my_email_address)
-
+        self.results_table.setSortingEnabled(True)
+        
     def _update_row_for_thread(self, row_idx, thread, my_email_address):
         """Helper to populate a row for a thread item from `notmuch search --output=summary`."""
         
-        date_stamp = thread.get("newest_date")
+        date_stamp = thread.get("timestamp")
         date_item = self._create_date_item(date_stamp)
         self.results_table.setItem(row_idx, 0, date_item)
         
-        subject_text = f"{thread.get('subject')} ({thread.get('total_messages')})"
+        subject_text = f"<{thread.get('total')}> {thread.get('subject')}"
         subject_item = QTableWidgetItem(subject_text)
         self.results_table.setItem(row_idx, 1, subject_item)
         
         # Directly use the authors field from the thread summary
-        sender_receiver_item = QTableWidgetItem(thread.get("authors", "Unknown"))
-        self.results_table.setItem(row_idx, 2, sender_receiver_item)
+        authors_item = QTableWidgetItem(thread.get("authors", "Unknown"))
+        self.results_table.setItem(row_idx, 2, authors_item)
         
         # Store the entire thread object in the first column's user data
         self.results_table.item(row_idx, 0).setData(Qt.ItemDataRole.UserRole, thread)
 
     def _update_row_for_mail(self, row_idx, mail, my_email_address):
         """Helper to populate a row for a mail item from `notmuch show`."""
-        
         date_stamp = mail.get("timestamp")
         date_item = self._create_date_item(date_stamp)
         self.results_table.setItem(row_idx, 0, date_item)
         
-        subject_item = QTableWidgetItem(mail.get("headers", {}).get("Subject", "No Subject"))
+        subject_text = mail.get("headers", {}).get("Subject", "No Subject")
+        subject_item = QTableWidgetItem(subject_text)
         self.results_table.setItem(row_idx, 1, subject_item)
         
         sender_receiver_text = self._get_sender_receiver(mail.get("headers", {}).get("From", ""), my_email_address)
         sender_receiver_item = QTableWidgetItem(sender_receiver_text)
-        self.results_table.setItem(row_idx, 2, sender_receiver_text)
+        self.results_table.setItem(row_idx, 2, sender_receiver_item)
         
-        # Store the entire mail object in the first column's user data
         self.results_table.item(row_idx, 0).setData(Qt.ItemDataRole.UserRole, mail)
         
     def _create_date_item(self, timestamp):
