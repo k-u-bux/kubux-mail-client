@@ -22,32 +22,14 @@ import logging
 import mimetypes
 import subprocess
 import email.utils
+
 from config import config
+from common import display_error
 
 # Set up basic logging to console
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # --- Custom Widgets ---
-
-class CopyableErrorDialog(QDialog):
-    def __init__(self, title, message, parent=None):
-        super().__init__(parent)
-        self.setWindowTitle(title)
-        self.setMinimumWidth(500)
-        
-        layout = QVBoxLayout(self)
-        
-        label = QLabel("The following error occurred:")
-        layout.addWidget(label)
-        
-        self.text_edit = QTextEdit()
-        self.text_edit.setReadOnly(True)
-        self.text_edit.setPlainText(message)
-        layout.addWidget(self.text_edit)
-        
-        button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok)
-        button_box.accepted.connect(self.accept)
-        layout.addWidget(button_box)
 
 class EmailAddressLineEdit(QLineEdit):
     """
@@ -179,8 +161,7 @@ class MailEditor(QMainWindow):
                 return email.message_from_binary_file(f, policy=policy.default)
         except Exception as e:
             logging.error(f"Failed to parse draft mail file: {e}")
-            dialog = CopyableErrorDialog("Parsing Error", f"Failed to parse draft mail file:\n{e}")
-            dialog.exec()
+            display_error("Parsing Error", f"Failed to parse draft mail file:\n{e}")
             return None
 
     def setup_ui(self):
@@ -397,8 +378,7 @@ class MailEditor(QMainWindow):
                 self.attachments.append(part)
                 self.attachments_list.addItem(file_path.name)
         except Exception as e:
-            dialog = CopyableErrorDialog("Failed to Add Attachment", f"Failed to add attachment:\n{e}")
-            dialog.exec()
+            display_error("Failed to Add Attachment", f"Failed to add attachment:\n{e}")
 
     def remove_attachment(self, item):
         row = self.attachments_list.row(item)
@@ -450,8 +430,7 @@ class MailEditor(QMainWindow):
                 return tmp_path
 
         except Exception as e:
-            dialog = CopyableErrorDialog("Draft Creation Error", f"Failed to create draft file:\n{e}")
-            dialog.exec()
+            display_error("Draft Creation Error", f"Failed to create draft file:\n{e}")
             return None
 
     def save_message(self):
@@ -481,8 +460,7 @@ class MailEditor(QMainWindow):
                 os.remove(self.mail_file_path)
             except Exception as e:
                 logging.error(f"Failed to delete draft file: {e}")
-                dialog = CopyableErrorDialog("Discard Error", f"Failed to delete draft file:\n{e}")
-                dialog.exec()
+                display_error("Discard Error", f"Failed to delete draft file:\n{e}")
                 return
         
         self.close()

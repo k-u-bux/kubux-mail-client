@@ -10,10 +10,6 @@ from email.utils import getaddresses
 import re
 from datetime import datetime, timezone
 
-# Assuming 'notmuch.py' is in a package that can be imported
-from notmuch import notmuch_show, flatten_message_tree, find_matching_messages, find_matching_threads
-from config import config
-
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLineEdit, QPushButton, QTableWidget, QTableWidgetItem, QHeaderView,
@@ -24,33 +20,12 @@ from PySide6.QtCore import Qt, QSize
 from PySide6.QtGui import QFont, QKeySequence, QAction
 import logging
 
+from notmuch import notmuch_show, flatten_message_tree, find_matching_messages, find_matching_threads
+from config import config
+from common import display_error
+
 # Set up basic logging to console
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-
-# Custom dialog for displaying copyable error messages
-class CopyableErrorDialog(QDialog):
-    def __init__(self, title, message, parent=None):
-        super().__init__(parent)
-        self.setWindowTitle(title)
-        self.setMinimumWidth(500)
-        
-        layout = QVBoxLayout(self)
-        
-        label = QLabel("The following error occurred:")
-        layout.addWidget(label)
-        
-        self.text_edit = QTextEdit()
-        self.text_edit.setReadOnly(True)
-        self.text_edit.setPlainText(message)
-        layout.addWidget(self.text_edit)
-        
-        button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok)
-        button_box.accepted.connect(self.accept)
-        layout.addWidget(button_box)
-
-def display_error(parent, title, message):
-    dialog = CopyableErrorDialog( title, message, parent=parent )
-    dialog.exec()
 
 
 class ThreadViewer(QMainWindow):

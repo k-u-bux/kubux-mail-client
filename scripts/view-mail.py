@@ -21,7 +21,9 @@ import logging
 import subprocess
 import json
 import textwrap
+
 from config import config
+from common import display_error
 
 # Set up basic logging to console
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -31,27 +33,6 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 # In a future version, this should be loaded from the config file.
 MY_EMAIL_ADDRESS = "your.email@example.com"
 
-
-# Custom dialog for displaying copyable error messages
-class CopyableErrorDialog(QDialog):
-    def __init__(self, title, message, parent=None):
-        super().__init__(parent)
-        self.setWindowTitle(title)
-        self.setMinimumWidth(500)
-        
-        layout = QVBoxLayout(self)
-        
-        label = QLabel("The following error occurred:")
-        layout.addWidget(label)
-        
-        self.text_edit = QTextEdit()
-        self.text_edit.setReadOnly(True)
-        self.text_edit.setPlainText(message)
-        layout.addWidget(self.text_edit)
-        
-        button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok)
-        button_box.accepted.connect(self.accept)
-        layout.addWidget(button_box)
 
 # Custom widget for clickable email addresses
 class ClickableLabel(QLabel):
@@ -119,12 +100,11 @@ class MailViewer(QMainWindow):
             subprocess.run(['notmuch', '--version'], check=True, capture_output=True)
             return True
         except (subprocess.CalledProcessError, FileNotFoundError) as e:
-            dialog = CopyableErrorDialog(
+            display_error(
                 "Notmuch Not Found",
                 f"The 'notmuch' command was not found or is not executable.\n"
                 f"Tag-related functionality will be disabled.\n\nError: {e}"
             )
-            dialog.exec()
             return False
 
     def get_message_id(self):
@@ -377,11 +357,10 @@ class MailViewer(QMainWindow):
             tags_list = [tag.strip() for tag in result.stdout.strip().split('\n') if tag.strip()]
             self.tags = sorted(tags_list)
         except subprocess.CalledProcessError as e:
-            dialog = CopyableErrorDialog(
+            display_error(
                 "Notmuch Command Failed",
                 f"An error occurred while running notmuch:\n\n{e.stderr}\n\nCommand was: {' '.join(command)}"
             )
-            dialog.exec()
             self.tags = []
         
         return self.tags
@@ -447,11 +426,9 @@ class MailViewer(QMainWindow):
             subprocess.run(command, check=True, capture_output=True, text=True)
             logging.info(f"Tag '{tag}' removed successfully.")
         except subprocess.CalledProcessError as e:
-            dialog = CopyableErrorDialog("Failed to Remove Tag", f"Failed to remove tag '{tag}':\n\n{e.stderr}")
-            dialog.exec()
+            display_error("Failed to Remove Tag", f"Failed to remove tag '{tag}':\n\n{e.stderr}")
         except FileNotFoundError:
-            dialog = CopyableErrorDialog("Notmuch Not Found", "The 'notmuch' command was not found. Please ensure it is installed and in your PATH.")
-            dialog.exec()
+            display_eerro("Notmuch Not Found", "The 'notmuch' command was not found. Please ensure it is installed and in your PATH.")
     
     def add_tag(self, tag):
         """Adds a new tag to the current mail."""
@@ -461,8 +438,7 @@ class MailViewer(QMainWindow):
             subprocess.run(command, check=True, capture_output=True, text=True)
             logging.info(f"Tag '{tag}' added successfully.")
         except subprocess.CalledProcessError as e:
-            dialog = CopyableErrorDialog("Failed to Add Tag", f"Failed to add tag '{tag}':\n\n{e.stderr}")
-            dialog.exec()
+            display_error("Failed to Add Tag", f"Failed to add tag '{tag}':\n\n{e.stderr}")
 
 
     def handle_address_selection(self, address, is_selected):
