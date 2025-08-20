@@ -37,14 +37,16 @@ def notmuch_show(query, sort, flag_error):
 
 def flatten_message_tree(list_of_groups_of_messages):
     message_list = []
-    def flatten_message_pair(the_pair):
+    def flatten_message_pair(the_pair,depth):
         # a pair is a message (dict) followed by a list of message pairs
-        message_list.append(the_pair[0])
+        msg = the_pair[0]
+        msg["depth"] = depth
+        message_list.append(msg)
         for msg in the_pair[1]:
-            flatten_message_pair(msg)
+            flatten_message_pair(msg, depth+1)
     for thread in list_of_groups_of_messages:
         for message_pair in thread:
-            flatten_message_pair(message_pair)
+            flatten_message_pair(message_pair,0)
     return message_list
 
 def find_matching_messages(query, flag_error):
