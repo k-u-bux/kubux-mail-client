@@ -21,14 +21,21 @@ from query import QueryParser
 from common import display_error
 
 
+class PreservingTableWidgetItem(QTableWidgetItem):
+    """
+    A custom QTableWidgetItem that preserves its display text when editing begins.
+    """
+    def data(self, role):
+        if role == Qt.ItemDataRole.EditRole:
+            return super().data(Qt.ItemDataRole.DisplayRole)
+        return super().data(role)
+
 class QueryEditor(QMainWindow):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Edit Named Queries")
         self.setMinimumSize(QSize(800, 600))
         
-        # NOTE: I am using the user-provided config.py which
-        #       is assumed to be available to the interpreter.
         self.query_parser = QueryParser(config.config_path.parent)
         
         self.setup_ui()
@@ -69,10 +76,6 @@ class QueryEditor(QMainWindow):
         self.query_table.verticalHeader().setVisible(False)
         self.query_table.setFont(config.text_font)
         
-        # Set the edit triggers to begin editing only when a key is pressed,
-        # preserving the existing text on a single click.
-        self.query_table.setEditTriggers(QAbstractItemView.EditTrigger.SelectedClicked)
-        
         # Connect signals for saving and opening queries
         self.query_table.cellChanged.connect(self.save_queries_from_table)
         self.query_table.cellDoubleClicked.connect(self.open_query_results)
@@ -88,11 +91,11 @@ class QueryEditor(QMainWindow):
         self.query_table.cellChanged.disconnect(self.save_queries_from_table)
         
         for row, (name, query) in enumerate(queries.items()):
-            name_item = QTableWidgetItem(name)
+            name_item = PreservingTableWidgetItem(name)
             name_item.setFont(config.text_font)
             self.query_table.setItem(row, 0, name_item)
             
-            query_item = QTableWidgetItem(query)
+            query_item = PreservingTableWidgetItem(query)
             query_item.setFont(config.text_font)
             self.query_table.setItem(row, 1, query_item)
             
@@ -124,11 +127,11 @@ class QueryEditor(QMainWindow):
         row_count = self.query_table.rowCount()
         self.query_table.insertRow(row_count)
         
-        name_item = QTableWidgetItem("")
+        name_item = PreservingTableWidgetItem("")
         name_item.setFont(config.text_font)
         self.query_table.setItem(row_count, 0, name_item)
         
-        query_item = QTableWidgetItem("")
+        query_item = PreservingTableWidgetItem("")
         query_item.setFont(config.text_font)
         self.query_table.setItem(row_count, 1, query_item)
 
