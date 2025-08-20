@@ -9,9 +9,10 @@ from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QTableWidget, QTableWidgetItem, QHeaderView,
     QAbstractItemView, QMenu, QDialog, QDialogButtonBox, QLabel, QTextEdit,
-    QStyledItemDelegate
+    QStyledItemDelegate, QLineEdit
 )
-from PySide6.QtCore import Qt, QSize
+from PySide6.QtCore import Qt, QSize, QEvent
+from PySide6.QtGui import QMouseEvent
 import logging
 
 # Set up basic logging to console
@@ -22,20 +23,37 @@ from query import QueryParser
 from common import display_error
 
 
-class PreservingTextDelegate(QStyledItemDelegate):
+class ClickableLineEdit(QLineEdit):
+    """A custom line edit that allows cursor positioning on click instead of selecting all text."""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        # Don't select all text when receiving focus
+        self.setAttribute(Qt.WidgetAttribute.WA_MacShowFocusRect, False)
+        
+    def mousePressEvent(self, event):
+        # Override the default behavior to prevent automatic text selection
+        super().mousePressEvent(event)
+        # Place cursor at click position
+        self.deselect()
+
+
+class ImprovedTextDelegate(QStyledItemDelegate):
     """
-    A custom delegate that preserves text when editing begins.
+    A custom delegate that preserves text when editing begins and provides better cursor behavior.
     """
     def createEditor(self, parent, option, index):
-        # Create the default editor (usually a line edit)
-        editor = super().createEditor(parent, option, index)
+        # Create our custom line edit instead of the default one
+        editor = ClickableLineEdit(parent)
+        editor.setFont(config.get_text_font())
         return editor
         
     def setEditorData(self, editor, index):
-        # This is called when editing starts - we explicitly get the display text
-        # and set it in the editor
+        # Get the current text from the model
         text = index.data(Qt.ItemDataRole.DisplayRole)
+        # Set the text in the editor
         editor.setText(text)
+        # Move cursor to the end as a fallback position
+        editor.setCursorPosition(len(text))
 
 
 class QueryEditor(QMainWindow):
@@ -84,8 +102,15 @@ class QueryEditor(QMainWindow):
         self.query_table.verticalHeader().setVisible(False)
         self.query_table.setFont(config.get_text_font())
         
-        # Apply the custom delegate to preserve text during editing
-        text_delegate = PreservingTextDelegate()
+        # Configure editing behavior
+        self.query_table.setEditTriggers(
+            QAbstractItemView.EditTrigger.DoubleClicked | 
+            QAbstractItemView.EditTrigger.SelectedClicked | 
+            QAbstractItemView.EditTrigger.EditKeyPressed
+        )
+        
+        # Apply the improved custom delegate
+        text_delegate = ImprovedTextDelegate()
         self.query_table.setItemDelegate(text_delegate)
         
         # Connect signals for saving and opening queries
