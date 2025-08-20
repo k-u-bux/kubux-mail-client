@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 
 # Assuming 'notmuch.py' is in a package that can be imported
 from notmuch import notmuch_show, flatten_message_tree, find_matching_messages, find_matching_threads
+from config import config
 
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
@@ -25,24 +26,6 @@ import logging
 
 # Set up basic logging to console
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-
-# Assuming a config module similar to the other scripts
-try:
-    from config import config
-except ImportError:
-    # A simple mock for demonstration purposes if config.py is not available
-    class MockConfig:
-        def get_font(self, section):
-            if section == "text":
-                return QFont("monospace", 10)
-            return QFont("sans-serif", 10)
-        def get_keybinding(self, action):
-            bindings = {
-                "refresh": "F5",
-                "quit": "Ctrl+Q"
-            }
-            return bindings.get(action)
-    config = MockConfig()
 
 # Custom dialog for displaying copyable error messages
 class CopyableErrorDialog(QDialog):
@@ -79,7 +62,6 @@ class ThreadViewer(QMainWindow):
 
         self.view_mode = "tree" # or "list"
         self.results = []
-        self.my_email_address = self.get_my_email_address()
 
         self.setup_ui()
         self.setup_key_bindings()
@@ -94,7 +76,7 @@ class ThreadViewer(QMainWindow):
         top_bar_layout = QHBoxLayout()
         main_layout.addLayout(top_bar_layout)
 
-        self.view_mode_button = QPushButton("List View")
+        self.view_mode_button = QPushButton("Tree View (toggle for list view)")
         self.view_mode_button.clicked.connect(self.toggle_view_mode)
         top_bar_layout.addWidget(self.view_mode_button)
 
@@ -156,49 +138,31 @@ class ThreadViewer(QMainWindow):
     def toggle_view_mode(self):
         if self.view_mode == "tree":
             self.view_mode = "list"
-            self.view_mode_button.setText("Tree View")
+            self.view_mode_button.setText("List View (toggle for tree view)")
         else:
             self.view_mode = "tree"
-            self.view_mode_button.setText("List View")
+            self.view_mode_button.setText("Tree View (toggle for list view)")
         self.execute_query()
-
-    def get_my_email_address(self):
-        """Retrieves the user's email address from notmuch config."""
-        try:
-            command = ['notmuch', 'config', 'get', 'user.primary_email']
-            result = subprocess.run(command, check=True, capture_output=True, text=True)
-            return result.stdout.strip()
-        except subprocess.CalledProcessError as e:
-            logging.error(f"Failed to get primary email from notmuch config: {e.stderr}")
-            return None
 
     def execute_query(self):
         logging.info(f"Executing query for thread ID: {self.thread_id}")
-        
         self.results_table.setRowCount(0)
         self.results_table.clearContents()
-        
-        my_email_address = self.get_my_email_address()
-        
-        # The notmuch_show function returns a list of threads, so we handle that directly
-        list_of_groups_of_messages = notmuch_show(f"thread:{self.thread_id}", "oldest-first", lambda *args: display_error(self, *args))
-        
-        # Then we flatten the tree
-        flattened_messages = flatten_message_tree(list_of_groups_of_messages)
-        
+        flattened_messages = find_matching_messages(f"thread:{self.thread_id}",
+                                                    lambda *args: display_error(self, *args))
         if self.view_mode == "tree":
             self.results_table.setSortingEnabled(False)
-            self._populate_table(flattened_messages, my_email_address, indent=True)
+            self._populate_table(flattened_messages, indent=True)
         else: # list mode
             self.results_table.setSortingEnabled(True)
-            self._populate_table(flattened_messages, my_email_address, indent=False)
+            self._populate_table(flattened_messages, indent=False)
         
-    def _populate_table(self, messages, my_email_address, indent):
+    def _populate_table(self, messages, indent):
         """Populates the QTableWidget from a flattened list of messages."""
         self.results_table.setRowCount(len(messages))
         for row_idx, mail in enumerate(messages):
             date_item = self._create_date_item(mail.get("timestamp"))
-            sender_receiver_text = self._get_sender_receiver(mail.get("headers", {}).get("From", ""), my_email_address)
+            sender_receiver_text = self._get_sender_receiver(mail)
             sender_receiver_item = QTableWidgetItem(sender_receiver_text)
             
             subject_text = mail.get("headers", {}).get("Subject", "No Subject")
@@ -225,18 +189,17 @@ class ThreadViewer(QMainWindow):
         item.setData(Qt.ItemDataRole.UserRole, timestamp)
         return item
         
-    def _get_sender_receiver(self, authors_string, my_email):
+    def _get_sender_receiver(self, message):
         """Extracts the sender/receiver based on my email address."""
-        addresses = getaddresses([authors_string])
-        
-        if len(addresses) == 1 and addresses[0][1] == my_email:
-            return "To: (You)"
-
-        for name, addr in addresses:
-            if addr != my_email:
-                return name if name else addr
-                
-        return "You"
+        from_field = message.get("headers", {}).get("From", "unknown <nobody@nowhere.net>")
+        if isinstance(from_field, str):
+            authors_string_list = [from_field]
+        else: # assuming it's a list
+            authors_string_list = from_field
+        if not config.is_me(authors_string_list):
+            return from_field
+        else:
+            return "to: " + message.get("headers", {}).get("To", "unknown <nobody@nowhere.net>")
 
     def open_selected_item(self, index):
         """Launches the mail viewer based on the selected item."""

@@ -11,6 +11,8 @@ import re
 from datetime import datetime, timezone
 
 from notmuch import find_matching_messages, find_matching_threads
+from config import config
+
 
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
@@ -25,23 +27,6 @@ import logging
 # Set up basic logging to console
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# Assuming a config module similar to the other scripts
-try:
-    from config import config
-except ImportError:
-    # A simple mock for demonstration purposes if config.py is not available
-    class MockConfig:
-        def get_font(self, section):
-            if section == "text":
-                return QFont("monospace", 10)
-            return QFont("sans-serif", 10)
-        def get_keybinding(self, action):
-            bindings = {
-                "refresh": "F5",
-                "quit": "Ctrl+Q"
-            }
-            return bindings.get(action)
-    config = MockConfig()
 
 # Custom dialog for displaying copyable error messages
 class CopyableErrorDialog(QDialog):
@@ -185,16 +170,6 @@ class QueryResultsViewer(QMainWindow):
             self.view_mode_button.setText("Thread View (toggle for mail view)")
         self.execute_query()
 
-    def get_my_email_address(self):
-        """Retrieves the user's email address from notmuch config."""
-        try:
-            command = ['notmuch', 'config', 'get', 'user.primary_email']
-            result = subprocess.run(command, check=True, capture_output=True, text=True)
-            return result.stdout.strip()
-        except subprocess.CalledProcessError as e:
-            logging.error(f"Failed to get primary email from notmuch config: {e.stderr}")
-            return None
-
     def execute_query(self):
         self.current_query = self.query_edit.text()
         logging.info(f"Executing query: '{self.current_query}' in '{self.view_mode}' mode.")
@@ -202,34 +177,32 @@ class QueryResultsViewer(QMainWindow):
         self.results_table.setRowCount(0)
         self.results_table.clearContents()
         
-        my_email_address = self.get_my_email_address()
-        
         if self.view_mode == "threads":
-            self._execute_threads_query(my_email_address)
+            self._execute_threads_query()
         else: # mails mode
-            self._execute_mails_query(my_email_address)
+            self._execute_mails_query()
             
-    def _execute_threads_query(self, my_email_address):
+    def _execute_threads_query(self):
         """Fetches and populates the table with thread data."""
         self.results = find_matching_threads(self.current_query, display_error)
         self.results_table.setHorizontalHeaderLabels(["Date", "Authors", "Subject"])
         self.results_table.setRowCount(len(self.results))
         self.results_table.setSortingEnabled(False)
         for row_idx, thread in enumerate(self.results):
-            self._update_row_for_thread(row_idx, thread, my_email_address)
+            self._update_row_for_thread(row_idx, thread)
         self.results_table.setSortingEnabled(True)
 
-    def _execute_mails_query(self, my_email_address):
+    def _execute_mails_query(self):
         """Fetches and populates the table with mail data."""
         self.results = find_matching_messages(self.current_query, display_error)
         self.results_table.setHorizontalHeaderLabels(["Date", "Sender/Receiver", "Subject"])
         self.results_table.setRowCount(len(self.results))
         self.results_table.setSortingEnabled(False)
         for row_idx, mail in enumerate(self.results):
-            self._update_row_for_mail(row_idx, mail, my_email_address)
+            self._update_row_for_mail(row_idx, mail)
         self.results_table.setSortingEnabled(True)
         
-    def _update_row_for_thread(self, row_idx, thread, my_email_address):
+    def _update_row_for_thread(self, row_idx, thread):
         """Helper to populate a row for a thread item from `notmuch search --output=summary`."""
         
         date_stamp = thread.get("timestamp")
@@ -247,7 +220,7 @@ class QueryResultsViewer(QMainWindow):
         # Store the entire thread object in the first column's user data
         self.results_table.item(row_idx, 0).setData(Qt.ItemDataRole.UserRole, thread)
 
-    def _update_row_for_mail(self, row_idx, mail, my_email_address):
+    def _update_row_for_mail(self, row_idx, mail):
         """Helper to populate a row for a mail item from `notmuch show`."""
         date_stamp = mail.get("timestamp")
         date_item = self._create_date_item(date_stamp)
@@ -257,7 +230,7 @@ class QueryResultsViewer(QMainWindow):
         subject_item = QTableWidgetItem(subject_text)
         self.results_table.setItem(row_idx, 2, subject_item)
         
-        sender_receiver_text = self._get_sender_receiver(mail.get("headers", {}).get("From", ""), my_email_address)
+        sender_receiver_text = self._get_sender_receiver(mail)
         sender_receiver_item = QTableWidgetItem(sender_receiver_text)
         self.results_table.setItem(row_idx, 1, sender_receiver_item)
         
@@ -275,18 +248,17 @@ class QueryResultsViewer(QMainWindow):
         item.setData(Qt.ItemDataRole.UserRole, timestamp)
         return item
         
-    def _get_sender_receiver(self, authors_string, my_email):
+    def _get_sender_receiver(self, message):
         """Extracts the sender/receiver based on my email address."""
-        addresses = getaddresses([authors_string])
-        
-        if len(addresses) == 1 and addresses[0][1] == my_email:
-            return "To: (You)"
-
-        for name, addr in addresses:
-            if addr != my_email:
-                return name if name else addr
-                
-        return "You"
+        from_field = message.get("headers", {}).get("From", "unknown <nobody@nowhere.net>")
+        if isinstance(from_field, str):
+            authors_string_list = [from_field]
+        else: # assuming it's a list
+            authors_string_list = from_field
+        if not config.is_me(authors_string_list):
+            return from_field
+        else:
+            return "to: " + message.get("headers", {}).get("To", "unknown <nobody@nowhere.net>")
 
     def open_selected_item(self, index):
         """Launches the appropriate viewer based on the selected item."""

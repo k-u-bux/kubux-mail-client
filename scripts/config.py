@@ -88,25 +88,21 @@ class Config:
         return self.data["visual"].get(key)
         
     def get_setting(self, section: str, key: str, default=None):
-        """Safely get a value from the configuration with a default."""
         return self.data.get(section, {}).get(key, default)
         
     def get_keybinding(self, action_name: str) -> Optional[str]:
-        """Gets a keybinding from the 'bindings' section of the config."""
         return self.data.get("bindings", {}).get(action_name)
 
     def get_identities(self):
         return self.data.get("email_identities", {}).get("identities", [])
 
-    def is_me(self, address_string: str) -> bool:
-        """
-        Checks if the given address string corresponds to one of the configured identities.
-        Handles "Name <email@example.com>" format.
-        """
-        from_addresses = getaddresses([address_string])
+    def is_me(self, address_string_list) -> bool:
+        from_addresses = getaddresses(address_string_list)
         from_addrs_only = {addr for name, addr in from_addresses}
-        
-        return not from_addrs_only.isdisjoint(self._identity_emails)
+        my_addresses = getaddresses([me["email"] for me in self.get_identities()])
+        my_addrs_only = {addr for name, addr in my_addresses}
+        # print(f"DEBUG:{from_addrs_only} vs {my_addrs_only}")
+        return not from_addrs_only.isdisjoint(my_addrs_only)
 
 # A global config object for easy access
 config = Config()
