@@ -8,10 +8,9 @@ from pathlib import Path
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QTableWidget, QTableWidgetItem, QHeaderView,
-    QAbstractItemView, QMenu, QDialog, QDialogButtonBox, QLabel, QTextEdit,
-    QLineEdit, QInputDialog
+    QAbstractItemView, QMenu, QStyledItemDelegate, QLineEdit
 )
-from PySide6.QtCore import Qt, QSize
+from PySide6.QtCore import Qt, QSize, QEvent
 import logging
 
 # Set up basic logging to console
@@ -20,6 +19,36 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 from config import config
 from query import QueryParser
 from common import display_error
+
+
+class PlainTextDelegate(QStyledItemDelegate):
+    """
+    A delegate that creates a standard QLineEdit for editing table cells,
+    but doesn't select all text when editing begins.
+    """
+    def createEditor(self, parent, option, index):
+        editor = QLineEdit(parent)
+        editor.setFont(config.get_text_font())
+        
+        # This is critical - disable automatic text selection when focus is gained
+        editor.installEventFilter(self)
+        
+        return editor
+    
+    def setEditorData(self, editor, index):
+        # Get the text from the model
+        text = index.model().data(index, Qt.ItemDataRole.DisplayRole)
+        # Set the text in the editor without selecting it
+        editor.setText(text)
+        # This moves the cursor to the end by default, which is reasonable
+        
+    def eventFilter(self, obj, event):
+        # Intercept focus events to prevent text selection
+        if event.type() == QEvent.Type.FocusIn and isinstance(obj, QLineEdit):
+            # Schedule a deselection for after the focus event is processed
+            QApplication.postEvent(obj, QEvent(QEvent.Type.KeyRelease))
+            return False
+        return super().eventFilter(obj, event)
 
 
 class QueryEditor(QMainWindow):
@@ -59,7 +88,7 @@ class QueryEditor(QMainWindow):
         self.quit_button.clicked.connect(self.close)
         top_bar_layout.addWidget(self.quit_button)
         
-        # Non-editable table (we'll handle editing ourselves)
+        # Editable table
         self.query_table = QTableWidget()
         self.query_table.setColumnCount(2)
         self.query_table.setHorizontalHeaderLabels(["Name", "Query Expression"])
@@ -68,11 +97,18 @@ class QueryEditor(QMainWindow):
         self.query_table.verticalHeader().setVisible(False)
         self.query_table.setFont(config.get_text_font())
         
-        # Disable built-in editing
-        self.query_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        # Configure editing behavior
+        self.query_table.setEditTriggers(
+            QAbstractItemView.EditTrigger.DoubleClicked | 
+            QAbstractItemView.EditTrigger.SelectedClicked | 
+            QAbstractItemView.EditTrigger.EditKeyPressed
+        )
         
-        # Connect our custom editing signals
-        self.query_table.cellClicked.connect(self.edit_cell_with_dialog)
+        # Use our custom delegate for editing
+        self.query_table.setItemDelegate(PlainTextDelegate())
+        
+        # Connect signals for saving and opening queries
+        self.query_table.cellChanged.connect(self.save_queries_from_table)
         self.query_table.cellDoubleClicked.connect(self.open_query_results)
 
         main_layout.addWidget(self.query_table)
@@ -82,6 +118,9 @@ class QueryEditor(QMainWindow):
         queries = self.query_parser.named_queries
         self.query_table.setRowCount(len(queries))
         
+        # Temporarily disconnect the signal to avoid repeated saves during loading
+        self.query_table.cellChanged.disconnect(self.save_queries_from_table)
+        
         for row, (name, query) in enumerate(queries.items()):
             name_item = QTableWidgetItem(name)
             name_item.setFont(config.get_text_font())
@@ -90,30 +129,9 @@ class QueryEditor(QMainWindow):
             query_item = QTableWidgetItem(query)
             query_item.setFont(config.get_text_font())
             self.query_table.setItem(row, 1, query_item)
+            
+        self.query_table.cellChanged.connect(self.save_queries_from_table)
 
-    def edit_cell_with_dialog(self, row, column):
-        """Opens a dialog to edit the cell contents."""
-        current_item = self.query_table.item(row, column)
-        current_text = current_item.text() if current_item else ""
-        
-        # Field labels
-        field_label = "Name" if column == 0 else "Query Expression"
-        
-        # Create and configure an input dialog
-        text, ok = QInputDialog.getText(
-            self,
-            f"Edit {field_label}",
-            f"Enter {field_label.lower()}:",
-            QLineEdit.EchoMode.Normal,
-            current_text
-        )
-        
-        if ok:
-            # Update the table cell
-            current_item.setText(text)
-            # Save changes
-            self.save_queries_from_table()
-    
     def save_queries_from_table(self):
         """Saves the contents of the table back to the queries.toml file."""
         queries_to_save = []
@@ -147,9 +165,6 @@ class QueryEditor(QMainWindow):
         query_item = QTableWidgetItem("")
         query_item.setFont(config.get_text_font())
         self.query_table.setItem(row_count, 1, query_item)
-        
-        # Immediately open edit dialog for the name field
-        self.edit_cell_with_dialog(row_count, 0)
 
     def open_query_results(self, row, column):
         """Launches show-query-results.py with the selected query."""
