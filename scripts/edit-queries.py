@@ -10,7 +10,8 @@ from PySide6.QtWidgets import (
     QPushButton, QTableWidget, QTableWidgetItem, QHeaderView,
     QAbstractItemView, QMenu, QStyledItemDelegate, QLineEdit
 )
-from PySide6.QtCore import Qt, QSize, QEvent
+from PySide6.QtCore import Qt, QSize, QEvent, QTimer
+from PySide6.QtGui import QMouseEvent
 import logging
 
 # Set up basic logging to console
@@ -21,18 +22,40 @@ from query import QueryParser
 from common import display_error
 
 
-class PlainTextDelegate(QStyledItemDelegate):
+class CustomLineEdit(QLineEdit):
+    """A custom line edit that doesn't select text on focus or click."""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        
+    def mousePressEvent(self, event):
+        # Get cursor position at click point
+        cursor_pos = self.cursorPositionAt(event.pos())
+        
+        # Call parent implementation which handles selection
+        super().mousePressEvent(event)
+        
+        # Immediately clear any selection and position cursor where clicked
+        self.deselect()
+        self.setCursorPosition(cursor_pos)
+        
+    def focusInEvent(self, event):
+        # Call parent implementation
+        super().focusInEvent(event)
+        
+        # Immediately clear any selection that was made
+        cursor_pos = self.cursorPosition()
+        self.deselect()
+        self.setCursorPosition(cursor_pos)
+
+
+class NoSelectTextDelegate(QStyledItemDelegate):
     """
-    A delegate that creates a standard QLineEdit for editing table cells,
-    but doesn't select all text when editing begins.
+    A delegate that creates a custom QLineEdit for editing table cells,
+    ensuring text is never auto-selected.
     """
     def createEditor(self, parent, option, index):
-        editor = QLineEdit(parent)
+        editor = CustomLineEdit(parent)
         editor.setFont(config.get_text_font())
-        
-        # This is critical - disable automatic text selection when focus is gained
-        editor.installEventFilter(self)
-        
         return editor
     
     def setEditorData(self, editor, index):
@@ -40,15 +63,13 @@ class PlainTextDelegate(QStyledItemDelegate):
         text = index.model().data(index, Qt.ItemDataRole.DisplayRole)
         # Set the text in the editor without selecting it
         editor.setText(text)
-        # This moves the cursor to the end by default, which is reasonable
         
-    def eventFilter(self, obj, event):
-        # Intercept focus events to prevent text selection
-        if event.type() == QEvent.Type.FocusIn and isinstance(obj, QLineEdit):
-            # Schedule a deselection for after the focus event is processed
-            QApplication.postEvent(obj, QEvent(QEvent.Type.KeyRelease))
-            return False
-        return super().eventFilter(obj, event)
+        # Important: This deselects any text and moves cursor to end
+        editor.deselect()
+        
+        # Schedule a second deselection after a tiny delay to handle any 
+        # platform-specific focus behaviors
+        QTimer.singleShot(0, editor.deselect)
 
 
 class QueryEditor(QMainWindow):
@@ -104,8 +125,8 @@ class QueryEditor(QMainWindow):
             QAbstractItemView.EditTrigger.EditKeyPressed
         )
         
-        # Use our custom delegate for editing
-        self.query_table.setItemDelegate(PlainTextDelegate())
+        # Use our improved delegate for editing
+        self.query_table.setItemDelegate(NoSelectTextDelegate())
         
         # Connect signals for saving and opening queries
         self.query_table.cellChanged.connect(self.save_queries_from_table)
