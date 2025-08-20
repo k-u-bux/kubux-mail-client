@@ -185,26 +185,32 @@ class MailEditor(QMainWindow):
 
     def setup_ui(self):
         central_widget = QWidget()
+        central_widget.setFont(config.get_text_font())
         self.setCentralWidget(central_widget)
         main_layout = QVBoxLayout(central_widget)
 
         top_bar = QWidget()
         top_bar_layout = QHBoxLayout(top_bar)
+        top_bar_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.addWidget(top_bar)
 
         self.add_attachment_button = QPushButton("Attachments")
+        self.add_attachment_button.setFont(config.get_interface_font())
         self.add_attachment_button.clicked.connect(self.add_attachment)
         top_bar_layout.addWidget(self.add_attachment_button)
         
         self.more_headers_button = QPushButton("More Headers")
+        self.more_headers_button.setFont(config.get_interface_font())
         self.more_headers_button.clicked.connect(self.toggle_more_headers)
         top_bar_layout.addWidget(self.more_headers_button)
-
         top_bar_layout.addStretch()
 
         self.send_button = QPushButton("Send")
         self.save_button = QPushButton("Save")
         self.discard_button = QPushButton("Discard")
+        self.send_button.setFont(config.get_interface_font())
+        self.save_button.setFont(config.get_interface_font())
+        self.discard_button.setFont(config.get_interface_font())
         
         self.send_button.clicked.connect(self.send_message)
         self.save_button.clicked.connect(self.save_message)
@@ -216,7 +222,8 @@ class MailEditor(QMainWindow):
 
         headers_group_box = QWidget()
         self.headers_layout = QFormLayout(headers_group_box)
-        
+        self.headers_layout.setContentsMargins(0, 0, 0, 0)
+
         self.from_combo = QComboBox()
         self.populate_from_field()
         
@@ -248,6 +255,7 @@ class MailEditor(QMainWindow):
         main_layout.addWidget(self.splitter)
 
         self.body_edit = QTextEdit()
+        self.body_edit.setContentsMargins(0, 0, 0, 0)
         self.body_edit.setFont(config.text_font)
         self.splitter.addWidget(self.body_edit)
 
