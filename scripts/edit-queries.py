@@ -2,7 +2,7 @@
 
 import sys
 import os
-import toml
+import json
 import subprocess
 from pathlib import Path
 from PySide6.QtWidgets import (
@@ -200,13 +200,13 @@ class QueryEditor(QMainWindow):
 
     def load_queries_into_table(self):
         """Loads named queries from the parser into the table."""
-        queries = self.query_parser.named_queries
+        queries = self.query_parser.queries
         self.query_table.setRowCount(len(queries))
         
         # Temporarily disconnect the signal to avoid repeated saves during loading
         self.query_table.cellChanged.disconnect(self.save_queries_from_table)
         
-        for row, (name, query) in enumerate(queries.items()):
+        for row, (name, query) in enumerate(queries):
             name_item = QTableWidgetItem(name)
             name_item.setFont(config.get_text_font())
             self.query_table.setItem(row, 0, name_item)
@@ -218,7 +218,6 @@ class QueryEditor(QMainWindow):
         self.query_table.cellChanged.connect(self.save_queries_from_table)
 
     def save_queries_from_table(self):
-        """Saves the contents of the table back to the queries.toml file."""
         queries_to_save = []
         for row in range(self.query_table.rowCount()):
             name_item = self.query_table.item(row, 0)
@@ -228,11 +227,11 @@ class QueryEditor(QMainWindow):
             query = query_item.text().strip() if query_item else ""
             
             if name or query:
-                queries_to_save.append({"name": name, "query": query})
+                queries_to_save.append( [name, query] )
         
         try:
             with open(self.query_parser.queries_path, "w") as f:
-                toml.dump({"queries": queries_to_save}, f)
+                json.dump({"queries": queries_to_save}, f)
             logging.info("Queries saved successfully.")
         except Exception as e:
             logging.error(f"Failed to save queries: {e}")
