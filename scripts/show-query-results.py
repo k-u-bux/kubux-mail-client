@@ -148,8 +148,8 @@ class QueryResultsViewer(QMainWindow):
         remaining_width = total_width - date_col_width
 
         # Calculate the target widths for Subject and Sender based on 80:20 ratio
-        subject_col_width = int(remaining_width * 0.70)
-        sender_col_width = int(remaining_width * 0.30)
+        subject_col_width = int(remaining_width * 0.30)
+        sender_col_width = int(remaining_width * 0.70)
 
         # Apply the new widths
         self.results_table.setColumnWidth(1, subject_col_width)
@@ -289,7 +289,7 @@ class QueryResultsViewer(QMainWindow):
     def _execute_threads_query(self, my_email_address):
         """Fetches and populates the table with thread data."""
         self.results = self.find_matching_threads(self.current_query)
-        self.results_table.setHorizontalHeaderLabels(["Date", "Subject", "Authors"])
+        self.results_table.setHorizontalHeaderLabels(["Date", "Authors", "Subject"])
         self.results_table.setRowCount(len(self.results))
         self.results_table.setSortingEnabled(False)
         for row_idx, thread in enumerate(self.results):
@@ -299,7 +299,7 @@ class QueryResultsViewer(QMainWindow):
     def _execute_mails_query(self, my_email_address):
         """Fetches and populates the table with mail data."""
         self.results = self.find_matching_messages(self.current_query)
-        self.results_table.setHorizontalHeaderLabels(["Date", "Subject", "Sender/Receiver"])
+        self.results_table.setHorizontalHeaderLabels(["Date", "Sender/Receiver", "Subject"])
         self.results_table.setRowCount(len(self.results))
         self.results_table.setSortingEnabled(False)
         for row_idx, mail in enumerate(self.results):
@@ -315,11 +315,11 @@ class QueryResultsViewer(QMainWindow):
         
         subject_text = f"<{thread.get('total')}> {thread.get('subject')}"
         subject_item = QTableWidgetItem(subject_text)
-        self.results_table.setItem(row_idx, 1, subject_item)
+        self.results_table.setItem(row_idx, 2, subject_item)
         
         # Directly use the authors field from the thread summary
         authors_item = QTableWidgetItem(thread.get("authors", "Unknown"))
-        self.results_table.setItem(row_idx, 2, authors_item)
+        self.results_table.setItem(row_idx, 1, authors_item)
         
         # Store the entire thread object in the first column's user data
         self.results_table.item(row_idx, 0).setData(Qt.ItemDataRole.UserRole, thread)
@@ -332,11 +332,11 @@ class QueryResultsViewer(QMainWindow):
         
         subject_text = mail.get("headers", {}).get("Subject", "No Subject")
         subject_item = QTableWidgetItem(subject_text)
-        self.results_table.setItem(row_idx, 1, subject_item)
+        self.results_table.setItem(row_idx, 2, subject_item)
         
         sender_receiver_text = self._get_sender_receiver(mail.get("headers", {}).get("From", ""), my_email_address)
         sender_receiver_item = QTableWidgetItem(sender_receiver_text)
-        self.results_table.setItem(row_idx, 2, sender_receiver_item)
+        self.results_table.setItem(row_idx, 1, sender_receiver_item)
         
         self.results_table.item(row_idx, 0).setData(Qt.ItemDataRole.UserRole, mail)
         
