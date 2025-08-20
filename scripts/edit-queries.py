@@ -100,6 +100,11 @@ class QueryEditor(QMainWindow):
         # Create our custom delegate
         self.text_delegate = NoSelectTextDelegate()
         
+        # Track double-click detection
+        self.last_click_time = 0
+        self.last_click_pos = None
+        self.double_click_interval = QApplication.instance().doubleClickInterval()
+        
         self.setup_ui()
         self.load_queries_into_table()
         
@@ -149,7 +154,9 @@ class QueryEditor(QMainWindow):
         
         # Connect signals
         self.query_table.cellChanged.connect(self.save_queries_from_table)
-        self.query_table.cellDoubleClicked.connect(self.open_query_results)
+        
+        # NOTE: We're managing double-clicks manually, don't connect cellDoubleClicked
+        # self.query_table.cellDoubleClicked.connect(self.open_query_results)
         
         # Install event filter to track mouse position
         self.query_table.viewport().installEventFilter(self)
@@ -157,7 +164,7 @@ class QueryEditor(QMainWindow):
         main_layout.addWidget(self.query_table)
 
     def eventFilter(self, obj, event):
-        """Track mouse position and force immediate edit mode on click."""
+        """Track mouse position and handle clicks with special double-click detection."""
         if obj is self.query_table.viewport() and event.type() == QEvent.Type.MouseButtonPress:
             # Get the position and determine which cell was clicked
             pos = event.pos()
@@ -165,23 +172,49 @@ class QueryEditor(QMainWindow):
             column = self.query_table.columnAt(pos.x())
             
             if row >= 0 and column >= 0:
-                # Calculate position relative to the cell
-                item_rect = self.query_table.visualRect(self.query_table.model().index(row, column))
-                cell_pos = event.pos() - item_rect.topLeft()
+                # Check if this is a double-click
+                current_time = QApplication.instance().queryTimer()
                 
-                # Store the click position in the delegate
-                self.text_delegate.setClickPosition(cell_pos)
-                
-                # Schedule editing to start immediately after event processing
-                QTimer.singleShot(0, lambda: self.start_editing(row, column))
-                
-                # We still want the event to propagate for selection
-                return False
+                # If this click is close enough in time and position to the last click, treat as double-click
+                if (current_time - self.last_click_time < self.double_click_interval and 
+                    self.last_click_pos and 
+                    (pos - self.last_click_pos).manhattanLength() < 5):
+                    
+                    # Handle as double-click - open query results
+                    self.open_query_results(row, column)
+                    
+                    # Reset click tracking
+                    self.last_click_time = 0
+                    self.last_click_pos = None
+                    
+                    # Don't start editing on double-click
+                    return True  # Consume the event
+                else:
+                    # This is a single click - start editing
+                    
+                    # Update click tracking for double-click detection
+                    self.last_click_time = current_time
+                    self.last_click_pos = pos
+                    
+                    # Calculate position relative to the cell
+                    item_rect = self.query_table.visualRect(self.query_table.model().index(row, column))
+                    cell_pos = event.pos() - item_rect.topLeft()
+                    
+                    # Store the click position in the delegate
+                    self.text_delegate.setClickPosition(cell_pos)
+                    
+                    # Schedule editing to start after a short delay
+                    # This delay helps with double-click detection
+                    QTimer.singleShot(10, lambda: self.start_editing(row, column))
                 
         return super().eventFilter(obj, event)
     
     def start_editing(self, row, column):
         """Start editing the specified cell and ensure cursor is positioned correctly."""
+        # Check if we've had a double-click since the timer was started
+        if self.last_click_time == 0:
+            return  # Double-click happened, don't start editing
+            
         # Make sure the item exists
         item = self.query_table.item(row, column)
         if item:
@@ -227,7 +260,7 @@ class QueryEditor(QMainWindow):
             query = query_item.text().strip() if query_item else ""
             
             if name or query:
-                queries_to_save.append( [name, query] )
+                queries_to_save.append([name, query])
         
         try:
             with open(self.query_parser.queries_path, "w") as f:
@@ -255,6 +288,8 @@ class QueryEditor(QMainWindow):
 
     def open_query_results(self, row, column):
         """Launches show-query-results.py with the selected query."""
+        logging.info(f"Opening query results for row {row}, column {column}")
+        
         name_item = self.query_table.item(row, 0)
         query_item = self.query_table.item(row, 1)
 
@@ -273,7 +308,9 @@ class QueryEditor(QMainWindow):
         try:
             viewer_path = os.path.join(os.path.dirname(__file__), "show-query-results.py")
             subprocess.Popen(["python3", viewer_path, "--query", final_query])
+            logging.info(f"Launched query viewer with query: {final_query}")
         except Exception as e:
+            logging.error(f"Failed to launch query viewer: {e}")
             display_error(self, "Launch Error", f"Could not launch show-query-results.py:\n\n{e}")
 
 
