@@ -177,7 +177,6 @@ class ThreadViewer(QMainWindow):
         
         self.results_table.setRowCount(0)
         self.results_table.clearContents()
-        self.results_table.setSortingEnabled(False)
         
         my_email_address = self.get_my_email_address()
         
@@ -188,12 +187,12 @@ class ThreadViewer(QMainWindow):
         flattened_messages = flatten_message_tree(list_of_groups_of_messages)
         
         if self.view_mode == "tree":
+            self.results_table.setSortingEnabled(False)
             self._populate_table(flattened_messages, my_email_address, indent=True)
         else: # list mode
+            self.results_table.setSortingEnabled(True)
             self._populate_table(flattened_messages, my_email_address, indent=False)
         
-        self.results_table.setSortingEnabled(True)
-
     def _populate_table(self, messages, my_email_address, indent):
         """Populates the QTableWidget from a flattened list of messages."""
         self.results_table.setRowCount(len(messages))
