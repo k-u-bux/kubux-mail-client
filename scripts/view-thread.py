@@ -1,0 +1,301 @@
+#!/usr/bin/env python3
+
+import sys
+import argparse
+import subprocess
+import json
+import os
+from pathlib import Path
+from email.utils import getaddresses
+import re
+from datetime import datetime, timezone
+
+from PySide6.QtWidgets import (
+    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
+    QLineEdit, QPushButton, QTableWidget, QTableWidgetItem, QHeaderView,
+    QMessageBox, QDialog, QDialogButtonBox, QLabel, QTextEdit,
+    QCheckBox, QAbstractItemView, QMenu
+)
+from PySide6.QtCore import Qt, QSize
+from PySide6.QtGui import QFont, QKeySequence, QAction
+import logging
+
+# Set up basic logging to console
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+# Assuming a config module similar to the other scripts
+try:
+    from config import config
+except ImportError:
+    class MockConfig:
+        def get_font(self, section):
+            if section == "text":
+                return QFont("monospace", 10)
+            return QFont("sans-serif", 10)
+        def get_keybinding(self, action):
+            bindings = {
+                "refresh": "F5",
+                "quit": "Ctrl+Q"
+            }
+            return bindings.get(action)
+    config = MockConfig()
+
+# Custom dialog for displaying copyable error messages
+class CopyableErrorDialog(QDialog):
+    def __init__(self, title, message, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(title)
+        self.setMinimumWidth(500)
+        
+        layout = QVBoxLayout(self)
+        
+        label = QLabel("The following error occurred:")
+        layout.addWidget(label)
+        
+        self.text_edit = QTextEdit()
+        self.text_edit.setReadOnly(True)
+        self.text_edit.setPlainText(message)
+        layout.addWidget(self.text_edit)
+        
+        button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok)
+        button_box.accepted.connect(self.accept)
+        layout.addWidget(button_box)
+
+class ThreadViewer(QMainWindow):
+    def __init__(self, thread_id, parent=None):
+        super().__init__(parent)
+        self.thread_id = thread_id
+        self.setWindowTitle("Thread Viewer")
+        self.setMinimumSize(QSize(1024, 768))
+
+        self.view_mode = "tree" # or "list"
+        self.results = []
+        self.my_email_address = self.get_my_email_address()
+
+        self.setup_ui()
+        self.setup_key_bindings()
+        self.execute_query()
+
+    def setup_ui(self):
+        central_widget = QWidget()
+        self.setCentralWidget(central_widget)
+        main_layout = QVBoxLayout(central_widget)
+
+        # Top bar with buttons
+        top_bar_layout = QHBoxLayout()
+        main_layout.addLayout(top_bar_layout)
+
+        self.view_mode_button = QPushButton("List View")
+        self.view_mode_button.clicked.connect(self.toggle_view_mode)
+        top_bar_layout.addWidget(self.view_mode_button)
+
+        self.refresh_button = QPushButton("Refresh")
+        self.refresh_button.clicked.connect(self.execute_query)
+        top_bar_layout.addWidget(self.refresh_button)
+
+        top_bar_layout.addStretch()
+
+        self.quit_button = QPushButton("Quit")
+        self.quit_button.clicked.connect(self.close)
+        top_bar_layout.addWidget(self.quit_button)
+        
+        # Table view to serve as both list and tree view
+        self.results_table = QTableWidget()
+        self.results_table.setColumnCount(3)
+        self.results_table.setHorizontalHeaderLabels(["Date", "Sender/Receiver", "Subject"])
+        self.results_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+        self.results_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        self.results_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Interactive)
+        self.results_table.verticalHeader().setVisible(False)
+        self.results_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.results_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.results_table.setSortingEnabled(True)
+        self.results_table.doubleClicked.connect(self.open_selected_item)
+        main_layout.addWidget(self.results_table)
+
+    def showEvent(self, event):
+        """Called when the widget is shown."""
+        super().showEvent(event)
+        # We don't need a custom showEvent here because the stretch mode on the Subject column works well
+        # and there's no complex ratio to calculate like in show-query-results.py.
+        pass
+
+    def setup_key_bindings(self):
+        """Sets up key bindings based on the config file."""
+        actions = {
+            "quit": self.close,
+            "refresh": self.execute_query
+        }
+        for name, func in actions.items():
+            key_seq = config.get_keybinding(name)
+            if key_seq:
+                action = QAction(self)
+                action.setShortcut(QKeySequence(key_seq))
+                action.triggered.connect(func)
+                self.addAction(action)
+
+    def toggle_view_mode(self):
+        if self.view_mode == "tree":
+            self.view_mode = "list"
+            self.view_mode_button.setText("Tree View")
+        else:
+            self.view_mode = "tree"
+            self.view_mode_button.setText("List View")
+        self.execute_query()
+
+    def get_my_email_address(self):
+        """Retrieves the user's email address from notmuch config."""
+        try:
+            command = ['notmuch', 'config', 'get', 'user.primary_email']
+            result = subprocess.run(command, check=True, capture_output=True, text=True)
+            return result.stdout.strip()
+        except subprocess.CalledProcessError as e:
+            logging.error(f"Failed to get primary email from notmuch config: {e.stderr}")
+            return None
+
+    def notmuch_show(self, query):
+        try:
+            command = [
+                'notmuch',
+                'show',
+                '--format=json',
+                '--body=false',
+                query
+            ]
+            
+            result = subprocess.run(command, check=True, capture_output=True, text=True)
+            output = json.loads(result.stdout)
+            
+            # The output can be a list of message-pairs (threads with replies)
+            # or a single message (threads with one message). Normalize to a list of lists.
+            if isinstance(output, dict):
+                return [[output, []]]
+            return output
+            
+        except subprocess.CalledProcessError as e:
+            dialog = CopyableErrorDialog(
+                "Notmuch Query Failed",
+                f"An error occurred while running notmuch:\n\n{e.stderr}"
+            )
+            dialog.exec()
+            os.exit(1)
+
+        except json.JSONDecodeError as e:
+            dialog = CopyableErrorDialog(
+                "Notmuch Output Error",
+                f"Failed to parse JSON output from notmuch:\n\n{e}"
+            )
+            dialog.exec()
+            os.exit(1)
+
+    def execute_query(self):
+        logging.info(f"Executing query for thread ID: {self.thread_id}")
+        
+        self.results = self.notmuch_show(f"thread:{self.thread_id}")
+        
+        self.results_table.setRowCount(0)
+        self.results_table.clearContents()
+        self.results_table.setSortingEnabled(False)
+        
+        if self.view_mode == "tree":
+            messages = self.flatten_and_indent_message_tree(self.results)
+            self._populate_table_from_flattened_list(messages, indent=True)
+        else:
+            messages = self.flatten_message_tree(self.results)
+            self._populate_table_from_flattened_list(messages, indent=False)
+        
+        self.results_table.setSortingEnabled(True)
+
+    def flatten_message_tree(self, tree):
+        messages = []
+        for message_pair in tree:
+            messages.append(message_pair[0])
+            if message_pair[1]:
+                messages.extend(self.flatten_message_tree(message_pair[1]))
+        return messages
+
+    def flatten_and_indent_message_tree(self, tree, indent_level=0):
+        messages = []
+        for message_pair in tree:
+            message_pair[0]['indent_level'] = indent_level
+            messages.append(message_pair[0])
+            if message_pair[1]:
+                messages.extend(self.flatten_and_indent_message_tree(message_pair[1], indent_level + 1))
+        return messages
+    
+    def _populate_table_from_flattened_list(self, messages, indent):
+        """Populates the QTableWidget from a flattened list of messages."""
+        self.results_table.setRowCount(len(messages))
+        for row_idx, mail in enumerate(messages):
+            date_item = self._create_date_item(mail.get("timestamp"))
+            sender_receiver_text = self._get_sender_receiver(mail.get("headers", {}).get("From", ""), self.my_email_address)
+            sender_receiver_item = QTableWidgetItem(sender_receiver_text)
+            
+            subject_text = mail.get("headers", {}).get("Subject", "No Subject")
+            if indent:
+                indent_string = "    " * mail.get('indent_level', 0)
+                subject_text = indent_string + subject_text
+            subject_item = QTableWidgetItem(subject_text)
+            
+            self.results_table.setItem(row_idx, 0, date_item)
+            self.results_table.setItem(row_idx, 1, sender_receiver_item)
+            self.results_table.setItem(row_idx, 2, subject_item)
+            
+            self.results_table.item(row_idx, 0).setData(Qt.ItemDataRole.UserRole, mail)
+            
+    def _create_date_item(self, timestamp):
+        """Creates a sortable QTableWidgetItem for the date."""
+        if not isinstance(timestamp, (int, float)):
+            timestamp = 0
+            
+        dt = datetime.fromtimestamp(timestamp, tz=timezone.utc).astimezone()
+        date_string = dt.strftime("%Y-%m-%d %H:%M")
+        
+        item = QTableWidgetItem(date_string)
+        item.setData(Qt.ItemDataRole.UserRole, timestamp)
+        return item
+        
+    def _get_sender_receiver(self, authors_string, my_email):
+        """Extracts the sender/receiver based on my email address."""
+        addresses = getaddresses([authors_string])
+        
+        if len(addresses) == 1 and addresses[0][1] == my_email:
+            return "To: (You)"
+
+        for name, addr in addresses:
+            if addr != my_email:
+                return name if name else addr
+                
+        return "You"
+
+    def open_selected_item(self, index):
+        """Launches the mail viewer based on the selected item."""
+        
+        mail_data = self.results_table.item(index.row(), 0).data(Qt.ItemDataRole.UserRole)
+            
+        if mail_data:
+            mail_file_path = mail_data.get("filename")
+            if mail_file_path:
+                logging.info(f"Launching mail viewer for file: {mail_file_path}")
+                try:
+                    viewer_path = os.path.join(os.path.dirname(__file__), "view-mail.py")
+                    # Use Popen to launch it in a new process without blocking
+                    subprocess.Popen(["python3", viewer_path, mail_file_path[0]])
+                except Exception as e:
+                    QMessageBox.critical(self, "Error", f"Could not launch mail viewer: {e}")
+            else:
+                logging.warning("Could not find mail file path for selected row.")
+
+# --- Main Entry Point ---
+def main():
+    parser = argparse.ArgumentParser(description="View messages in a specific notmuch thread.")
+    parser.add_argument("thread_id", help="The thread ID to display.")
+    args = parser.parse_args()
+    
+    app = QApplication(sys.argv)
+    viewer = ThreadViewer(args.thread_id)
+    viewer.show()
+    sys.exit(app.exec())
+
+if __name__ == "__main__":
+    main()

@@ -374,9 +374,11 @@ class QueryResultsViewer(QMainWindow):
             # notmuch search with --output=summary returns a "thread" key
             thread_id = item_data.get("thread")
             if thread_id:
-                logging.info(f"Launching thread viewer for thread ID: {thread_id}")
-                # Placeholder for the command to launch thread viewer
-                QMessageBox.information(self, "Action Mocked", f"Launching thread viewer for thread ID: {thread_id}")
+                try:
+                    viewer_path = os.path.join(os.path.dirname(__file__), "view-thread.py")
+                    subprocess.Popen(["python3", viewer_path, thread_id])
+                except Exception as e:
+                    QMessageBox.critical(self, "Error", f"Could not launch mail viewer: {e}")
             else:
                 logging.warning("Could not find thread ID for selected row.")
         else: # mails mode
