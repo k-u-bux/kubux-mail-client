@@ -8,7 +8,8 @@ from pathlib import Path
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QTableWidget, QTableWidgetItem, QHeaderView,
-    QAbstractItemView, QMenu, QDialog, QDialogButtonBox, QLabel, QTextEdit
+    QAbstractItemView, QMenu, QDialog, QDialogButtonBox, QLabel, QTextEdit,
+    QStyledItemDelegate
 )
 from PySide6.QtCore import Qt, QSize
 import logging
@@ -20,21 +21,22 @@ from config import config
 from query import QueryParser
 from common import display_error
 
-class PreservingTableWidgetItem(QTableWidgetItem):
+
+class PreservingTextDelegate(QStyledItemDelegate):
     """
-    A custom QTableWidgetItem that preserves its display text when editing begins.
+    A custom delegate that preserves text when editing begins.
     """
-    def __init__(self, text=""):
-        super().__init__(text)
-        # Explicitly set both display and edit roles to the same value
-        self.setData(Qt.ItemDataRole.DisplayRole, text)
-        self.setData(Qt.ItemDataRole.EditRole, text)
+    def createEditor(self, parent, option, index):
+        # Create the default editor (usually a line edit)
+        editor = super().createEditor(parent, option, index)
+        return editor
         
-    def setData(self, role, value):
-        # When display role is set, also set edit role to the same value
-        if role == Qt.ItemDataRole.DisplayRole:
-            super().setData(Qt.ItemDataRole.EditRole, value)
-        super().setData(role, value)
+    def setEditorData(self, editor, index):
+        # This is called when editing starts - we explicitly get the display text
+        # and set it in the editor
+        text = index.data(Qt.ItemDataRole.DisplayRole)
+        editor.setText(text)
+
 
 class QueryEditor(QMainWindow):
     def __init__(self, parent=None):
@@ -82,6 +84,10 @@ class QueryEditor(QMainWindow):
         self.query_table.verticalHeader().setVisible(False)
         self.query_table.setFont(config.get_text_font())
         
+        # Apply the custom delegate to preserve text during editing
+        text_delegate = PreservingTextDelegate()
+        self.query_table.setItemDelegate(text_delegate)
+        
         # Connect signals for saving and opening queries
         self.query_table.cellChanged.connect(self.save_queries_from_table)
         self.query_table.cellDoubleClicked.connect(self.open_query_results)
@@ -97,11 +103,11 @@ class QueryEditor(QMainWindow):
         self.query_table.cellChanged.disconnect(self.save_queries_from_table)
         
         for row, (name, query) in enumerate(queries.items()):
-            name_item = PreservingTableWidgetItem(name)
+            name_item = QTableWidgetItem(name)
             name_item.setFont(config.get_text_font())
             self.query_table.setItem(row, 0, name_item)
             
-            query_item = PreservingTableWidgetItem(query)
+            query_item = QTableWidgetItem(query)
             query_item.setFont(config.get_text_font())
             self.query_table.setItem(row, 1, query_item)
             
@@ -133,11 +139,11 @@ class QueryEditor(QMainWindow):
         row_count = self.query_table.rowCount()
         self.query_table.insertRow(row_count)
         
-        name_item = PreservingTableWidgetItem("")
+        name_item = QTableWidgetItem("")
         name_item.setFont(config.get_text_font())
         self.query_table.setItem(row_count, 0, name_item)
         
-        query_item = PreservingTableWidgetItem("")
+        query_item = QTableWidgetItem("")
         query_item.setFont(config.get_text_font())
         self.query_table.setItem(row_count, 1, query_item)
 
