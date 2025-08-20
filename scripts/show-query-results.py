@@ -70,6 +70,7 @@ class QueryResultsViewer(QMainWindow):
 
     def setup_ui(self):
         central_widget = QWidget()
+        central_widget.setFont(config.get_text_font())
         self.setCentralWidget(central_widget)
         main_layout = QVBoxLayout(central_widget)
 
@@ -79,11 +80,13 @@ class QueryResultsViewer(QMainWindow):
         
         # View mode toggle button
         self.view_mode_button = QPushButton("Thread View (toggle for mail view)")
+        self.view_mode_button.setFont(config.get_interface_font())
         self.view_mode_button.clicked.connect(self.toggle_view_mode)
         top_bar_layout.addWidget(self.view_mode_button)
 
         # Refresh button
         self.refresh_button = QPushButton("Refresh")
+        self.refresh_button.setFont(config.get_interface_font())
         self.refresh_button.clicked.connect(self.execute_query)
         top_bar_layout.addWidget(self.refresh_button)
 
@@ -92,11 +95,13 @@ class QueryResultsViewer(QMainWindow):
         
         # Quit button
         self.quit_button = QPushButton("Quit")
+        self.quit_button.setFont(config.get_interface_font())
         self.quit_button.clicked.connect(self.close)
         top_bar_layout.addWidget(self.quit_button)
         
         # b) below the top row: an edit box for the query.
         self.query_edit = QLineEdit(self.current_query)
+        self.query_edit.setFont(config.get_interface_font())
         self.query_edit.returnPressed.connect(self.execute_query)
         main_layout.addWidget(self.query_edit)
 

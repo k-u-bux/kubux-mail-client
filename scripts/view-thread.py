@@ -69,6 +69,7 @@ class ThreadViewer(QMainWindow):
 
     def setup_ui(self):
         central_widget = QWidget()
+        central_widget.setFont(config.get_text_font())
         self.setCentralWidget(central_widget)
         main_layout = QVBoxLayout(central_widget)
 
@@ -77,16 +78,19 @@ class ThreadViewer(QMainWindow):
         main_layout.addLayout(top_bar_layout)
 
         self.view_mode_button = QPushButton("Tree View (toggle for list view)")
+        self.view_mode_button.setFont(config.get_interface_font())
         self.view_mode_button.clicked.connect(self.toggle_view_mode)
         top_bar_layout.addWidget(self.view_mode_button)
 
         self.refresh_button = QPushButton("Refresh")
+        self.refresh_button.setFont(config.get_interface_font())
         self.refresh_button.clicked.connect(self.execute_query)
         top_bar_layout.addWidget(self.refresh_button)
 
         top_bar_layout.addStretch()
 
         self.quit_button = QPushButton("Quit")
+        self.quit_button.setFont(config.get_interface_font())
         self.quit_button.clicked.connect(self.close)
         top_bar_layout.addWidget(self.quit_button)
         
@@ -154,8 +158,9 @@ class ThreadViewer(QMainWindow):
             self.results_table.setSortingEnabled(False)
             self._populate_table(flattened_messages, indent=True)
         else: # list mode
-            self.results_table.setSortingEnabled(True)
+            self.results_table.setSortingEnabled(False)
             self._populate_table(flattened_messages, indent=False)
+            self.results_table.setSortingEnabled(True)
         
     def _populate_table(self, messages, indent):
         """Populates the QTableWidget from a flattened list of messages."""

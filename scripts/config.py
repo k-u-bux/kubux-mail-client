@@ -84,6 +84,12 @@ class Config:
         font.setPointSize(self.data["visual"][f"{font_type}_font_size"])
         return font
 
+    def get_interface_font(self):
+        return self.get_font("interface")
+
+    def get_text_font(self):
+        return self.get_font("text")
+
     def get_visual_setting(self, key):
         return self.data["visual"].get(key)
         

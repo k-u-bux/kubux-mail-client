@@ -167,6 +167,7 @@ class MailViewer(QMainWindow):
 
     def setup_ui(self):
         central_widget = QWidget()
+        central_widget.setFont(config.get_interface_font())
         self.setCentralWidget(central_widget)
         main_layout = QVBoxLayout(central_widget)
 
@@ -185,6 +186,7 @@ class MailViewer(QMainWindow):
         self.compose_menu.addSeparator()
         self.compose_menu.addAction("Compose New").triggered.connect(self.compose_new)
         self.compose_button.setMenu(self.compose_menu)
+        top_bar_layout.setContentsMargins(0, 0, 0, 0)
         top_bar_layout.addWidget(self.compose_button)
         
         # Tags button with menu
@@ -239,14 +241,16 @@ class MailViewer(QMainWindow):
 
         # Mail Headers section as a GroupBox
         self.headers_group_box = QGroupBox()
+        self.headers_group_box.setFont(config.get_text_font())
         self.headers_layout = QFormLayout(self.headers_group_box)
         self.headers_group_box.setStyleSheet("QGroupBox { border: 1px solid gray; }")
         self.splitter.addWidget(self.headers_group_box)
         
         # Mail Content area
         self.mail_content = QTextEdit()
+        self.mail_content.setFont(config.get_text_font())
         self.mail_content.setReadOnly(True)
-        self.mail_content.setFont(config.get_font("text"))
+        self.mail_content.setFont(config.get_text_font())
         self.splitter.addWidget(self.mail_content)
         
         # Add a context menu for clipboard actions and view raw
@@ -255,6 +259,7 @@ class MailViewer(QMainWindow):
 
         # Attachments list
         self.attachments_list = QListWidget()
+        self.attachments_list.setFont(config.get_interface_font())
         self.attachments_list.setMinimumHeight(40)
         self.attachments_list.setMaximumHeight(200)
         self.splitter.addWidget(self.attachments_list)
@@ -310,7 +315,7 @@ class MailViewer(QMainWindow):
         for field, value in header_fields.items():
             if value:
                 label = QLabel(f"<b>{field}:</b>")
-                label.setFont(config.get_font("interface"))
+                label.setFont(config.get_text_font())
                 
                 # Create a widget for addresses
                 addresses_widget = QWidget()
