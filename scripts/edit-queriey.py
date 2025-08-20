@@ -27,6 +27,8 @@ class QueryEditor(QMainWindow):
         self.setWindowTitle("Edit Named Queries")
         self.setMinimumSize(QSize(800, 600))
         
+        # NOTE: I am using the user-provided config.py which
+        #       is assumed to be available to the interpreter.
         self.query_parser = QueryParser(config.config_path.parent)
         
         self.setup_ui()
@@ -66,6 +68,10 @@ class QueryEditor(QMainWindow):
         self.query_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         self.query_table.verticalHeader().setVisible(False)
         self.query_table.setFont(config.text_font)
+        
+        # Set the edit triggers to begin editing only when a key is pressed,
+        # preserving the existing text on a single click.
+        self.query_table.setEditTriggers(QAbstractItemView.EditTrigger.SelectedClicked)
         
         # Connect signals for saving and opening queries
         self.query_table.cellChanged.connect(self.save_queries_from_table)

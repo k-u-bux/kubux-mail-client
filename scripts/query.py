@@ -51,7 +51,7 @@ class QueryParser:
     def _expand_queries(self, expression: str, visited: list, trace: list) -> str:
         """Recursive helper function to expand queries."""
         # Find all named query references
-        references = re.findall(r'@(\w+)', expression)
+        references = re.findall(r'$(\w+)', expression)
         
         if not references:
             return expression
@@ -63,7 +63,7 @@ class QueryParser:
                 raise ValueError(f"Circular query reference detected: {' -> '.join(trace + [ref])}")
             
             if ref not in self.named_queries:
-                raise ValueError(f"Undefined query name: '@{ref}'")
+                raise ValueError(f"Undefined query name: '${ref}'")
             
             referenced_query = self.named_queries[ref]
             
@@ -72,7 +72,7 @@ class QueryParser:
             
             # Substitute the reference with the expanded query, wrapped in parentheses
             # to preserve notmuch's operator precedence
-            expanded_expression = expanded_expression.replace(f"@{ref}", f"({expanded_sub_query})")
+            expanded_expression = expanded_expression.replace(f"${ref}", f"({expanded_sub_query})")
             
         return expanded_expression
 
@@ -97,11 +97,11 @@ if __name__ == '__main__':
     
     [[queries]]
     name = "urgent_inbox"
-    query = "tag:urgent and @unread"
+    query = "tag:urgent and $unread"
     
     [[queries]]
     name = "recursive_example"
-    query = "@recursive_example"
+    query = "$recursive_example"
     """
     
     with open(mock_config_dir / "queries.toml", "w") as f:
@@ -113,11 +113,11 @@ if __name__ == '__main__':
     print(parser.named_queries)
 
     test_queries = [
-        "subject:project and @urgent_inbox",
-        "@unread and not @from_me",
+        "subject:project and $urgent_inbox",
+        "$unread and not $from_me",
         "tag:archive",
-        "tag:unread and @unknown_query",
-        "tag:unread or @recursive_example"
+        "tag:unread and $unknown_query",
+        "tag:unread or $recursive_example"
     ]
 
     for q in test_queries:
