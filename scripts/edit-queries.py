@@ -118,11 +118,11 @@ class QueryEditor(QMainWindow):
         self.query_table.verticalHeader().setVisible(False)
         self.query_table.setFont(config.get_text_font())
         
-        # Configure editing behavior
+        # Critical change: Use AnyKeyPressed as a trigger, and enable SingleClicked
         self.query_table.setEditTriggers(
-            QAbstractItemView.EditTrigger.DoubleClicked | 
-            QAbstractItemView.EditTrigger.SelectedClicked | 
-            QAbstractItemView.EditTrigger.EditKeyPressed
+            QAbstractItemView.EditTrigger.AnyKeyPressed | 
+            QAbstractItemView.EditTrigger.SelectedClicked |
+            QAbstractItemView.EditTrigger.CurrentChanged
         )
         
         # Use our improved delegate for editing
@@ -131,8 +131,13 @@ class QueryEditor(QMainWindow):
         # Connect signals for saving and opening queries
         self.query_table.cellChanged.connect(self.save_queries_from_table)
         self.query_table.cellDoubleClicked.connect(self.open_query_results)
+        self.query_table.cellClicked.connect(self.activate_edit_on_click)
 
         main_layout.addWidget(self.query_table)
+
+    def activate_edit_on_click(self, row, column):
+        """Force edit mode on a single click."""
+        self.query_table.editItem(self.query_table.item(row, column))
 
     def load_queries_into_table(self):
         """Loads named queries from the parser into the table."""
