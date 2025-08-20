@@ -5,11 +5,13 @@ from pathlib import Path
 import logging
 import re
 
+from config import config
+
 class QueryParser:
     """
     Parses and expands user-defined named queries.
     """
-    def __init__(self, config_dir: Path):
+    def __init__(self, config_dir: config.config_dir):
         """
         Initializes the parser and loads named queries from a file.
         """

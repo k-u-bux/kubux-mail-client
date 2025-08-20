@@ -8,6 +8,7 @@ from email.utils import getaddresses
 class Config:
     def __init__(self, config_file: str = "~/.config/kubux-mail-client/config.toml"):
         self.config_path = Path(config_file).expanduser()
+        self.config_dir = os.path.dirname(self.config_path)
         self.data = self.load_config()
 
         # Visual settings
@@ -57,7 +58,7 @@ class Config:
                 ]
             }
         }
-        
+
         if not self.config_path.exists():
             # Create a default config file if it doesn't exist
             self.config_path.parent.mkdir(parents=True, exist_ok=True)
