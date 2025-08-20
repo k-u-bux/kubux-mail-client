@@ -20,15 +20,21 @@ from config import config
 from query import QueryParser
 from common import display_error
 
-
 class PreservingTableWidgetItem(QTableWidgetItem):
     """
     A custom QTableWidgetItem that preserves its display text when editing begins.
     """
-    def data(self, role):
-        if role == Qt.ItemDataRole.EditRole:
-            return super().data(Qt.ItemDataRole.DisplayRole)
-        return super().data(role)
+    def __init__(self, text=""):
+        super().__init__(text)
+        # Explicitly set both display and edit roles to the same value
+        self.setData(Qt.ItemDataRole.DisplayRole, text)
+        self.setData(Qt.ItemDataRole.EditRole, text)
+        
+    def setData(self, role, value):
+        # When display role is set, also set edit role to the same value
+        if role == Qt.ItemDataRole.DisplayRole:
+            super().setData(Qt.ItemDataRole.EditRole, value)
+        super().setData(role, value)
 
 class QueryEditor(QMainWindow):
     def __init__(self, parent=None):
