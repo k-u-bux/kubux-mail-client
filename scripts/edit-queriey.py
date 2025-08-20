@@ -43,7 +43,7 @@ class QueryEditor(QMainWindow):
         
     def setup_ui(self):
         central_widget = QWidget()
-        central_widget.setFont(config.interface_font)
+        central_widget.setFont(config.get_interface_font())
         self.setCentralWidget(central_widget)
         main_layout = QVBoxLayout(central_widget)
 
@@ -52,18 +52,18 @@ class QueryEditor(QMainWindow):
         main_layout.addLayout(top_bar_layout)
 
         self.new_mail_button = QPushButton("New Mail")
-        self.new_mail_button.setFont(config.interface_font)
+        self.new_mail_button.setFont(config.get_interface_font())
         top_bar_layout.addWidget(self.new_mail_button)
         
         self.new_query_button = QPushButton("New Query")
-        self.new_query_button.setFont(config.interface_font)
+        self.new_query_button.setFont(config.get_interface_font())
         self.new_query_button.clicked.connect(self.add_new_row)
         top_bar_layout.addWidget(self.new_query_button)
 
         top_bar_layout.addStretch()
 
         self.quit_button = QPushButton("Quit")
-        self.quit_button.setFont(config.interface_font)
+        self.quit_button.setFont(config.get_interface_font())
         self.quit_button.clicked.connect(self.close)
         top_bar_layout.addWidget(self.quit_button)
         
@@ -74,7 +74,7 @@ class QueryEditor(QMainWindow):
         self.query_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
         self.query_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         self.query_table.verticalHeader().setVisible(False)
-        self.query_table.setFont(config.text_font)
+        self.query_table.setFont(config.get_text_font())
         
         # Connect signals for saving and opening queries
         self.query_table.cellChanged.connect(self.save_queries_from_table)
@@ -92,11 +92,11 @@ class QueryEditor(QMainWindow):
         
         for row, (name, query) in enumerate(queries.items()):
             name_item = PreservingTableWidgetItem(name)
-            name_item.setFont(config.text_font)
+            name_item.setFont(config.get_text_font())
             self.query_table.setItem(row, 0, name_item)
             
             query_item = PreservingTableWidgetItem(query)
-            query_item.setFont(config.text_font)
+            query_item.setFont(config.get_text_font())
             self.query_table.setItem(row, 1, query_item)
             
         self.query_table.cellChanged.connect(self.save_queries_from_table)
@@ -128,11 +128,11 @@ class QueryEditor(QMainWindow):
         self.query_table.insertRow(row_count)
         
         name_item = PreservingTableWidgetItem("")
-        name_item.setFont(config.text_font)
+        name_item.setFont(config.get_text_font())
         self.query_table.setItem(row_count, 0, name_item)
         
         query_item = PreservingTableWidgetItem("")
-        query_item.setFont(config.text_font)
+        query_item.setFont(config.get_text_font())
         self.query_table.setItem(row_count, 1, query_item)
 
     def open_query_results(self, row, column):
