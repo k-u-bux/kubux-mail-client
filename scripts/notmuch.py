@@ -1,0 +1,88 @@
+import sys
+import subprocess
+import json
+import os
+from pathlib import Path
+from email.utils import getaddresses
+import re
+from datetime import datetime, timezone
+
+def notmuch_show(query, sort, flag_error):
+    try:
+        command = [
+            'notmuch',
+            'show',
+            '--format=json',
+            '--body=false',
+            f'--sort={sort}',
+            query
+        ]
+        
+        result = subprocess.run(command, check=True, capture_output=True, text=True)
+        return json.loads(result.stdout)
+
+    except subprocess.CalledProcessError as e:
+        flag_error(
+            "Notmuch Query Failed",
+            f"An error occurred while running notmuch:\n\n{e.stderr}"
+        )
+        os.exit(1)
+
+    except json.JSONDecodeError as e:
+        flag_error(
+            "Notmuch Output Error",
+            f"Failed to parse JSON output from notmuch:\n\n{e}"
+        )
+        os.exit(1)
+
+def flatten_message_tree(list_of_groups_of_messages):
+    message_list = []
+    def flatten_message_pair(the_pair):
+        # a pair is a message (dict) followed by a list of message pairs
+        message_list.append(the_pair[0])
+        for msg in the_pair[1]:
+            flatten_message_pair(msg)
+    for thread in list_of_groups_of_messages:
+        for message_pair in thread:
+            flatten_message_pair(message_pair)
+    return message_list
+
+def find_matching_messages(query, flag_error):
+    list_of_messages = flatten_message_tree( notmuch_show(query, "newest-first", flag_error) )
+    result = []
+    for msg in list_of_messages:
+        if msg["match"]:
+            result.append( msg )
+    return result
+
+def notmuch_search(query, output, sort, flag_error):
+    try:
+        command = [
+            'notmuch',
+            'search',
+            '--format=json',
+            f'--output={output}',
+            f'--sort={sort}',
+            query
+        ]
+        
+        result = subprocess.run(command, check=True, capture_output=True, text=True)
+        return json.loads(result.stdout)
+
+    except subprocess.CalledProcessError as e:
+        flag_error(
+            "Notmuch Query Failed",
+            f"An error occurred while running notmuch:\n\n{e.stderr}"
+        )
+        os.exit(1)
+
+    except json.JSONDecodeError as e:
+        flag_error(
+            "Notmuch Output Error",
+            f"Failed to parse JSON output from notmuch:\n\n{e}"
+        )
+        os.exit(1)
+
+def find_matching_threads(query, flag_error):
+    list_of_threads = notmuch_search(query, "summary", "newest-first", flag_error)
+    return list_of_threads

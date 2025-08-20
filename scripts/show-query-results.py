@@ -10,6 +10,8 @@ from email.utils import getaddresses
 import re
 from datetime import datetime, timezone
 
+from notmuch import find_matching_messages, find_matching_threads
+
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLineEdit, QPushButton, QTableWidget, QTableWidgetItem, QHeaderView,
@@ -61,6 +63,11 @@ class CopyableErrorDialog(QDialog):
         button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok)
         button_box.accepted.connect(self.accept)
         layout.addWidget(button_box)
+
+def display_error(parent, title, message):
+    dialog = CopyableErrorDialog( title, message, parent=parent )
+    dialog.exec()
+
 
 class QueryResultsViewer(QMainWindow):
     def __init__(self, query_string="tag:inbox and tag:unread", parent=None):
@@ -188,90 +195,6 @@ class QueryResultsViewer(QMainWindow):
             logging.error(f"Failed to get primary email from notmuch config: {e.stderr}")
             return None
 
-    def notmuch_show(self, query, sort):
-        try:
-            command = [
-                'notmuch',
-                'show',
-                '--format=json',
-                '--body=false',
-                f'--sort={sort}',
-                query
-            ]
-            
-            result = subprocess.run(command, check=True, capture_output=True, text=True)
-            return json.loads(result.stdout)
-
-        except subprocess.CalledProcessError as e:
-            dialog = CopyableErrorDialog(
-                "Notmuch Query Failed",
-                f"An error occurred while running notmuch:\n\n{e.stderr}"
-            )
-            dialog.exec()
-            os.exit(1)
-
-        except json.JSONDecodeError as e:
-            dialog = CopyableErrorDialog(
-                "Notmuch Output Error",
-                f"Failed to parse JSON output from notmuch:\n\n{e}"
-            )
-            dialog.exec()
-            os.exit(1)
-
-    def flatten_message_tree(self, list_of_groups_of_messages):
-        message_list = []
-        def flatten_message_pair(the_pair):
-            # a pair is a message (dict) followed by a list of message pairs
-            message_list.append(the_pair[0])
-            for msg in the_pair[1]:
-                flatten_message_pair(msg)
-        for thread in list_of_groups_of_messages:
-            for message_pair in thread:
-                flatten_message_pair(message_pair)
-        return message_list
-
-    def find_matching_messages(self, query):
-        list_of_messages = self.flatten_message_tree( self.notmuch_show(query, "newest-first") )
-        result = []
-        for msg in list_of_messages:
-            if msg["match"]:
-                result.append( msg )
-        return result
-
-    def notmuch_search(self, query, output, sort):
-        try:
-            command = [
-                'notmuch',
-                'search',
-                '--format=json',
-                f'--output={output}',
-                f'--sort={sort}',
-                query
-            ]
-            
-            result = subprocess.run(command, check=True, capture_output=True, text=True)
-            return json.loads(result.stdout)
-
-        except subprocess.CalledProcessError as e:
-            dialog = CopyableErrorDialog(
-                "Notmuch Query Failed",
-                f"An error occurred while running notmuch:\n\n{e.stderr}"
-            )
-            dialog.exec()
-            os.exit(1)
-
-        except json.JSONDecodeError as e:
-            dialog = CopyableErrorDialog(
-                "Notmuch Output Error",
-                f"Failed to parse JSON output from notmuch:\n\n{e}"
-            )
-            dialog.exec()
-            os.exit(1)
-
-    def find_matching_threads(self, query):
-        list_of_threads = self.notmuch_search(query, "summary", "newest-first")
-        return list_of_threads
-
     def execute_query(self):
         self.current_query = self.query_edit.text()
         logging.info(f"Executing query: '{self.current_query}' in '{self.view_mode}' mode.")
@@ -288,7 +211,7 @@ class QueryResultsViewer(QMainWindow):
             
     def _execute_threads_query(self, my_email_address):
         """Fetches and populates the table with thread data."""
-        self.results = self.find_matching_threads(self.current_query)
+        self.results = find_matching_threads(self.current_query, display_error)
         self.results_table.setHorizontalHeaderLabels(["Date", "Authors", "Subject"])
         self.results_table.setRowCount(len(self.results))
         self.results_table.setSortingEnabled(False)
@@ -298,7 +221,7 @@ class QueryResultsViewer(QMainWindow):
 
     def _execute_mails_query(self, my_email_address):
         """Fetches and populates the table with mail data."""
-        self.results = self.find_matching_messages(self.current_query)
+        self.results = find_matching_messages(self.current_query, display_error)
         self.results_table.setHorizontalHeaderLabels(["Date", "Sender/Receiver", "Subject"])
         self.results_table.setRowCount(len(self.results))
         self.results_table.setSortingEnabled(False)
