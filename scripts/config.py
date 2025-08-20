@@ -3,6 +3,7 @@ from pathlib import Path
 import os
 from PySide6.QtGui import QFont
 from typing import Dict, Any, Optional
+from email.utils import getaddresses
 
 class Config:
     def __init__(self, config_file: str = "~/.config/kubux-mail-client/config.toml"):
@@ -96,6 +97,16 @@ class Config:
 
     def get_identities(self):
         return self.data.get("email_identities", {}).get("identities", [])
+
+    def is_me(self, address_string: str) -> bool:
+        """
+        Checks if the given address string corresponds to one of the configured identities.
+        Handles "Name <email@example.com>" format.
+        """
+        from_addresses = getaddresses([address_string])
+        from_addrs_only = {addr for name, addr in from_addresses}
+        
+        return not from_addrs_only.isdisjoint(self._identity_emails)
 
 # A global config object for easy access
 config = Config()
