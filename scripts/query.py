@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import toml
+import json
 from pathlib import Path
 import logging
 import re
@@ -16,8 +16,9 @@ class QueryParser:
         Initializes the parser and loads named queries from a file.
         """
         self.queries_path = config_dir / "queries.toml"
-        self.named_queries = self._load_queries()
-        
+        self.queries = self._load_queries()
+        self.named_queries = {name:query for name, query in self.queries if not name ==""}
+
     def _load_queries(self):
         """
         Loads named queries from the TOML configuration file.
@@ -25,18 +26,18 @@ class QueryParser:
         if not self.queries_path.exists():
             logging.warning(f"Queries file not found at {self.queries_path}. Using empty named queries.")
             # Create a default file
-            default_queries = {"queries": []}
+            default_queries = []
             try:
                 with open(self.queries_path, "w") as f:
-                    toml.dump(default_queries, f)
+                    json.dump(default_queries, f)
             except Exception as e:
                 logging.error(f"Failed to create default queries.toml file: {e}")
             return {}
 
         try:
             with open(self.queries_path, "r") as f:
-                data = toml.load(f)
-                return {q["name"]: q["query"] for q in data.get("queries", [])}
+                data = json.load(f)
+                return data
         except Exception as e:
             logging.error(f"Failed to load queries from {self.queries_path}: {e}")
             return {}
@@ -51,8 +52,8 @@ class QueryParser:
     def _expand_queries(self, expression: str, visited: list, trace: list) -> str:
         """Recursive helper function to expand queries."""
         # Find all named query references
-        references = re.findall(r'$(\w+)', expression)
-        
+        references = re.findall(r'\$(\w+)', expression)
+
         if not references:
             return expression
         
@@ -87,21 +88,12 @@ if __name__ == '__main__':
     
     # Create a mock queries.toml file
     mock_queries_content = """
-    [[queries]]
-    name = "unread"
-    query = "tag:inbox and tag:unread"
-
-    [[queries]]
-    name = "from_me"
-    query = "from:me@kubux.net"
-    
-    [[queries]]
-    name = "urgent_inbox"
-    query = "tag:urgent and $unread"
-    
-    [[queries]]
-    name = "recursive_example"
-    query = "$recursive_example"
+    [
+      [ "unread", "tag:inbox and tag:unread" ],
+      [ "from_me",  "from:me@kubux.net" ],
+      [ "urgent_inbox", "tag:urgent and $unread" ],
+      [ "recursive_example", "$recursive_example" ]
+    ]
     """
     
     with open(mock_config_dir / "queries.toml", "w") as f:
