@@ -10,6 +10,9 @@ from email.utils import getaddresses
 import re
 from datetime import datetime, timezone
 
+# Assuming 'notmuch.py' is in a package that can be imported
+from notmuch import notmuch_show, flatten_message_tree, find_matching_messages, find_matching_threads
+
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLineEdit, QPushButton, QTableWidget, QTableWidgetItem, QHeaderView,
@@ -27,6 +30,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 try:
     from config import config
 except ImportError:
+    # A simple mock for demonstration purposes if config.py is not available
     class MockConfig:
         def get_font(self, section):
             if section == "text":
@@ -60,6 +64,11 @@ class CopyableErrorDialog(QDialog):
         button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok)
         button_box.accepted.connect(self.accept)
         layout.addWidget(button_box)
+
+def display_error(parent, title, message):
+    dialog = CopyableErrorDialog( title, message, parent=parent )
+    dialog.exec()
+
 
 class ThreadViewer(QMainWindow):
     def __init__(self, thread_id, parent=None):
@@ -116,9 +125,19 @@ class ThreadViewer(QMainWindow):
     def showEvent(self, event):
         """Called when the widget is shown."""
         super().showEvent(event)
-        # We don't need a custom showEvent here because the stretch mode on the Subject column works well
-        # and there's no complex ratio to calculate like in show-query-results.py.
-        pass
+        
+        if self.results_table.rowCount() == 0:
+            return
+
+        total_width = self.results_table.viewport().width()
+        date_col_width = self.results_table.columnWidth(0)
+        remaining_width = total_width - date_col_width
+
+        subject_col_width = int(remaining_width * 0.70)
+        sender_col_width = int(remaining_width * 0.30)
+        
+        self.results_table.setColumnWidth(1, sender_col_width)
+        self.results_table.setColumnWidth(2, subject_col_width)
 
     def setup_key_bindings(self):
         """Sets up key bindings based on the config file."""
@@ -153,87 +172,39 @@ class ThreadViewer(QMainWindow):
             logging.error(f"Failed to get primary email from notmuch config: {e.stderr}")
             return None
 
-    def notmuch_show(self, query):
-        try:
-            command = [
-                'notmuch',
-                'show',
-                '--format=json',
-                '--body=false',
-                query
-            ]
-            
-            result = subprocess.run(command, check=True, capture_output=True, text=True)
-            output = json.loads(result.stdout)
-            
-            # The output can be a list of message-pairs (threads with replies)
-            # or a single message (threads with one message). Normalize to a list of lists.
-            if isinstance(output, dict):
-                return [[output, []]]
-            return output
-            
-        except subprocess.CalledProcessError as e:
-            dialog = CopyableErrorDialog(
-                "Notmuch Query Failed",
-                f"An error occurred while running notmuch:\n\n{e.stderr}"
-            )
-            dialog.exec()
-            os.exit(1)
-
-        except json.JSONDecodeError as e:
-            dialog = CopyableErrorDialog(
-                "Notmuch Output Error",
-                f"Failed to parse JSON output from notmuch:\n\n{e}"
-            )
-            dialog.exec()
-            os.exit(1)
-
     def execute_query(self):
         logging.info(f"Executing query for thread ID: {self.thread_id}")
-        
-        self.results = self.notmuch_show(f"thread:{self.thread_id}")
         
         self.results_table.setRowCount(0)
         self.results_table.clearContents()
         self.results_table.setSortingEnabled(False)
         
+        my_email_address = self.get_my_email_address()
+        
+        # The notmuch_show function returns a list of threads, so we handle that directly
+        list_of_groups_of_messages = notmuch_show(f"thread:{self.thread_id}", "oldest-first", lambda *args: display_error(self, *args))
+        
+        # Then we flatten the tree
+        flattened_messages = flatten_message_tree(list_of_groups_of_messages)
+        
         if self.view_mode == "tree":
-            messages = self.flatten_and_indent_message_tree(self.results)
-            self._populate_table_from_flattened_list(messages, indent=True)
-        else:
-            messages = self.flatten_message_tree(self.results)
-            self._populate_table_from_flattened_list(messages, indent=False)
+            self._populate_table(flattened_messages, my_email_address, indent=True)
+        else: # list mode
+            self._populate_table(flattened_messages, my_email_address, indent=False)
         
         self.results_table.setSortingEnabled(True)
 
-    def flatten_message_tree(self, tree):
-        messages = []
-        for message_pair in tree:
-            messages.append(message_pair[0])
-            if message_pair[1]:
-                messages.extend(self.flatten_message_tree(message_pair[1]))
-        return messages
-
-    def flatten_and_indent_message_tree(self, tree, indent_level=0):
-        messages = []
-        for message_pair in tree:
-            message_pair[0]['indent_level'] = indent_level
-            messages.append(message_pair[0])
-            if message_pair[1]:
-                messages.extend(self.flatten_and_indent_message_tree(message_pair[1], indent_level + 1))
-        return messages
-    
-    def _populate_table_from_flattened_list(self, messages, indent):
+    def _populate_table(self, messages, my_email_address, indent):
         """Populates the QTableWidget from a flattened list of messages."""
         self.results_table.setRowCount(len(messages))
         for row_idx, mail in enumerate(messages):
             date_item = self._create_date_item(mail.get("timestamp"))
-            sender_receiver_text = self._get_sender_receiver(mail.get("headers", {}).get("From", ""), self.my_email_address)
+            sender_receiver_text = self._get_sender_receiver(mail.get("headers", {}).get("From", ""), my_email_address)
             sender_receiver_item = QTableWidgetItem(sender_receiver_text)
             
             subject_text = mail.get("headers", {}).get("Subject", "No Subject")
             if indent:
-                indent_string = "    " * mail.get('indent_level', 0)
+                indent_string = "    " * mail.get('depth', 0)
                 subject_text = indent_string + subject_text
             subject_item = QTableWidgetItem(subject_text)
             
@@ -279,7 +250,6 @@ class ThreadViewer(QMainWindow):
                 logging.info(f"Launching mail viewer for file: {mail_file_path}")
                 try:
                     viewer_path = os.path.join(os.path.dirname(__file__), "view-mail.py")
-                    # Use Popen to launch it in a new process without blocking
                     subprocess.Popen(["python3", viewer_path, mail_file_path[0]])
                 except Exception as e:
                     QMessageBox.critical(self, "Error", f"Could not launch mail viewer: {e}")
