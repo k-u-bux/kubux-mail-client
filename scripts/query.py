@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import json
+import os
 from pathlib import Path
 import logging
 import re
@@ -11,7 +12,7 @@ class QueryParser:
     """
     Parses and expands user-defined named queries.
     """
-    def __init__(self, config_dir: config.config_dir):
+    def __init__(self, config_dir = config.config_dir):
         """
         Initializes the parser and loads named queries from a file.
         """

@@ -23,7 +23,7 @@ import logging
 from notmuch import find_matching_messages, find_matching_threads
 from config import config
 from common import display_error
-
+from query import QueryParser
 
 # Set up basic logging to console
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -151,7 +151,8 @@ class QueryResultsViewer(QMainWindow):
         self.execute_query()
 
     def execute_query(self):
-        self.current_query = self.query_edit.text()
+        parser = QueryParser(config_dir=config.config_dir)
+        self.current_query = parser.parse( self.query_edit.text() )
         logging.info(f"Executing query: '{self.current_query}' in '{self.view_mode}' mode.")
         
         self.results_table.setRowCount(0)
