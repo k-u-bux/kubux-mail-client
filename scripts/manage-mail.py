@@ -123,7 +123,12 @@ class QueryEditor(QMainWindow):
         self.new_mail_button = QPushButton("New Mail")
         self.new_mail_button.setFont(config.get_interface_font())
         top_bar_layout.addWidget(self.new_mail_button)
+        self.new_mail_button = QPushButton("Edit Draft")
+        self.new_mail_button.setFont(config.get_interface_font())
+        top_bar_layout.addWidget(self.new_mail_button)
         
+        top_bar_layout.addStretch()
+
         self.new_query_button = QPushButton("New Query")
         self.new_query_button.setFont(config.get_interface_font())
         self.new_query_button.clicked.connect(self.add_new_row)
