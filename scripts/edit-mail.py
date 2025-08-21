@@ -410,7 +410,7 @@ class MailEditor(QMainWindow):
         # Fallback to the default if no match is found
         return Path("~/.local/share/kubux-mail-client/mail/drafts").expanduser()
 
-    def save_message(self):
+    def _save_draft(self):
         """
         Saves the current mail as a draft.
         1. Creates a temporary file in the drafts directory of the selected identity.
@@ -473,27 +473,24 @@ class MailEditor(QMainWindow):
             shutil.move(tmp_path, new_draft_path)
             self.mail_file_path = new_draft_path  # Update the path for future saves
             logging.info(f"Draft saved to {self.mail_file_path}")
-            
-            self.close()
 
         except Exception as e:
             display_error("Draft Creation Error", f"Failed to save draft file:\n{e}")
             return None
 
-    def send_message(self):
-        # NOTE: This method still calls the old _create_draft_file() but will be updated to use the new logic.
-        # For now, it will not work as expected until it is updated.
-        draft_path = self._create_draft_file()
-        if not draft_path:
-            return
+    def save_message(self):
+        self._save_draft()
+        self.close()
 
+    def send_message(self):
+        self._save_draft()
         try:
             send_mail_path = Path(__file__).parent / "send-mail.py"
             if not send_mail_path.exists():
                 QMessageBox.critical(self, "Error", f"Could not find send mail script at {send_mail_path}")
                 return
 
-            subprocess.Popen([sys.executable, str(send_mail_path), str(draft_path)])
+            subprocess.Popen([sys.executable, str(send_mail_path), str(self.mail_file_path)])
             self.close()
 
         except Exception as e:
