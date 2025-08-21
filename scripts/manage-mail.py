@@ -4,6 +4,7 @@ import sys
 import os
 import json
 import subprocess
+import shutil  # Added for shutil.copyfile
 from pathlib import Path
 import time
 import secrets
@@ -109,6 +110,9 @@ class QueryEditor(QMainWindow):
         self.double_click_interval = QApplication.instance().styleHints().mouseDoubleClickInterval()
         self.is_double_click_pending = False
         
+        # Flag to track if we're currently processing a cell change
+        self.is_processing_cell_change = False
+        
         self.setup_ui()
         self.load_queries_into_table()
         
@@ -126,6 +130,7 @@ class QueryEditor(QMainWindow):
         self.new_mail_button.setFont(config.get_interface_font())
         top_bar_layout.addWidget(self.new_mail_button)
         self.new_mail_button.clicked.connect(self.new_mail_action) # Connect the new action
+        
         self.edit_drafts_button = QPushButton("Edit Draft")
         self.edit_drafts_button.setFont(config.get_interface_font())
         self.edit_drafts_button.clicked.connect(self.edit_drafts_action) # Connect the new action
@@ -133,13 +138,8 @@ class QueryEditor(QMainWindow):
         
         top_bar_layout.addStretch()
 
-        self.new_query_button = QPushButton("New Query")
-        self.new_query_button.setFont(config.get_interface_font())
-        self.new_query_button.clicked.connect(self.add_new_row)
-        top_bar_layout.addWidget(self.new_query_button)
-
-        top_bar_layout.addStretch()
-
+        # Removed the "New Query" button
+        
         self.quit_button = QPushButton("Quit")
         self.quit_button.setFont(config.get_interface_font())
         self.quit_button.clicked.connect(self.close)
@@ -164,7 +164,7 @@ class QueryEditor(QMainWindow):
         self.query_table.setItemDelegate(self.text_delegate)
         
         # Connect signals
-        self.query_table.cellChanged.connect(self.save_queries_from_table)
+        self.query_table.cellChanged.connect(self.handle_cell_changed)
         self.query_table.cellDoubleClicked.connect(self.open_query_results)
         
         # Install event filter to track mouse position
@@ -242,14 +242,23 @@ class QueryEditor(QMainWindow):
                     editor.setCursorPosition(cursor_pos)
 
     def load_queries_into_table(self):
-        """Loads named queries from the parser into the table."""
+        """Loads named queries from the parser into the table and adds an empty row at the top."""
         queries = self.query_parser.queries
-        self.query_table.setRowCount(len(queries))
+        
+        # Set row count to include queries plus one empty row at the top
+        row_count = len(queries) + 1
+        self.query_table.setRowCount(row_count)
         
         # Temporarily disconnect the signal to avoid repeated saves during loading
-        self.query_table.cellChanged.disconnect(self.save_queries_from_table)
+        self.query_table.cellChanged.disconnect(self.handle_cell_changed)
         
-        for row, (name, query) in enumerate(queries):
+        # Add the empty row at the top (index 0)
+        self.add_empty_row_at_top()
+        
+        # Load the rest of the queries starting from index 1
+        for i, (name, query) in enumerate(queries):
+            row = i + 1  # Start at row 1, after the empty row
+            
             name_item = QTableWidgetItem(name)
             name_item.setFont(config.get_text_font())
             self.query_table.setItem(row, 0, name_item)
@@ -258,17 +267,65 @@ class QueryEditor(QMainWindow):
             query_item.setFont(config.get_text_font())
             self.query_table.setItem(row, 1, query_item)
             
-        self.query_table.cellChanged.connect(self.save_queries_from_table)
+        # Reconnect the signal
+        self.query_table.cellChanged.connect(self.handle_cell_changed)
 
-    def save_queries_from_table(self):
-        queries_to_save = []
-        for row in range(self.query_table.rowCount()):
+    def add_empty_row_at_top(self):
+        """Adds an empty row at the top of the table."""
+        # Create empty items for the top row
+        name_item = QTableWidgetItem("")
+        name_item.setFont(config.get_text_font())
+        self.query_table.setItem(0, 0, name_item)
+        
+        query_item = QTableWidgetItem("")
+        query_item.setFont(config.get_text_font())
+        self.query_table.setItem(0, 1, query_item)
+
+    def handle_cell_changed(self, row, column):
+        """Handles cell changes and creates a new row if needed."""
+        # Check if we're already processing a change to avoid recursion
+        if self.is_processing_cell_change:
+            return
+            
+        self.is_processing_cell_change = True
+        
+        try:
+            # Get the items from the changed row
             name_item = self.query_table.item(row, 0)
             query_item = self.query_table.item(row, 1)
             
             name = name_item.text().strip() if name_item else ""
             query = query_item.text().strip() if query_item else ""
             
+            # If the top row (row 0) was changed and has content, add a new empty row
+            if row == 0 and (name or query):
+                # Insert a new empty row at the top
+                self.query_table.insertRow(0)
+                
+                # Add empty items to the new top row
+                self.add_empty_row_at_top()
+                
+                # Update the UI to reflect the change
+                self.query_table.update()
+            
+            # Save all queries
+            self.save_queries_from_table()
+        finally:
+            self.is_processing_cell_change = False
+
+    def save_queries_from_table(self):
+        """Saves the contents of the table back to the queries file, skipping the empty top row."""
+        queries_to_save = []
+        
+        # Start from row 1 to skip the empty top row
+        for row in range(1, self.query_table.rowCount()):
+            name_item = self.query_table.item(row, 0)
+            query_item = self.query_table.item(row, 1)
+            
+            name = name_item.text().strip() if name_item else ""
+            query = query_item.text().strip() if query_item else ""
+            
+            # Only save non-empty rows
             if name or query:
                 queries_to_save.append([name, query])
         
@@ -279,27 +336,15 @@ class QueryEditor(QMainWindow):
         except Exception as e:
             logging.error(f"Failed to save queries: {e}")
             display_error(self, "Save Error", f"Failed to save queries to file:\n\n{e}")
-            
-    def add_new_row(self):
-        """Adds a new empty row to the table."""
-        row_count = self.query_table.rowCount()
-        self.query_table.insertRow(row_count)
-        
-        name_item = QTableWidgetItem("")
-        name_item.setFont(config.get_text_font())
-        self.query_table.setItem(row_count, 0, name_item)
-        
-        query_item = QTableWidgetItem("")
-        query_item.setFont(config.get_text_font())
-        self.query_table.setItem(row_count, 1, query_item)
-        
-        # Select the new row
-        self.query_table.setCurrentCell(row_count, 0)
 
     def open_query_results(self, row, column):
         """Launches show-query-results.py with the selected query."""
         logging.info(f"Opening query results for row {row}, column {column}")
         
+        # Skip the top empty row
+        if row == 0:
+            return
+            
         name_item = self.query_table.item(row, 0)
         query_item = self.query_table.item(row, 1)
 
