@@ -35,18 +35,19 @@ def notmuch_show(query, sort, flag_error):
         )
         os.exit(1)
 
-def flatten_message_tree(list_of_groups_of_messages):
+def flatten_message_tree(list_of_threads):
+    # todo: make this less recursive (never run into the stack limit)
     message_list = []
-    def flatten_message_pair(the_pair,depth):
+    def flatten_message_thread_pair(the_pair,depth):
         # a pair is a message (dict) followed by a list of message pairs
         msg = the_pair[0]
         msg["depth"] = depth
         message_list.append(msg)
-        for msg in the_pair[1]:
-            flatten_message_pair(msg, depth+1)
-    for thread in list_of_groups_of_messages:
-        for message_pair in thread:
-            flatten_message_pair(message_pair,0)
+        for msg_t_pair in the_pair[1]:
+            flatten_message_thread_pair(msg_t_pair, depth+1)
+    for thread in list_of_threads:
+        for message_thread_pair in thread:
+            flatten_message_thread_pair(message_thread_pair,0)
     return message_list
 
 def find_matching_messages(query, flag_error):
