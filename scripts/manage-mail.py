@@ -12,8 +12,7 @@ from datetime import datetime
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QTableWidget, QTableWidgetItem, QHeaderView,
-    QAbstractItemView, QMenu, QStyledItemDelegate, QLineEdit, QInputDialog,
-    QMessageBox
+    QAbstractItemView, QMenu, QStyledItemDelegate, QLineEdit, QInputDialog
 )
 from PySide6.QtCore import Qt, QSize, QEvent, QTimer, QRect, QPoint
 from PySide6.QtGui import QMouseEvent, QFontMetrics, QAction
@@ -178,6 +177,23 @@ class QueryEditor(QMainWindow):
         
         # Install event filter to track mouse position
         self.query_table.viewport().installEventFilter(self)
+        
+        # Remove the blue selection highlight with stylesheet
+        self.query_table.setStyleSheet("""
+            QTableWidget {
+                selection-background-color: transparent;
+                outline: none; /* Remove focus outline */
+            }
+            QTableWidget::item:selected {
+                background-color: transparent;
+                color: black; /* Keep text color normal */
+                border: 1px solid #888; /* Subtle border to show selection */
+            }
+            QTableWidget::item:focus {
+                background-color: transparent;
+                border: 1px solid #888;
+            }
+        """)
 
         main_layout.addWidget(self.query_table)
 
@@ -247,16 +263,16 @@ class QueryEditor(QMainWindow):
         context_menu.setFont(config.get_text_font())
         
         # Add actions
-        delete_action = QAction("Delete", self)
-        delete_action.triggered.connect(self.delete_row)
+        execute_action = QAction("Execute", self)
+        execute_action.triggered.connect(self.execute_row)
         
         edit_action = QAction("Edit", self)
         edit_action.triggered.connect(self.edit_row)
         
-        execute_action = QAction("Execute", self)
-        execute_action.triggered.connect(self.execute_row)
+        delete_action = QAction("Delete", self)
+        delete_action.triggered.connect(self.delete_row)
         
-        # Add actions to menu
+        # Add actions to menu in the preferred order
         context_menu.addAction(execute_action)
         context_menu.addAction(edit_action)
         context_menu.addAction(delete_action)
