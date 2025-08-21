@@ -10,14 +10,19 @@ import email.message
 from datetime import datetime
 from email.utils import getaddresses
 import logging
+import time
 
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QTableWidget, QTableWidgetItem, QHeaderView,
     QAbstractItemView, QMenu
 )
-from PySide6.QtCore import Qt, QSize
+from PySide6.QtCore import Qt, QSize, QTimer, QObject, Signal, QThread
 from PySide6.QtGui import QFont
+
+# Import watchdog for directory monitoring
+from watchdog.observers import Observer
+from watchdog.events import FileSystemEventHandler
 
 # Import the shared components
 from config import config
@@ -27,6 +32,63 @@ from common import display_error
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 
+class DraftsFileSystemEventHandler(FileSystemEventHandler):
+    """Handles file system events for the drafts directory."""
+    def __init__(self, callback):
+        self.callback = callback
+        # Debounce mechanism to avoid multiple rapid reloads
+        self.last_event_time = 0
+        self.debounce_interval = 0.5  # seconds
+        
+    def on_any_event(self, event):
+        """Called for any file system event."""
+        # Skip directories and non-eml files
+        if event.is_directory:
+            return
+        path = Path(event.src_path)
+        if path.suffix.lower() != '.eml':
+            return
+            
+        # Debounce - only process events if enough time has passed since the last one
+        current_time = time.time()
+        if current_time - self.last_event_time > self.debounce_interval:
+            self.last_event_time = current_time
+            self.callback()
+
+
+class FSWatcherSignals(QObject):
+    """Signals for the file system watcher thread."""
+    reload_needed = Signal()
+
+
+class FileSystemWatcherThread(QThread):
+    """Thread for watching file system changes."""
+    def __init__(self, directory_path):
+        super().__init__()
+        self.directory_path = directory_path
+        self.signals = FSWatcherSignals()
+        self.observer = None
+        self.running = True
+        
+    def run(self):
+        """Start monitoring the directory."""
+        self.observer = Observer()
+        event_handler = DraftsFileSystemEventHandler(self.signals.reload_needed.emit)
+        self.observer.schedule(event_handler, str(self.directory_path), recursive=False)
+        self.observer.start()
+        
+        # Keep the thread running
+        while self.running:
+            time.sleep(0.5)
+            
+    def stop(self):
+        """Stop monitoring the directory."""
+        self.running = False
+        if self.observer:
+            self.observer.stop()
+            self.observer.join()
+
+
 class DraftsManager(QMainWindow):
     def __init__(self, drafts_dir_path=None, parent=None):
         super().__init__(parent)
@@ -34,6 +96,7 @@ class DraftsManager(QMainWindow):
         self.resize(QSize(900, 700))
 
         self.current_drafts_dir = None
+        self.fs_watcher = None
         
         self.setup_ui()
         
@@ -47,7 +110,6 @@ class DraftsManager(QMainWindow):
                 first_identity = identities[0]
                 drafts_path_str = first_identity.get('drafts', "~/.local/share/kubux-mail-client/mail/drafts")
                 self.load_drafts(Path(drafts_path_str).expanduser())
-
 
     def setup_ui(self):
         central_widget = QWidget()
@@ -95,6 +157,7 @@ class DraftsManager(QMainWindow):
     def _create_drafts_menu(self):
         """Creates a dropdown menu for selecting an identity's drafts folder."""
         menu = QMenu(self)
+        menu.setFont(config.get_text_font())
         identities = config.get_identities()
         if not identities:
             action = menu.addAction("No identities found")
@@ -107,6 +170,30 @@ class DraftsManager(QMainWindow):
                 drafts_path = Path(drafts_path_str).expanduser()
                 action.triggered.connect(lambda checked, p=drafts_path: self.load_drafts(p))
         return menu
+
+    def start_file_system_watcher(self, directory_path):
+        """Start watching the drafts directory for changes."""
+        # Stop any existing watcher
+        self.stop_file_system_watcher()
+        
+        # Create a new watcher thread
+        self.fs_watcher = FileSystemWatcherThread(directory_path)
+        self.fs_watcher.signals.reload_needed.connect(self.reload_drafts)
+        self.fs_watcher.start()
+        logging.info(f"Started file system watcher for {directory_path}")
+        
+    def stop_file_system_watcher(self):
+        """Stop the file system watcher."""
+        if self.fs_watcher:
+            self.fs_watcher.stop()
+            self.fs_watcher.wait()  # Wait for the thread to finish
+            self.fs_watcher = None
+            logging.info("Stopped file system watcher")
+
+    def closeEvent(self, event):
+        """Handle the window close event."""
+        self.stop_file_system_watcher()
+        super().closeEvent(event)
 
     def load_drafts(self, directory_path):
         """Loads and displays a list of drafts from a given directory."""
@@ -166,6 +253,15 @@ class DraftsManager(QMainWindow):
 
         # Make the headers resize to content
         self.header.resizeSections(QHeaderView.ResizeMode.ResizeToContents)
+        
+        # Start watching this directory for changes
+        self.start_file_system_watcher(self.current_drafts_dir)
+    
+    def reload_drafts(self):
+        """Reload the drafts list."""
+        if self.current_drafts_dir:
+            logging.info(f"Reloading drafts from {self.current_drafts_dir} due to file system changes")
+            self.load_drafts(self.current_drafts_dir)
 
     def open_selected_draft(self, row, column):
         """Opens the selected draft file in edit-mail.py."""
