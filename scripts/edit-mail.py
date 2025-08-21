@@ -296,6 +296,15 @@ class MailEditor(QMainWindow):
 
         message = draft_message or self.draft_message
 
+        # Populate the sender combo box based on the 'From' header
+        from_header = message.get('From', '')
+        if from_header:
+            from_addr = email.utils.parseaddr(from_header)[1]
+            for i in range(self.from_combo.count()):
+                if self.from_combo.itemData(i) == from_addr:
+                    self.from_combo.setCurrentIndex(i)
+                    break
+
         self.to_edit.setText(message.get('To', ''))
         self.cc_edit.setText(message.get('Cc', ''))
         self.subject_edit.setText(message.get('Subject', ''))
