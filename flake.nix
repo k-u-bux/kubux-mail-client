@@ -13,6 +13,7 @@
       pyPkgs.notmuch
       pyPkgs.scikit-learn
       pyPkgs.toml
+      pyPkgs.watchdog
       pyPkgs.pytest
     ]);
   in {
