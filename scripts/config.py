@@ -52,14 +52,16 @@ class Config:
                 "delete_word_right": "Ctrl+Delete",
                 "delete_to_end_of_line": "Ctrl+K"
             },
-            "identities": [
-                {
-                    "name": "Default User", 
-                    "email": "user@example.com"
-                    "drafts": "~/.local/share/kubux-mail-client/mail/drafts"
-                    "template": "~/.config/kubux-mail-client/draft_template.eml"
-                },
-            ]
+            "email_identities": {
+                "identities": [
+                    {
+                        "name": "Default User", 
+                        "email": "user@example.com",
+                        "drafts": "~/.local/share/kubux-mail-client/mail/drafts",
+                        "template": "~/.config/kubux-mail-client/draft_template.eml"
+                    },
+                ]
+            }
         }
 
         if not self.config_path.exists():
@@ -104,7 +106,7 @@ class Config:
         return self.data.get("bindings", {}).get(action_name)
 
     def get_identities(self):
-        return self.data.get("identities", [])
+        return self.data.get("email_identities", {}).get("identities", [])
 
     def is_me(self, address_string_list) -> bool:
         from_addresses = getaddresses(address_string_list)

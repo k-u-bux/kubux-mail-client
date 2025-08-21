@@ -6,10 +6,12 @@ import json
 import subprocess
 from pathlib import Path
 import time
+import secrets
+from datetime import datetime
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QTableWidget, QTableWidgetItem, QHeaderView,
-    QAbstractItemView, QMenu, QStyledItemDelegate, QLineEdit
+    QAbstractItemView, QMenu, QStyledItemDelegate, QLineEdit, QInputDialog
 )
 from PySide6.QtCore import Qt, QSize, QEvent, QTimer, QRect, QPoint
 from PySide6.QtGui import QMouseEvent, QFontMetrics
@@ -123,6 +125,7 @@ class QueryEditor(QMainWindow):
         self.new_mail_button = QPushButton("New Mail")
         self.new_mail_button.setFont(config.get_interface_font())
         top_bar_layout.addWidget(self.new_mail_button)
+        self.new_mail_button.clicked.connect(self.new_mail_action) # Connect the new action
         self.new_mail_button = QPushButton("Edit Draft")
         self.new_mail_button.setFont(config.get_interface_font())
         top_bar_layout.addWidget(self.new_mail_button)
@@ -318,8 +321,67 @@ class QueryEditor(QMainWindow):
         except Exception as e:
             logging.error(f"Failed to launch query viewer: {e}")
             display_error(self, "Launch Error", f"Could not launch show-query-results.py:\n\n{e}")
+            
+    def new_mail_action(self):
+        """Prompts the user to select an identity and creates a new draft."""
+        identities = config.get_identities()
+        if not identities:
+            display_error(self, "Identities not found", "No email identities are configured. Please check your config file.")
+            return
 
+        identity_names = [f"{i.get('name', '')} <{i.get('email', '')}>" for i in identities]
+        selected_identity, ok = QInputDialog.getItem(
+            self,
+            "Select Sender Identity",
+            "Choose the identity for the new email:",
+            identity_names,
+            0,
+            False
+        )
 
+        if ok and selected_identity:
+            # Find the full identity dictionary for the selected name
+            selected_id_dict = next((i for i in identities if f"{i.get('name', '')} <{i.get('email', '')}>" == selected_identity), None)
+            
+            if selected_id_dict:
+                # Use the 'drafts' path from the identity, or fall back to the default
+                drafts_path_str = selected_id_dict.get('drafts', "~/.local/share/kubux-mail-client/mail/drafts")
+                drafts_path = Path(drafts_path_str).expanduser()
+                template_path_str = selected_id_dict.get('template', "~/.config/kubux-mail-client/draft_template.eml")
+                template_path = Path(drafts_path_str).expanduser()
+
+                # Create the directory if it doesn't exist
+                drafts_path.mkdir(parents=True, exist_ok=True)
+                
+                # Create a unique filename with a timestamp
+                timestamp_str = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+                random_component = secrets.token_hex(16)
+                draft_filename = f"{timestamp_str}-{random_component}.eml"
+                draft_path = drafts_path / draft_filename
+                
+                try:
+                    if not template_path.is_file():
+                        logging.warning(f"Template file not found at {template_path}. Creating an empty draft instead.")
+                        with open(draft_path, "w") as f:
+                            f.write(f"From: {selected_id_dict['name']} <{selected_id_dict['email']}>\n")
+                            f.write("To: \n")
+                            f.write("Subject: \n\n")
+                    else:
+                        shutil.copyfile(template_path, draft_path)
+                        logging.info(f"Created new draft file at {draft_path} from template.")
+                except Exception as e:
+                    display_error(self, "File Creation Error", f"Could not create draft file:\n\n{e}")
+                    return                # Create the draft file with a minimal header
+                
+                # Launch the mail editor on the new draft file
+                try:
+                    viewer_path = os.path.join(os.path.dirname(__file__), "edit-mail.py")
+                    subprocess.Popen(["python3", viewer_path, "--mail-file", str(draft_path)])
+                    logging.info(f"Launched mail editor for new draft: {draft_path}")
+                except Exception as e:
+                    logging.error(f"Failed to launch mail editor: {e}")
+                    display_error(self, "Launch Error", f"Could not launch edit-mail.py:\n\n{e}")
+                    
 # --- Main Entry Point ---
 def main():
     app = QApplication(sys.argv)
