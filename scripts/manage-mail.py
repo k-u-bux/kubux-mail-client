@@ -126,9 +126,10 @@ class QueryEditor(QMainWindow):
         self.new_mail_button.setFont(config.get_interface_font())
         top_bar_layout.addWidget(self.new_mail_button)
         self.new_mail_button.clicked.connect(self.new_mail_action) # Connect the new action
-        self.new_mail_button = QPushButton("Edit Draft")
-        self.new_mail_button.setFont(config.get_interface_font())
-        top_bar_layout.addWidget(self.new_mail_button)
+        self.edit_drafts_button = QPushButton("Edit Draft")
+        self.edit_drafts_button.setFont(config.get_interface_font())
+        self.edit_drafts_button.clicked.connect(self.edit_drafts_action) # Connect the new action
+        top_bar_layout.addWidget(self.edit_drafts_button)
         
         top_bar_layout.addStretch()
 
@@ -330,8 +331,9 @@ class QueryEditor(QMainWindow):
             return
 
         menu = QMenu(self)
+        menu.setFont(config.get_text_font())
         for identity in identities:
-            action_text = f"{identity.get('name', '')} <{identity.get('email', '')}>"
+            action_text = f"From: {identity.get('name', '')} <{identity.get('email', '')}>"
             action = menu.addAction(action_text)
             action.triggered.connect(lambda checked, i=identity: self._create_draft(i))
 
@@ -376,6 +378,40 @@ class QueryEditor(QMainWindow):
             logging.error(f"Failed to create draft or launch editor: {e}")
             display_error(self, "Action Error", f"Could not complete the action:\n\n{e}")
                     
+    def edit_drafts_action(self):
+        """
+        Displays a menu of identities and launches open-drafts.py
+        for the selected identity's drafts folder.
+        """
+        identities = config.get_identities()
+        if not identities:
+            display_error(self, "Identities not found", "No email identities are configured. Please check your config file.")
+            return
+
+        menu = QMenu(self)
+        menu.setFont(config.get_text_font())
+        for identity in identities:
+            action_text = f"From: {identity.get('name', '')} <{identity.get('email', '')}>"
+            action = menu.addAction(action_text)
+            action.triggered.connect(lambda checked, i=identity: self._launch_drafts_manager(i))
+
+        # Get the position of the Edit Drafts button and show the menu
+        button_pos = self.edit_drafts_button.mapToGlobal(self.edit_drafts_button.rect().bottomLeft())
+        menu.exec(button_pos)
+
+    def _launch_drafts_manager(self, identity_dict):
+        """Launches the drafts manager script for a given identity's drafts folder."""
+        try:
+            drafts_path_str = identity_dict.get('drafts', "~/.local/share/kubux-mail-client/mail/drafts")
+            drafts_path = Path(drafts_path_str).expanduser()
+
+            viewer_path = os.path.join(os.path.dirname(__file__), "open-drafts.py")
+            subprocess.Popen(["python3", viewer_path, "--drafts-dir", str(drafts_path)])
+            logging.info(f"Launched drafts manager for directory: {drafts_path}")
+        except Exception as e:
+            logging.error(f"Failed to launch drafts manager: {e}")
+            display_error(self, "Launch Error", f"Could not launch open-drafts.py:\n\n{e}")
+
 # --- Main Entry Point ---
 def main():
     app = QApplication(sys.argv)

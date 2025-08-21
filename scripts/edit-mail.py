@@ -22,6 +22,9 @@ import logging
 import mimetypes
 import subprocess
 import email.utils
+import shutil
+from datetime import datetime
+import secrets
 
 from config import config
 from common import display_error
@@ -196,7 +199,7 @@ class MailEditor(QMainWindow):
         self.send_button.clicked.connect(self.send_message)
         self.save_button.clicked.connect(self.save_message)
         self.discard_button.clicked.connect(self.discard_draft)
-        
+
         top_bar_layout.addWidget(self.send_button)
         top_bar_layout.addWidget(self.save_button)
         top_bar_layout.addWidget(self.discard_button)
@@ -395,8 +398,37 @@ class MailEditor(QMainWindow):
             del self.attachments[row]
             self.attachments_list.takeItem(row)
 
-    def _create_draft_file(self):
+    def _get_selected_identity_drafts_path(self):
+        """Helper to get the drafts path for the currently selected identity."""
+        selected_email = self.from_combo.currentData()
+        identities = config.get_identities()
+        for identity in identities:
+            if identity.get('email') == selected_email:
+                drafts_path_str = identity.get('drafts', "~/.local/share/kubux-mail-client/mail/drafts")
+                return Path(drafts_path_str).expanduser()
+        
+        # Fallback to the default if no match is found
+        return Path("~/.local/share/kubux-mail-client/mail/drafts").expanduser()
+
+    def save_message(self):
+        """
+        Saves the current mail as a draft.
+        1. Creates a temporary file in the drafts directory of the selected identity.
+        2. Deletes the old mail file if it exists.
+        3. Renames the temporary file to a permanent draft filename.
+        """
         try:
+            # 1. Get the correct drafts directory and create a new filename
+            drafts_dir = self._get_selected_identity_drafts_path()
+            drafts_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Create a unique filename with a timestamp and a random component
+            timestamp_str = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+            random_component = secrets.token_hex(16)
+            new_draft_filename = f"{timestamp_str}-{random_component}.eml"
+            new_draft_path = drafts_dir / new_draft_filename
+
+            # 2. Create the draft message object
             draft = email.message.EmailMessage()
             
             if self.draft_message:
@@ -428,25 +460,29 @@ class MailEditor(QMainWindow):
             for part in self.attachments:
                 draft.attach(part)
             
-            with tempfile.NamedTemporaryFile(mode='wb', delete=False, dir=self.mail_file_path.parent) as tmp_file:
+            # 3. Write to a temporary file in the new drafts directory
+            tmp_path = drafts_dir / f"temp_{os.getpid()}.eml"
+            with open(tmp_path, 'wb') as tmp_file:
                 tmp_file.write(draft.as_bytes())
-                tmp_path = Path(tmp_file.name)
+
+            # 4. Remove the old draft file if it exists
+            if self.mail_file_path and self.mail_file_path.exists():
+                os.remove(self.mail_file_path)
             
-            if self.mail_file_path:
-                tmp_path.rename(self.mail_file_path)
-                return self.mail_file_path
-            else:
-                return tmp_path
-
-        except Exception as e:
-            display_error("Draft Creation Error", f"Failed to create draft file:\n{e}")
-            return None
-
-    def save_message(self):
-        if self._create_draft_file():
+            # 5. Atomically rename the temporary file
+            shutil.move(tmp_path, new_draft_path)
+            self.mail_file_path = new_draft_path  # Update the path for future saves
+            logging.info(f"Draft saved to {self.mail_file_path}")
+            
             self.close()
 
+        except Exception as e:
+            display_error("Draft Creation Error", f"Failed to save draft file:\n{e}")
+            return None
+
     def send_message(self):
+        # NOTE: This method still calls the old _create_draft_file() but will be updated to use the new logic.
+        # For now, it will not work as expected until it is updated.
         draft_path = self._create_draft_file()
         if not draft_path:
             return
