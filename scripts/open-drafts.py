@@ -76,11 +76,12 @@ class DraftsManager(QMainWindow):
         self.drafts_table.setHorizontalHeaderLabels(["Date", "From", "To/Cc", "Subject"])
         
         # Configure the table's appearance
-        header = self.drafts_table.horizontalHeader()
-        header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
-        header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
-        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
-        header.setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
+        # FIX: Make the header an instance variable to be accessible in other methods
+        self.header = self.drafts_table.horizontalHeader()
+        self.header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+        self.header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+        self.header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+        self.header.setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
 
         self.drafts_table.verticalHeader().setVisible(False)
         self.drafts_table.setFont(config.get_text_font())
@@ -164,7 +165,7 @@ class DraftsManager(QMainWindow):
                 self.drafts_table.setSpan(row, 0, 1, 4)
 
         # Make the headers resize to content
-        header.resizeSections(QHeaderView.ResizeMode.ResizeToContents)
+        self.header.resizeSections(QHeaderView.ResizeMode.ResizeToContents)
 
     def open_selected_draft(self, row, column):
         """Opens the selected draft file in edit-mail.py."""
