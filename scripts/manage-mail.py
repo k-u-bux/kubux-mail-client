@@ -4,7 +4,7 @@ import sys
 import os
 import json
 import subprocess
-import shutil  # Added for shutil.copyfile
+import shutil
 from pathlib import Path
 import time
 import secrets
@@ -12,10 +12,11 @@ from datetime import datetime
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QTableWidget, QTableWidgetItem, QHeaderView,
-    QAbstractItemView, QMenu, QStyledItemDelegate, QLineEdit, QInputDialog
+    QAbstractItemView, QMenu, QStyledItemDelegate, QLineEdit, QInputDialog,
+    QMessageBox
 )
 from PySide6.QtCore import Qt, QSize, QEvent, QTimer, QRect, QPoint
-from PySide6.QtGui import QMouseEvent, QFontMetrics
+from PySide6.QtGui import QMouseEvent, QFontMetrics, QAction
 import logging
 
 # Set up basic logging to console
@@ -112,6 +113,12 @@ class QueryEditor(QMainWindow):
         
         # Flag to track if we're currently processing a cell change
         self.is_processing_cell_change = False
+        # Flag to track if we're moving a row
+        self.is_moving_row = False
+        
+        # Store context menu position for later use
+        self.context_menu_row = -1
+        self.context_menu_column = -1
         
         self.setup_ui()
         self.load_queries_into_table()
@@ -129,16 +136,14 @@ class QueryEditor(QMainWindow):
         self.new_mail_button = QPushButton("New Mail")
         self.new_mail_button.setFont(config.get_interface_font())
         top_bar_layout.addWidget(self.new_mail_button)
-        self.new_mail_button.clicked.connect(self.new_mail_action) # Connect the new action
+        self.new_mail_button.clicked.connect(self.new_mail_action)
         
         self.edit_drafts_button = QPushButton("Edit Draft")
         self.edit_drafts_button.setFont(config.get_interface_font())
-        self.edit_drafts_button.clicked.connect(self.edit_drafts_action) # Connect the new action
+        self.edit_drafts_button.clicked.connect(self.edit_drafts_action)
         top_bar_layout.addWidget(self.edit_drafts_button)
         
         top_bar_layout.addStretch()
-
-        # Removed the "New Query" button
         
         self.quit_button = QPushButton("Quit")
         self.quit_button.setFont(config.get_interface_font())
@@ -160,12 +165,16 @@ class QueryEditor(QMainWindow):
             QAbstractItemView.EditTrigger.AnyKeyPressed
         )
         
+        # Enable context menu
+        self.query_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.query_table.customContextMenuRequested.connect(self.show_context_menu)
+        
         # Use our custom delegate
         self.query_table.setItemDelegate(self.text_delegate)
         
         # Connect signals
         self.query_table.cellChanged.connect(self.handle_cell_changed)
-        self.query_table.cellDoubleClicked.connect(self.open_query_results)
+        self.query_table.cellDoubleClicked.connect(self.handle_cell_double_clicked)
         
         # Install event filter to track mouse position
         self.query_table.viewport().installEventFilter(self)
@@ -176,46 +185,113 @@ class QueryEditor(QMainWindow):
         """Track mouse position and force immediate edit mode on click."""
         if obj is self.query_table.viewport():
             if event.type() == QEvent.Type.MouseButtonPress:
-                # Get the position and determine which cell was clicked
-                pos = event.position().toPoint()
-                row = self.query_table.rowAt(pos.y())
-                column = self.query_table.columnAt(pos.x())
-                
-                if row >= 0 and column >= 0:
-                    # Check for potential double click by looking at time since last click
-                    current_time = int(time.time() * 1000)  # Current time in milliseconds
+                # Only handle left mouse button presses here
+                if event.button() == Qt.MouseButton.LeftButton:
+                    # Get the position and determine which cell was clicked
+                    pos = event.position().toPoint()
+                    row = self.query_table.rowAt(pos.y())
+                    column = self.query_table.columnAt(pos.x())
                     
-                    # If this is within double-click interval, don't start edit mode yet
-                    if (current_time - self.last_click_time < self.double_click_interval and 
-                        self.last_click_pos and 
-                        (pos - self.last_click_pos).manhattanLength() < 5):
+                    if row >= 0 and column >= 0:
+                        # Check for potential double click by looking at time since last click
+                        current_time = int(time.time() * 1000)  # Current time in milliseconds
                         
-                        # This is likely part of a double-click, don't do anything yet
-                        self.is_double_click_pending = True
-                        return False
-                    
-                    # Reset click tracking
-                    self.last_click_time = current_time
-                    self.last_click_pos = pos
-                    self.is_double_click_pending = False
-                    
-                    # Calculate position relative to the cell
-                    item_rect = self.query_table.visualRect(self.query_table.model().index(row, column))
-                    cell_pos = pos - item_rect.topLeft()
-                    
-                    # Store the click position in the delegate
-                    self.text_delegate.setClickPosition(cell_pos)
-                    
-                    # Schedule editing to start after double-click interval has passed
-                    QTimer.singleShot(self.double_click_interval + 10, 
-                                     lambda: self.delayed_start_editing(row, column))
+                        # If this is within double-click interval, don't start edit mode yet
+                        if (current_time - self.last_click_time < self.double_click_interval and 
+                            self.last_click_pos and 
+                            (pos - self.last_click_pos).manhattanLength() < 5):
+                            
+                            # This is likely part of a double-click, don't do anything yet
+                            self.is_double_click_pending = True
+                            return False
+                        
+                        # Reset click tracking
+                        self.last_click_time = current_time
+                        self.last_click_pos = pos
+                        self.is_double_click_pending = False
+                        
+                        # Calculate position relative to the cell
+                        item_rect = self.query_table.visualRect(self.query_table.model().index(row, column))
+                        cell_pos = pos - item_rect.topLeft()
+                        
+                        # Store the click position in the delegate
+                        self.text_delegate.setClickPosition(cell_pos)
+                        
+                        # Schedule editing to start after double-click interval has passed
+                        QTimer.singleShot(self.double_click_interval + 10, 
+                                         lambda: self.delayed_start_editing(row, column))
                     
             elif event.type() == QEvent.Type.MouseButtonDblClick:
-                # Handle double click - we'll let the table's built-in handler call open_query_results
+                # Handle double click - we'll let the table's built-in handler call the double-click handler
                 self.is_double_click_pending = False
                 return False  # Let the event propagate to trigger cellDoubleClicked
                 
         return super().eventFilter(obj, event)
+    
+    def show_context_menu(self, position):
+        """Show context menu with options to delete, edit, or execute a query."""
+        # Get the row and column at the context menu position
+        row = self.query_table.rowAt(position.y())
+        column = self.query_table.columnAt(position.x())
+        
+        # Skip if we're outside the table or on the empty input row
+        if row < 0 or column < 0 or row == 0:
+            return
+        
+        # Store the row and column for later use
+        self.context_menu_row = row
+        self.context_menu_column = column
+        
+        # Create context menu
+        context_menu = QMenu(self)
+        context_menu.setFont(config.get_text_font())
+        
+        # Add actions
+        delete_action = QAction("Delete", self)
+        delete_action.triggered.connect(self.delete_row)
+        
+        edit_action = QAction("Edit", self)
+        edit_action.triggered.connect(self.edit_row)
+        
+        execute_action = QAction("Execute", self)
+        execute_action.triggered.connect(self.execute_row)
+        
+        # Add actions to menu
+        context_menu.addAction(execute_action)
+        context_menu.addAction(edit_action)
+        context_menu.addAction(delete_action)
+        
+        # Show context menu at the right position
+        context_menu.exec(self.query_table.viewport().mapToGlobal(position))
+
+    def delete_row(self):
+        """Delete the row that was right-clicked without confirmation."""
+        if self.context_menu_row > 0:  # Ensure we're not deleting the empty input row
+            # Remove the row directly without confirmation
+            self.query_table.removeRow(self.context_menu_row)
+            
+            # Save the changes
+            self.save_queries_from_table()
+            
+            # Reset context menu position
+            self.context_menu_row = -1
+            self.context_menu_column = -1
+
+    def edit_row(self):
+        """Start editing the cell that was right-clicked."""
+        if self.context_menu_row > 0 and self.context_menu_column >= 0:
+            # Get the item
+            item = self.query_table.item(self.context_menu_row, self.context_menu_column)
+            if item:
+                # Edit the item
+                self.query_table.editItem(item)
+
+    def execute_row(self):
+        """Execute the query in the row that was right-clicked (same as double-click)."""
+        if self.context_menu_row > 0:
+            # Move the row to top and open it, just like double-click
+            self.move_row_to_top(self.context_menu_row)
+            self.open_query_results(1, self.context_menu_column)
     
     def delayed_start_editing(self, row, column):
         """Start editing after a delay to allow for double-click detection."""
@@ -284,7 +360,7 @@ class QueryEditor(QMainWindow):
     def handle_cell_changed(self, row, column):
         """Handles cell changes and creates a new row if needed."""
         # Check if we're already processing a change to avoid recursion
-        if self.is_processing_cell_change:
+        if self.is_processing_cell_change or self.is_moving_row:
             return
             
         self.is_processing_cell_change = True
@@ -307,11 +383,66 @@ class QueryEditor(QMainWindow):
                 
                 # Update the UI to reflect the change
                 self.query_table.update()
+            elif row > 0 and (name or query):
+                # If this is not the empty input row and has content, move it to the top position (row 1)
+                self.move_row_to_top(row)
             
             # Save all queries
             self.save_queries_from_table()
         finally:
             self.is_processing_cell_change = False
+
+    def handle_cell_double_clicked(self, row, column):
+        """Handles double click event - opens query results and moves row to top."""
+        # Skip the top empty row
+        if row == 0:
+            return
+            
+        # Move the row to the top of the list (just below the empty input row)
+        self.move_row_to_top(row)
+        
+        # Now open the query results
+        self.open_query_results(1, column)  # Use row 1 since the item is now there
+
+    def move_row_to_top(self, row):
+        """Moves a row to the top of the list (just below the empty input row at row 0)."""
+        # Don't move if it's already at the top or it's the empty input row
+        if row <= 1:
+            return
+            
+        # Set the flag to prevent triggering cell change events
+        self.is_moving_row = True
+        
+        try:
+            # Extract the data from the row to be moved
+            name_item = self.query_table.item(row, 0)
+            query_item = self.query_table.item(row, 1)
+            
+            name = name_item.text() if name_item else ""
+            query = query_item.text() if query_item else ""
+            
+            # Remove the row
+            self.query_table.removeRow(row)
+            
+            # Insert a new row at position 1 (just below the empty input row)
+            self.query_table.insertRow(1)
+            
+            # Add the items to the new row
+            new_name_item = QTableWidgetItem(name)
+            new_name_item.setFont(config.get_text_font())
+            self.query_table.setItem(1, 0, new_name_item)
+            
+            new_query_item = QTableWidgetItem(query)
+            new_query_item.setFont(config.get_text_font())
+            self.query_table.setItem(1, 1, new_query_item)
+            
+            # Save the changes
+            self.save_queries_from_table()
+            
+            # Select the moved row
+            self.query_table.setCurrentCell(1, 0)
+        finally:
+            self.is_moving_row = False
 
     def save_queries_from_table(self):
         """Saves the contents of the table back to the queries file, skipping the empty top row."""
