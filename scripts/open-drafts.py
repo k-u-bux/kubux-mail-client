@@ -122,6 +122,7 @@ class DraftsManager(QMainWindow):
         self.resize(QSize(900, 700))
 
         self.current_drafts_dir = None
+        self.current_identity = None
         self.fs_watcher = None
         
         self.setup_ui()
@@ -135,7 +136,7 @@ class DraftsManager(QMainWindow):
             if identities:
                 first_identity = identities[0]
                 drafts_path_str = first_identity.get('drafts', "~/.local/share/kubux-mail-client/mail/drafts")
-                self.load_drafts(Path(drafts_path_str).expanduser())
+                self.load_drafts(Path(drafts_path_str).expanduser(), identity=first_identity)
 
     def setup_ui(self):
         central_widget = QWidget()
@@ -147,7 +148,7 @@ class DraftsManager(QMainWindow):
         top_bar_layout = QHBoxLayout()
         main_layout.addLayout(top_bar_layout)
 
-        self.drafts_folder_button = QPushButton("Drafts Folder")
+        self.drafts_folder_button = QPushButton("Drafts")
         self.drafts_folder_button.setFont(config.get_interface_font())
         self.drafts_folder_button.setMenu(self._create_drafts_menu())
         top_bar_layout.addWidget(self.drafts_folder_button)
@@ -209,7 +210,6 @@ class DraftsManager(QMainWindow):
     def _create_drafts_menu(self):
         """Creates a dropdown menu for selecting an identity's drafts folder."""
         menu = QMenu(self)
-        menu.setFont(config.get_text_font())
         identities = config.get_identities()
         if not identities:
             action = menu.addAction("No identities found")
@@ -220,7 +220,8 @@ class DraftsManager(QMainWindow):
                 action = menu.addAction(action_text)
                 drafts_path_str = identity.get('drafts', "~/.local/share/kubux-mail-client/mail/drafts")
                 drafts_path = Path(drafts_path_str).expanduser()
-                action.triggered.connect(lambda checked, p=drafts_path: self.load_drafts(p))
+                # Pass both the path and the identity when connecting
+                action.triggered.connect(lambda checked, p=drafts_path, i=identity: self.load_drafts(p, i))
         return menu
 
     def start_file_system_watcher(self, directory_path):
@@ -260,10 +261,47 @@ class DraftsManager(QMainWindow):
         """Handle the window close event."""
         self.stop_file_system_watcher()
         super().closeEvent(event)
+    
+    def update_drafts_folder_button(self):
+        """Update the drafts folder button text based on the current identity."""
+        if self.current_identity:
+            name = self.current_identity.get('name', '')
+            email = self.current_identity.get('email', '')
+            if name and email:
+                self.drafts_folder_button.setText(f"Drafts for {name} <{email}>")
+            elif email:
+                self.drafts_folder_button.setText(f"Drafts for <{email}>")
+            else:
+                self.drafts_folder_button.setText("Drafts")
+        else:
+            # Find identity by matching the drafts path
+            if self.current_drafts_dir:
+                identities = config.get_identities()
+                for identity in identities:
+                    drafts_path_str = identity.get('drafts', "~/.local/share/kubux-mail-client/mail/drafts")
+                    drafts_path = Path(drafts_path_str).expanduser()
+                    if drafts_path == self.current_drafts_dir:
+                        name = identity.get('name', '')
+                        email = identity.get('email', '')
+                        if name and email:
+                            self.drafts_folder_button.setText(f"Drafts for {name} <{email}>")
+                            self.current_identity = identity
+                            return
+                        elif email:
+                            self.drafts_folder_button.setText(f"Drafts for <{email}>")
+                            self.current_identity = identity
+                            return
+            
+            # Fallback if no identity found
+            self.drafts_folder_button.setText(f"Drafts: {self.current_drafts_dir.name}")
 
-    def load_drafts(self, directory_path):
+    def load_drafts(self, directory_path, identity=None):
         """Loads and displays a list of drafts from a given directory."""
         self.current_drafts_dir = directory_path
+        self.current_identity = identity
+        
+        # Update the drafts folder button text
+        self.update_drafts_folder_button()
         
         # Clear the table and update the window title
         self.drafts_table.setRowCount(0)
@@ -351,7 +389,7 @@ class DraftsManager(QMainWindow):
             if self.current_drafts_dir:
                 logging.info(f"Reloading drafts from {self.current_drafts_dir} due to file system changes")
                 # Load drafts but capture any exceptions to prevent UI disruption
-                self.load_drafts(self.current_drafts_dir)
+                self.load_drafts(self.current_drafts_dir, self.current_identity)
         except Exception as e:
             # Log but don't propagate the error
             logging.error(f"Error reloading drafts: {e}")
