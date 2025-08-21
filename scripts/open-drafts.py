@@ -12,6 +12,7 @@ from email.utils import getaddresses
 import logging
 import time
 import traceback
+from threading import Timer
 
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
@@ -48,14 +49,13 @@ class DraftsFileSystemEventHandler(FileSystemEventHandler):
             # including temp files that might be part of the edit-save cycle
             
             # Cancel any existing timer
-            if self.timer:
+            if self.timer and self.timer.is_alive():
                 self.timer.cancel()
             
-            # Create a new timer that will execute after the debounce interval
-            self.timer = QTimer()
-            self.timer.setSingleShot(True)
-            self.timer.timeout.connect(self.callback)
-            self.timer.start(int(self.debounce_interval * 1000))  # Convert to milliseconds
+            # Create a new standard Python timer (works in any thread)
+            self.timer = Timer(self.debounce_interval, self.callback)
+            self.timer.daemon = True  # Allow the timer to be killed when the program exits
+            self.timer.start()
             
             logging.debug(f"File system event: {event.event_type} - {event.src_path}")
             
@@ -209,6 +209,7 @@ class DraftsManager(QMainWindow):
     def _create_drafts_menu(self):
         """Creates a dropdown menu for selecting an identity's drafts folder."""
         menu = QMenu(self)
+        menu.setFont(config.get_text_font())
         identities = config.get_identities()
         if not identities:
             action = menu.addAction("No identities found")
