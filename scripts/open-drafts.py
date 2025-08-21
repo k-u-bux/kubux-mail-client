@@ -28,7 +28,7 @@ from watchdog.events import FileSystemEventHandler
 
 # Import the shared components
 from config import config
-from common import display_error
+from common import display_error, create_new_mail_menu
 
 # Set up basic logging to console
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -148,10 +148,16 @@ class DraftsManager(QMainWindow):
         top_bar_layout = QHBoxLayout()
         main_layout.addLayout(top_bar_layout)
 
+        self.new_mail_button = QPushButton("New Mail")
+        self.new_mail_button.setFont(config.get_interface_font())
+        top_bar_layout.addWidget(self.new_mail_button)
+        self.new_mail_button.clicked.connect(self.new_mail_action)
+
         self.drafts_folder_button = QPushButton("Drafts")
         self.drafts_folder_button.setFont(config.get_interface_font())
         self.drafts_folder_button.setMenu(self._create_drafts_menu())
         top_bar_layout.addWidget(self.drafts_folder_button)
+
         top_bar_layout.addStretch()
 
         self.quit_button = QPushButton("Quit")
@@ -210,6 +216,7 @@ class DraftsManager(QMainWindow):
     def _create_drafts_menu(self):
         """Creates a dropdown menu for selecting an identity's drafts folder."""
         menu = QMenu(self)
+        menu.setFont(config.get_text_font())
         identities = config.get_identities()
         if not identities:
             action = menu.addAction("No identities found")
@@ -394,6 +401,10 @@ class DraftsManager(QMainWindow):
             # Log but don't propagate the error
             logging.error(f"Error reloading drafts: {e}")
             logging.debug(traceback.format_exc())
+
+    def new_mail_action(self):
+        """Creates and displays a menu for selecting an email identity."""
+        create_new_mail_menu(self)
 
     def open_selected_draft(self, row, column):
         """Opens the selected draft file in edit-mail.py."""

@@ -23,7 +23,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 from config import config
 from query import QueryParser
-from common import display_error
+from common import display_error, create_draft, create_new_mail_menu
 
 
 class CustomLineEdit(QLineEdit):
@@ -517,58 +517,7 @@ class QueryEditor(QMainWindow):
             
     def new_mail_action(self):
         """Creates and displays a menu for selecting an email identity."""
-        identities = config.get_identities()
-        if not identities:
-            display_error(self, "Identities not found", "No email identities are configured. Please check your config file.")
-            return
-
-        menu = QMenu(self)
-        menu.setFont(config.get_text_font())
-        for identity in identities:
-            action_text = f"From: {identity.get('name', '')} <{identity.get('email', '')}>"
-            action = menu.addAction(action_text)
-            action.triggered.connect(lambda checked, i=identity: self._create_draft(i))
-
-        # Get the position of the New Mail button and show the menu
-        button_pos = self.new_mail_button.mapToGlobal(QPoint(0, self.new_mail_button.height()))
-        menu.exec(button_pos)
-
-    def _create_draft(self, identity_dict):
-        """Creates a new draft file for the given identity."""
-        try:
-            # Use the 'drafts' path from the identity, or fall back to the default
-            drafts_path_str = identity_dict.get('drafts', "~/.local/share/kubux-mail-client/mail/drafts")
-            drafts_path = Path(drafts_path_str).expanduser()
-            template_path_str = identity_dict.get('template', "~/.config/kubux-mail-client/draft_template.eml")
-            template_path = Path(template_path_str).expanduser()
-
-            # Create the directory if it doesn't exist
-            drafts_path.mkdir(parents=True, exist_ok=True)
-            
-            # Create a unique filename with a timestamp and a random component
-            timestamp_str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-            random_component = secrets.token_hex(16)
-            draft_filename = f"{timestamp_str}__{random_component}.eml"
-            draft_path = drafts_path / draft_filename
-            
-            # Create the draft file by copying the template or creating a minimal one
-            if template_path.is_file():
-                shutil.copyfile(template_path, draft_path)
-                logging.info(f"Created new draft file at {draft_path} from template.")
-            else:
-                logging.warning(f"Template file not found at {template_path}. Creating a minimal draft instead.")
-                with open(draft_path, "w") as f:
-                    f.write(f"From: {identity_dict['name']} <{identity_dict['email']}>\n")
-                    f.write("To: \n")
-                    f.write("Subject: \n\n")
-
-            # Launch the mail editor on the new draft file
-            viewer_path = os.path.join(os.path.dirname(__file__), "edit-mail.py")
-            subprocess.Popen(["python3", viewer_path, "--mail-file", str(draft_path)])
-            logging.info(f"Launched mail editor for new draft: {draft_path}")
-        except Exception as e:
-            logging.error(f"Failed to create draft or launch editor: {e}")
-            display_error(self, "Action Error", f"Could not complete the action:\n\n{e}")
+        create_new_mail_menu(self)
                     
     def edit_drafts_action(self):
         """
