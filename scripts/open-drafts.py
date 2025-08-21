@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, QSize, QTimer, QObject, Signal, QThread
 from PySide6.QtGui import QFont
 
+# Import watchdog for directory monitoring
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
@@ -36,25 +37,28 @@ class DraftsFileSystemEventHandler(FileSystemEventHandler):
     """Handles file system events for the drafts directory."""
     def __init__(self, callback):
         self.callback = callback
-        # Debounce mechanism to avoid multiple rapid reloads
-        self.last_event_time = 0
+        # Track the timer for debouncing
+        self.timer = None
         self.debounce_interval = 0.5  # seconds
         
     def on_any_event(self, event):
         """Called for any file system event."""
         try:
-            # Skip directories and non-eml files
-            if event.is_directory:
-                return
-            path = Path(event.src_path)
-            if path.suffix.lower() != '.eml':
-                return
-                
-            # Debounce - only process events if enough time has passed since the last one
-            current_time = time.time()
-            if current_time - self.last_event_time > self.debounce_interval:
-                self.last_event_time = current_time
-                self.callback()
+            # Don't filter by file extension - we want to catch all events
+            # including temp files that might be part of the edit-save cycle
+            
+            # Cancel any existing timer
+            if self.timer:
+                self.timer.cancel()
+            
+            # Create a new timer that will execute after the debounce interval
+            self.timer = QTimer()
+            self.timer.setSingleShot(True)
+            self.timer.timeout.connect(self.callback)
+            self.timer.start(int(self.debounce_interval * 1000))  # Convert to milliseconds
+            
+            logging.debug(f"File system event: {event.event_type} - {event.src_path}")
+            
         except Exception as e:
             # Log the error but don't propagate it to avoid affecting the UI
             logging.error(f"Error in file system event handler: {e}")
@@ -80,6 +84,7 @@ class FileSystemWatcherThread(QThread):
         try:
             self.observer = Observer()
             event_handler = DraftsFileSystemEventHandler(self.signals.reload_needed.emit)
+            # Monitor the entire directory, not just .eml files
             self.observer.schedule(event_handler, str(self.directory_path), recursive=False)
             self.observer.start()
             
@@ -219,11 +224,6 @@ class DraftsManager(QMainWindow):
 
     def start_file_system_watcher(self, directory_path):
         """Start watching the drafts directory for changes."""
-        # Skip if watchdog is not available
-        if not WATCHDOG_AVAILABLE:
-            logging.warning("File system watcher not started: watchdog library not available")
-            return
-
         try:
             # Stop any existing watcher
             self.stop_file_system_watcher()
@@ -275,6 +275,7 @@ class DraftsManager(QMainWindow):
         logging.info(f"Loading drafts from directory: {self.current_drafts_dir}")
         
         try:
+            # Look specifically for .eml files for display in the table
             draft_files = sorted(self.current_drafts_dir.glob('*.eml'))
             
             valid_draft_files = []
