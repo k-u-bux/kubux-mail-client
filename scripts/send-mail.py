@@ -67,7 +67,6 @@ class SendMail:
             from_address = msg.get("From")
             if not from_address:
                 logging.error(f"Email file has no 'From' header: {file_path}")
-                self._move_file(file_path, Path(self.config["from"][from_addr].get("failed_dir", ".")))
                 return
 
             from_addr = email.utils.parseaddr(from_address)[1]
@@ -79,28 +78,26 @@ class SendMail:
             
             account = self._get_account_info(from_addr)
             if not account:
-                # Fallback to moving to a failed directory if account not found
-                failed_dir = Path(self.config["from"][list(self.config["from"].keys())[0]].get("failed_dir", "."))
-                self._move_file(file_path, failed_dir)
+                logging.error(f"No account configured for {from_addr}");
                 return
 
             self._send_via_smtp(account, from_addr, all_recipients, msg, file_path)
 
         except Exception as e:
             logging.error(f"An error occurred while processing {file_path}: {e}")
-            self._move_file(file_path, Path(account.get("failed_dir", ".")))
 
 
     def _send_via_smtp(self, account, from_addr, all_recipients, msg, file_path):
         """Sends the email message via SMTP."""
         smtp_server = account.get("smtp_server")
-        smtp_port = account.get("smtp_port", 587)
+        smtp_port = account.get("smtp_port")
         username = account.get("username")
         password = account.get("password")
+        sent_dir = account.get("sent_dir")
+        failed_dir = account.get("failed_dir");
 
-        if not all([smtp_server, username, password]):
-            logging.error("Missing required SMTP configuration fields.")
-            self._move_file(file_path, Path(account.get("failed_dir", ".")))
+        if not all([smtp_server, smtp_port, username, password, sent_dir, failed_dir]):
+            logging.error("Account configuration incomplete for {from_addr}")
             return
 
         logging.info(f"Attempting to send mail from {from_addr} to {all_recipients} via {smtp_server}:{smtp_port}")
@@ -121,14 +118,14 @@ class SendMail:
                     server.send_message(msg)
 
             logging.info(f"Successfully sent mail from {from_addr}")
-            self._move_file(file_path, Path(account.get("sent_dir", ".")))
+            self._move_file(file_path, Path(sent_dir))
 
         except smtplib.SMTPException as e:
             logging.error(f"SMTP error: {e}")
-            self._move_file(file_path, Path(account.get("failed_dir", ".")))
+            self._move_file(file_path, Path(failed_dir))
         except Exception as e:
             logging.error(f"Unexpected error while sending mail: {e}")
-            self._move_file(file_path, Path(account.get("failed_dir", ".")))
+            self._move_file(file_path, Path(failed_dir))
             
 # --- Main Entry Point ---
 def main():
