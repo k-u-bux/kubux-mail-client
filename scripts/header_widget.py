@@ -147,10 +147,10 @@ class MailHeaderWidget(QWidget):
         self.table_widget.setItemDelegateForColumn(1, self.address_delegate)
 
         self.data = [   
+            ("Subject:", message.get("Subject")),
             ("From:",    message.get("From")),
             ("To:",      message.get("To")),
             ("Cc:",      message.get("Cc")),
-            ("Subject:", message.get("Subject")),
             ("Date:",    message.get("Date"))
         ]
         

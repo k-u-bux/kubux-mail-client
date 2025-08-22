@@ -92,6 +92,7 @@ class MailViewer(QMainWindow):
 
         self.get_message_id()
         self.process_initial_tags()
+        self.parse_message()
         self.setup_ui()
         self.setup_key_bindings()
         self.display_message()
@@ -146,6 +147,35 @@ class MailViewer(QMainWindow):
         except Exception as e:
             logging.error(f"Failed to parse mail file: {e}")
             return None
+
+    def parse_message(self):
+        print("parsing message")
+        if not self.message:
+            return
+        body_text = ""
+        for part in self.message.walk():
+            # Check for attachments
+            print(f"{part.get_content_disposition()}, {part.get_content_type()}, {part.get_filename()}")
+            if part.get_content_disposition() == 'attachment':
+                filename = part.get_filename()
+                print(f"{filename}")
+                if filename:
+                    self.attachments.append(part)
+                    
+            # Prioritize plain text over HTML
+            if part.get_content_type() == 'text/plain':
+                body_text = part.get_content()
+                self.mail_body = body_text
+                self.is_html_body = False
+                return
+
+            if part.get_content_type() == 'text/html' and not body_text:
+                body_text = part.get_content()
+                sanitized_html = self.sanitize_html_fonts(body_text)
+                self.mail_body = sanitized_html
+                self.is_html_body = True
+
+        print(f"attachments: {self.attachments}")
 
     def setup_ui(self):
         central_widget = QWidget()
@@ -242,18 +272,24 @@ class MailViewer(QMainWindow):
         self.mail_content.customContextMenuRequested.connect(self.show_content_context_menu)
 
         # Attachments list
-        self.attachments_list = QListWidget()
-        self.attachments_list.setFont(config.get_interface_font())
-        self.attachments_list.setMinimumHeight(40)
-        self.attachments_list.setMaximumHeight(200)
-        self.splitter.addWidget(self.attachments_list)
-        
-        # Set context menu policy for the attachments list
-        self.attachments_list.setContextMenuPolicy(Qt.CustomContextMenu)
-        self.attachments_list.customContextMenuRequested.connect(self.show_attachment_context_menu)
+        if self.attachments:
+            self.attachments_list = QListWidget()
+            self.attachments_list.setFont(config.get_interface_font())
+            self.attachments_list.setMinimumHeight(40)
+            self.attachments_list.setMaximumHeight(200)
+            self.splitter.addWidget(self.attachments_list)
+            
+            # Set context menu policy for the attachments list
+            self.attachments_list.setContextMenuPolicy(Qt.CustomContextMenu)
+            self.attachments_list.customContextMenuRequested.connect(self.show_attachment_context_menu)
 
-        # Set initial sizes
-        self.splitter.setSizes([100, 500, 50])
+            for part in self.attachments:
+                print(f"attachment {part.get_filename()}")
+                self.attachments_list.append(part.get_filename())
+
+            self.splitter.setSizes([100, 500, 50])
+        else:
+            self.splitter.setSizes([100, 500])
 
     def show_or_hide_headers(self):
         if self.show_headers:
@@ -297,29 +333,11 @@ class MailViewer(QMainWindow):
         if self.notmuch_enabled:
             self.update_tags_ui()
 
-        # Find the plain text or HTML body of the email and attachments
-        body_text = ""
-        self.attachments.clear()
-        self.attachments_list.clear()
-        for part in self.message.walk():
-            # Check for attachments
-            if part.get_content_disposition() == 'attachment':
-                filename = part.get_filename()
-                if filename:
-                    self.attachments.append(part)
-                    self.attachments_list.addItem(filename)
-                    
-            # Prioritize plain text over HTML
-            if part.get_content_type() == 'text/plain':
-                body_text = part.get_content()
-                self.mail_content.setHtml("")
-                self.mail_content.setPlainText(body_text)
-                return
+        if self.is_html_body:
+            self.mail_content.setHtml( self.mail_body )
+        else:
+            self.mail_content.setPlainText( self.mail_body )
 
-            if part.get_content_type() == 'text/html' and not body_text:
-                body_text = part.get_content()
-                sanitized_html = self.sanitize_html_fonts(body_text)
-                self.mail_content.setHtml(sanitized_html)
 
     def sanitize_html_fonts(self, html_content: str) -> str:
         """Removes hardcoded font-size declarations from HTML to allow Qt to scale the font."""
