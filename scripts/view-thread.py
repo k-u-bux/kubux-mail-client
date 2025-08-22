@@ -32,7 +32,7 @@ class ThreadViewer(QMainWindow):
     def __init__(self, thread_id, parent=None):
         super().__init__(parent)
         self.thread_id = thread_id
-        self.setWindowTitle("Thread Viewer")
+        self.setWindowTitle("Kubux Mail Client - Thread Viewer")
         self.resize(QSize(1024, 768))
 
         self.view_mode = "tree" # or "list"

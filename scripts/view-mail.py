@@ -74,7 +74,7 @@ class ClickableLabel(QLabel):
 class MailViewer(QMainWindow):
     def __init__(self, mail_file_path, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Kubux Notmuch Mail Client - Viewer")
+        self.setWindowTitle("Kubux Mail Client - Viewer")
         self.resize(QSize(1024, 768))
 
         self.mail_file_path = Path(mail_file_path).expanduser()

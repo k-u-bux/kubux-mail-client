@@ -96,7 +96,7 @@ class NoSelectTextDelegate(QStyledItemDelegate):
 class QueryEditor(QMainWindow):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Edit Named Queries")
+        self.setWindowTitle("Kubux Mail Client - Manage Queries")
         self.resize(QSize(800, 600))
         
         self.query_parser = QueryParser(config.config_path.parent)
@@ -155,6 +155,7 @@ class QueryEditor(QMainWindow):
         self.query_table.setHorizontalHeaderLabels(["Name", "Query Expression"])
         self.query_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
         self.query_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        self.query_table.horizontalHeader().setVisible(False)
         self.query_table.verticalHeader().setVisible(False)
         self.query_table.setFont(config.get_text_font())
         
@@ -362,16 +363,50 @@ class QueryEditor(QMainWindow):
         # Reconnect the signal
         self.query_table.cellChanged.connect(self.handle_cell_changed)
 
+#    def add_empty_row_at_top(self):
+#        """Adds an empty row at the top of the table."""
+#        # Create empty items for the top row
+#        name_item = QTableWidgetItem("")
+#        name_item.setFont(config.get_text_font())
+#        self.query_table.setItem(0, 0, name_item)
+#        
+#        query_item = QTableWidgetItem("")
+#        query_item.setFont(config.get_text_font())
+#        self.query_table.setItem(0, 1, query_item)
+
+    def add_new_rule(self, label, query):
+        self.query_table.insertRow(1)
+        label_item = QTableWidgetItem(label)
+        label_item.setFont(config.get_text_font())
+        self.query_table.setItem(1, 0, label_item)
+        query_item = QTableWidgetItem(query)
+        query_item.setFont(config.get_text_font())
+        self.query_table.setItem(1, 1, query_item)
+
+    def handle_new_label(self,editor):
+        new_label = editor.text().strip()
+        new_query =""
+        self.add_new_rule(new_label, new_query)
+        editor.clear()
+
+    def handle_new_query(self,editor):
+        new_label = ""
+        new_query = editor.text().strip()
+        self.add_new_rule(new_label, new_query)
+        editor.clear()
+
     def add_empty_row_at_top(self):
         """Adds an empty row at the top of the table."""
-        # Create empty items for the top row
-        name_item = QTableWidgetItem("")
-        name_item.setFont(config.get_text_font())
-        self.query_table.setItem(0, 0, name_item)
-        
-        query_item = QTableWidgetItem("")
-        query_item.setFont(config.get_text_font())
-        self.query_table.setItem(0, 1, query_item)
+        label_editor = QLineEdit()
+        label_editor.setPlaceholderText("label")
+        self.query_table.setCellWidget(0, 0, label_editor)
+        label_editor.returnPressed.connect(lambda: self.handle_new_label(label_editor))
+
+        # Right column: Query
+        query_editor = QLineEdit()
+        query_editor.setPlaceholderText("new search expression")
+        self.query_table.setCellWidget(0, 1, query_editor)
+        query_editor.returnPressed.connect(lambda: self.handle_new_query(query_editor))
 
     def handle_cell_changed(self, row, column):
         """Handles cell changes and creates a new row if needed."""
