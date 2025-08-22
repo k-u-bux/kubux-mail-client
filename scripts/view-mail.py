@@ -24,6 +24,7 @@ import textwrap
 
 from config import config
 from common import display_error
+from header_widget import MailHeaderWidget
 
 # Set up basic logging to console
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -81,7 +82,8 @@ class MailViewer(QMainWindow):
         self.tags = []
         self.tags_state = {}
         self.message_id = None
-        
+        self.show_headers = True
+
         self.notmuch_enabled = self.check_notmuch()
 
         if not self.message:
@@ -189,6 +191,10 @@ class MailViewer(QMainWindow):
         self.view_thread_button = QPushButton("View Thread")
         self.view_thread_button.clicked.connect(lambda: self.show_mock_action("Thread viewer to be implemented."))
         top_bar_layout.addWidget(self.view_thread_button)
+
+        self.toggle_header_visibility_button =  QPushButton("Hide Headers")
+        self.toggle_header_visibility_button.clicked.connect(self.toggle_header_visibility)
+        top_bar_layout.addWidget(self.toggle_header_visibility_button)
         
         top_bar_layout.addStretch()
 
@@ -220,12 +226,10 @@ class MailViewer(QMainWindow):
         main_layout.addWidget(self.splitter)
 
         # Mail Headers section as a GroupBox
-        self.headers_group_box = QGroupBox()
-        self.headers_group_box.setFont(config.get_text_font())
-        self.headers_layout = QFormLayout(self.headers_group_box)
-        self.headers_group_box.setStyleSheet("QGroupBox { border: 1px solid gray; }")
+        self.headers_group_box = MailHeaderWidget(self, config, self.message)
         self.splitter.addWidget(self.headers_group_box)
-        
+        self.show_or_hide_headers()
+
         # Mail Content area
         self.mail_content = QTextEdit()
         self.mail_content.setFont(config.get_text_font())
@@ -250,6 +254,18 @@ class MailViewer(QMainWindow):
 
         # Set initial sizes
         self.splitter.setSizes([100, 500, 50])
+
+    def show_or_hide_headers(self):
+        if self.show_headers:
+            self.toggle_header_visibility_button.setText("Hide Headers")
+            self.headers_group_box.show()
+        else:
+            self.toggle_header_visibility_button.setText("Show Headers")
+            self.headers_group_box.hide()
+
+    def toggle_header_visibility(self):
+        self.show_headers = not self.show_headers
+        self.show_or_hide_headers()
 
     def setup_key_bindings(self):
         """Sets up key bindings based on the config file."""
@@ -280,41 +296,6 @@ class MailViewer(QMainWindow):
 
         if self.notmuch_enabled:
             self.update_tags_ui()
-
-        # Clear existing header widgets
-        while self.headers_layout.rowCount() > 0:
-            self.headers_layout.removeRow(0)
-
-        # Populate headers
-        header_fields = {"From": self.message.get("From"),
-                         "To": self.message.get("To"),
-                         "Cc": self.message.get("Cc"),
-                         "Subject": self.message.get("Subject"),
-                         "Date": self.message.get("Date")}
-
-        for field, value in header_fields.items():
-            if value:
-                label = QLabel(f"<b>{field}:</b>")
-                label.setFont(config.get_text_font())
-                
-                # Create a widget for addresses
-                addresses_widget = QWidget()
-                addresses_layout = QHBoxLayout(addresses_widget)
-                addresses_layout.setContentsMargins(0, 0, 0, 0)
-                
-                # Parse and add clickable labels for addresses
-                if field in ["From", "To", "Cc"]:
-                    addresses = getaddresses([value])
-                    for name, address in addresses:
-                        display_text = f"{name} &lt;{address}&gt;" if name else address
-                        addr_label = ClickableLabel(display_text, address)
-                        addr_label.clicked.connect(self.handle_address_selection)
-                        addresses_layout.addWidget(addr_label)
-                else:
-                    addresses_layout.addWidget(QLabel(value))
-                
-                addresses_layout.addStretch()
-                self.headers_layout.addRow(label, addresses_widget)
 
         # Find the plain text or HTML body of the email and attachments
         body_text = ""
@@ -382,10 +363,10 @@ class MailViewer(QMainWindow):
         # Add a button for each tag, styled by its state
         for tag, is_attached in self.tags_state.items():
             tag_button = QPushButton(tag)
+            tag_button.setFont(config.get_interface_font())
             if not is_attached:
-                # Greys out the button for detached tags
                 tag_button.setStyleSheet("QPushButton { color: gray; }")
-            
+
             # Connect the button click to the toggle function
             tag_button.clicked.connect(lambda checked, t=tag: self.toggle_tag(t))
             self.tags_layout.addWidget(tag_button)
