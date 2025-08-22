@@ -100,6 +100,9 @@ class SendMail:
             logging.error("Account configuration incomplete for {from_addr}")
             return
 
+        sent_dir = Path(sent_dir).expanduser()
+        failed_dir = Path(failed_dir).expanduser()
+
         logging.info(f"Attempting to send mail from {from_addr} to {all_recipients} via {smtp_server}:{smtp_port}")
 
         try:
