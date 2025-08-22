@@ -99,26 +99,27 @@ class MailViewer(QMainWindow):
             os.exit(1)
         try:
             mail = mailparser.parse_from_file(self.mail_file_path)
+            with open(self.mail_file_path, 'rb') as f:
+                self.message = email.message_from_binary_file(f, policy=policy.default)
         except Exception as e:
             logging.error(f"Failed to parse mail file: {e}")
             os.exit(1)
-        print("parsing message")
-        self.message = mail.message
+        # print("parsing message")
         body_text = ""
         for part in self.message.walk():
             # Prioritize plain text over HTML
             if part.get_content_type() == 'text/plain':
-                body_text = part.get_payload()
+                body_text = part.get_content()
                 self.mail_body = body_text
                 self.is_html_body = False
                 break
             if part.get_content_type() == 'text/html' and not body_text:
-                body_text = part.get_payload()
+                body_text = part.get_content()
                 sanitized_html = self.sanitize_html_fonts(body_text)
                 self.mail_body = sanitized_html
                 self.is_html_body = True
         self.attachments = mail.attachments 
-        self.message_id = mail.message_id
+        self.message_id = mail.message_id.strip('<>')
         print(f"Message-ID = {self.message_id}")
 
 
@@ -349,7 +350,6 @@ class MailViewer(QMainWindow):
         add_tag_button = QPushButton("Add tags")
         add_tag_button.clicked.connect(self.add_tag_dialog)
         self.tags_layout.addWidget(add_tag_button)
-
 
     def toggle_tag(self, tag):
         """Toggles a tag's state (add or remove)."""
