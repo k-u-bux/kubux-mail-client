@@ -22,6 +22,7 @@ import logging
 import subprocess
 import json
 import textwrap
+import base64
 
 from config import config
 from common import display_error
@@ -110,7 +111,7 @@ class MailViewer(QMainWindow):
                 body_text = part.get_payload()
                 self.mail_body = body_text
                 self.is_html_body = False
-                return
+                break
             if part.get_content_type() == 'text/html' and not body_text:
                 body_text = part.get_payload()
                 sanitized_html = self.sanitize_html_fonts(body_text)
@@ -118,6 +119,7 @@ class MailViewer(QMainWindow):
                 self.is_html_body = True
         self.attachments = mail.attachments 
         self.message_id = mail.message_id
+        print(f"Message-ID = {self.message_id}")
 
 
     def process_initial_tags(self):
@@ -201,7 +203,8 @@ class MailViewer(QMainWindow):
         self.tags_layout = QHBoxLayout(tags_container)
         self.tags_layout.setContentsMargins(0, 0, 0, 0)
         self.tags_scroll_area.setWidget(tags_container)
-        
+        main_layout.addWidget(self.tags_scroll_area)
+
         # Splitter for Headers, Content, and Attachments
         self.splitter = QSplitter(Qt.Orientation.Vertical)
         main_layout.addWidget(self.splitter)
@@ -235,8 +238,8 @@ class MailViewer(QMainWindow):
             self.attachments_list.customContextMenuRequested.connect(self.show_attachment_context_menu)
 
             for part in self.attachments:
-                print(f"attachment {part.get_filename()}")
-                self.attachments_list.append(part.get_filename())
+                print(f"attachment {part.keys()}")
+                self.attachments_list.addItem(part.get('filename'))
 
             self.splitter.setSizes([100, 500, 50])
         else:
@@ -575,45 +578,45 @@ class MailViewer(QMainWindow):
             menu.addAction(save_as_action)
             
             menu.exec(self.attachments_list.mapToGlobal(pos))
+
             
     def handle_attachment_open(self, item):
         """Saves the attachment to a temporary file and opens it."""
         try:
             part_index = self.attachments_list.row(item)
             attachment_part = self.attachments[part_index]
-            filename = attachment_part.get_filename()
+            filename = attachment_part['filename']
+
+            # Decode the base64 payload
+            payload_bytes = base64.b64decode(attachment_part['payload'])
 
             with tempfile.NamedTemporaryFile(suffix=f"_{filename}", delete=False) as temp_file:
-                temp_file.write(attachment_part.get_payload(decode=True))
+                temp_file.write(payload_bytes)
                 temp_path = temp_file.name
-
-            # Use system default application to open the file
-            if sys.platform == "win32":
-                os.startfile(temp_path)
-            elif sys.platform == "darwin":
-                subprocess.run(["open", temp_path])
-            else: # Linux and other POSIX-like systems
                 subprocess.run(["xdg-open", temp_path])
                 
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Could not open attachment: {e}")
+
 
     def handle_attachment_save_as(self, item):
         """Prompts the user to save the attachment to a chosen location."""
         try:
             part_index = self.attachments_list.row(item)
             attachment_part = self.attachments[part_index]
-            filename = attachment_part.get_filename()
+            filename = attachment_part['filename']
 
             save_path, _ = QFileDialog.getSaveFileName(self, "Save Attachment", filename)
-            
+        
             if save_path:
+                payload_bytes = base64.b64decode(attachment_part['payload'])
                 with open(save_path, 'wb') as f:
-                    f.write(attachment_part.get_payload(decode=True))
+                    f.write(payload_bytes)
                 QMessageBox.information(self, "Success", f"Attachment saved to:\n{save_path}")
-                
+            
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Could not save attachment: {e}")
+
 
     def show_content_context_menu(self, pos):
         """Creates a context menu for the mail content area."""
@@ -631,6 +634,7 @@ class MailViewer(QMainWindow):
         
     def show_mock_action(self, message):
         QMessageBox.information(self, "Action Mocked", message)
+
 
 # --- 3. Main Entry Point ---
 def main():
