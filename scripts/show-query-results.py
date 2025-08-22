@@ -35,7 +35,7 @@ class QueryResultsViewer(QMainWindow):
         self.setWindowTitle("Kubux Notmuch Mail Client - Queries")
         self.resize(QSize(1024, 768))
 
-        self.view_mode = "threads" # or "mails"
+        self.view_mode = "mails" # either "threads" or "mails"
         self.current_query = query_string
         self.results = []
 
@@ -54,7 +54,11 @@ class QueryResultsViewer(QMainWindow):
         main_layout.addLayout(top_bar_layout)
         
         # View mode toggle button
-        self.view_mode_button = QPushButton("Thread View (toggle for mail view)")
+        if self.view_mode == "threads":
+            self.view_mode_button = QPushButton("Thread View (toggle for mail view)")
+        else:
+            self.view_mode_button = QPushButton("Mail View (toggle for thread view)")
+            
         self.view_mode_button.setFont(config.get_interface_font())
         self.view_mode_button.clicked.connect(self.toggle_view_mode)
         top_bar_layout.addWidget(self.view_mode_button)

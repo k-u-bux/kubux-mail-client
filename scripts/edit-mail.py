@@ -303,11 +303,17 @@ class MailEditor(QMainWindow):
         from_header = message.get('From', '')
         if from_header:
             from_addr = email.utils.parseaddr(from_header)[1]
+            _, from_domain = from_addr.split('@')
             for i in range(self.from_combo.count()):
                 if self.from_combo.itemData(i) == from_addr:
                     self.from_combo.setCurrentIndex(i)
                     break
-
+        
+        message_id = message.get('Message-ID', '')
+        if not message_id:
+            message_id = email.utils.make_msgid(domain=from_domain)
+        self.message_id_loc, _ = message_id.split('@')
+            
         self.to_edit.setText(message.get('To', ''))
         self.cc_edit.setText(message.get('Cc', ''))
         self.subject_edit.setText(message.get('Subject', ''))
@@ -441,7 +447,7 @@ class MailEditor(QMainWindow):
 
             from_address = email.utils.parseaddr(self.from_combo.currentText())[1]
             domain = from_address.split('@')[1] if '@' in from_address else 'local.machine'
-            draft['Message-ID'] = email.utils.make_msgid(domain=domain)
+            draft['Message-ID'] = f"{self.message_id_loc}@{domain}"
             
             draft['From'] = self.from_combo.currentText()
             if self.to_edit.text():
