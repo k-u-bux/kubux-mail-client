@@ -14,6 +14,7 @@
       pyPkgs.scikit-learn
       pyPkgs.toml
       pyPkgs.watchdog
+      pyPkgs.mail-parser
       pyPkgs.pytest
     ]);
   in {

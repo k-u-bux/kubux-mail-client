@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import sys
+import mailparser
 import argparse
 import os
 import tempfile
@@ -76,57 +77,54 @@ class MailViewer(QMainWindow):
         self.resize(QSize(1024, 768))
 
         self.mail_file_path = Path(mail_file_path).expanduser()
-        self.message = self.parse_mail_file()
-        self.attachments = []
         self.selected_addresses = set()
         self.tags = []
         self.tags_state = {}
-        self.message_id = None
         self.show_headers = True
-
-        self.notmuch_enabled = self.check_notmuch()
-
-        if not self.message:
-            QMessageBox.critical(self, "Error", "Could not load or parse the mail file.")
-            sys.exit(1)
-
-        self.get_message_id()
+        self.attachments = []
+        self.message_id = None
+        self.message = None
+        self.parse_mail_file()
+        
         self.process_initial_tags()
-        self.parse_message()
         self.setup_ui()
         self.setup_key_bindings()
         self.display_message()
 
-    def check_notmuch(self):
-        """Checks if the notmuch command is available."""
+    def parse_mail_file(self):
+        """Parses a real email file from the local filesystem."""
+        if not self.mail_file_path.exists():
+            logging.error(f"Mail file {self.mail_file_path} does not exist.")
+            os.exit(1)
         try:
-            subprocess.run(['notmuch', '--version'], check=True, capture_output=True)
-            return True
-        except (subprocess.CalledProcessError, FileNotFoundError) as e:
-            display_error(
-                "Notmuch Not Found",
-                f"The 'notmuch' command was not found or is not executable.\n"
-                f"Tag-related functionality will be disabled.\n\nError: {e}"
-            )
-            return False
+            mail = mailparser.parse_from_file(self.mail_file_path)
+        except Exception as e:
+            logging.error(f"Failed to parse mail file: {e}")
+            os.exit(1)
+        print("parsing message")
+        self.message = mail.message
+        body_text = ""
+        for part in self.message.walk():
+            # Prioritize plain text over HTML
+            if part.get_content_type() == 'text/plain':
+                body_text = part.get_payload()
+                self.mail_body = body_text
+                self.is_html_body = False
+                return
+            if part.get_content_type() == 'text/html' and not body_text:
+                body_text = part.get_payload()
+                sanitized_html = self.sanitize_html_fonts(body_text)
+                self.mail_body = sanitized_html
+                self.is_html_body = True
+        self.attachments = mail.attachments 
+        self.message_id = mail.message_id
 
-    def get_message_id(self):
-        """Gets the message ID, as it is needed for notmuch queries."""
-        self.message_id = self.message.get("Message-ID")
-        if self.message_id:
-            self.message_id = self.message_id.strip('<>')
-        if not self.message_id:
-            logging.warning("Message-ID not found for this mail. Tag functionality will not work.")
-            self.notmuch_enabled = False
 
     def process_initial_tags(self):
         """
         Manages initial tag state. If a mail has the $new tag,
         it is silently replaced with the $unseen tag.
         """
-        if not self.notmuch_enabled:
-            return
-        
         current_tags = self.get_tags()
         if '$new' in current_tags:
             logging.info("Found '$new' tag. Silently replacing with '$unseen'.")
@@ -136,46 +134,6 @@ class MailViewer(QMainWindow):
             except subprocess.CalledProcessError as e:
                 logging.error(f"Failed to process initial tags: {e.stderr}")
 
-    def parse_mail_file(self):
-        """Parses a real email file from the local filesystem."""
-        if not self.mail_file_path.exists():
-            return None
-        
-        try:
-            with open(self.mail_file_path, 'rb') as f:
-                return email.message_from_binary_file(f, policy=policy.default)
-        except Exception as e:
-            logging.error(f"Failed to parse mail file: {e}")
-            return None
-
-    def parse_message(self):
-        print("parsing message")
-        if not self.message:
-            return
-        body_text = ""
-        for part in self.message.walk():
-            # Check for attachments
-            print(f"{part.get_content_disposition()}, {part.get_content_type()}, {part.get_filename()}")
-            if part.get_content_disposition() == 'attachment':
-                filename = part.get_filename()
-                print(f"{filename}")
-                if filename:
-                    self.attachments.append(part)
-                    
-            # Prioritize plain text over HTML
-            if part.get_content_type() == 'text/plain':
-                body_text = part.get_content()
-                self.mail_body = body_text
-                self.is_html_body = False
-                return
-
-            if part.get_content_type() == 'text/html' and not body_text:
-                body_text = part.get_content()
-                sanitized_html = self.sanitize_html_fonts(body_text)
-                self.mail_body = sanitized_html
-                self.is_html_body = True
-
-        print(f"attachments: {self.attachments}")
 
     def setup_ui(self):
         central_widget = QWidget()
@@ -210,8 +168,6 @@ class MailViewer(QMainWindow):
         self.tags_menu.addSeparator()
         self.tags_menu.addAction("Edit All Tags").triggered.connect(lambda: self.show_mock_action("Full tag management to be implemented."))
         self.tags_button.setMenu(self.tags_menu)
-        if not self.notmuch_enabled:
-            self.tags_button.setDisabled(True)
         top_bar_layout.addWidget(self.tags_button)
 
         self.delete_button = QPushButton("Delete")
@@ -246,11 +202,6 @@ class MailViewer(QMainWindow):
         self.tags_layout.setContentsMargins(0, 0, 0, 0)
         self.tags_scroll_area.setWidget(tags_container)
         
-        if self.notmuch_enabled:
-            main_layout.addWidget(self.tags_scroll_area)
-        else:
-            self.tags_scroll_area.hide()
-
         # Splitter for Headers, Content, and Attachments
         self.splitter = QSplitter(Qt.Orientation.Vertical)
         main_layout.addWidget(self.splitter)
@@ -330,8 +281,7 @@ class MailViewer(QMainWindow):
         if not self.message:
             return
 
-        if self.notmuch_enabled:
-            self.update_tags_ui()
+        self.update_tags_ui()
 
         if self.is_html_body:
             self.mail_content.setHtml( self.mail_body )
