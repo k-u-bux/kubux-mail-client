@@ -96,7 +96,7 @@ class NoSelectTextDelegate(QStyledItemDelegate):
 class QueryEditor(QMainWindow):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Kubux Mail Client - Manage Queries")
+        self.setWindowTitle("Kubux Mail Client")
         self.resize(QSize(800, 600))
         
         self.query_parser = QueryParser(config.config_path.parent)

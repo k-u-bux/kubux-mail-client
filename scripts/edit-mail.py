@@ -139,7 +139,7 @@ class EmailAddressLineEdit(QLineEdit):
 class MailEditor(QMainWindow):
     def __init__(self, parent=None, mail_file_path=None):
         super().__init__(parent)
-        self.setWindowTitle("Kubux Mail Client - Composer")
+        self.setWindowTitle("Kubux Mail Client - Editor")
         self.resize(QSize(800, 600))
         
         self.attachments = []
