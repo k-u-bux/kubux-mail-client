@@ -32,7 +32,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 class QueryResultsViewer(QMainWindow):
     def __init__(self, query_string="tag:inbox and tag:unread", parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Kubux Notmuch Mail Client - Queries")
+        self.setWindowTitle("Kubux Mail Client - Search Results")
         self.resize(QSize(1024, 768))
 
         self.view_mode = "mails" # either "threads" or "mails"

@@ -312,7 +312,7 @@ class DraftsManager(QMainWindow):
         
         # Clear the table and update the window title
         self.drafts_table.setRowCount(0)
-        self.setWindowTitle(f"Manage Drafts - {self.current_drafts_dir}")
+        self.setWindowTitle(f"Kubux Mail Client - Drafts ({self.current_identity['email']})")
         
         if not self.current_drafts_dir.is_dir():
             display_error(self, "Directory not found", f"The drafts directory does not exist:\n\n{self.current_drafts_dir}")

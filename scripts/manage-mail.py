@@ -363,16 +363,6 @@ class QueryEditor(QMainWindow):
         # Reconnect the signal
         self.query_table.cellChanged.connect(self.handle_cell_changed)
 
-#    def add_empty_row_at_top(self):
-#        """Adds an empty row at the top of the table."""
-#        # Create empty items for the top row
-#        name_item = QTableWidgetItem("")
-#        name_item.setFont(config.get_text_font())
-#        self.query_table.setItem(0, 0, name_item)
-#        
-#        query_item = QTableWidgetItem("")
-#        query_item.setFont(config.get_text_font())
-#        self.query_table.setItem(0, 1, query_item)
 
     def add_new_rule(self, label, query):
         self.query_table.insertRow(1)
