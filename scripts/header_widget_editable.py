@@ -4,7 +4,7 @@ import sys
 import re
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QScrollArea,
-    QLabel, QTextEdit, QGridLayout, QSizePolicy, QFrame, QHBoxLayout
+    QTextEdit, QGridLayout, QSizePolicy, QFrame, QHBoxLayout
 )
 from PySide6.QtGui import (
     QFont, QColor, QPainter, QTextCursor, QDrag, QTextCharFormat, 
@@ -14,6 +14,7 @@ from PySide6.QtCore import (
     Qt, Signal, QMimeData, QPoint, QSize, QEvent, QRect
 )
 
+# Import the real config instead of using a dummy
 from config import config
 
 # Shared comprehensive regex for RFC 5322 email addresses with or without display names
@@ -27,7 +28,7 @@ class AddressAwareTextEdit(QTextEdit):
     """
     addressDragged = Signal(str)  # Signal emitted when an address is dragged
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, read_only=False):
         super().__init__(parent)
         self.setAcceptDrops(True)
         self.setLineWrapMode(QTextEdit.WidgetWidth)
@@ -36,15 +37,24 @@ class AddressAwareTextEdit(QTextEdit):
         self.setFrameStyle(QFrame.NoFrame)
         self.setTabChangesFocus(True)  # Tab moves to next field
         
+        # Set read-only state if requested
+        self.setReadOnly(read_only)
+        
         # Enable rich text to allow for highlighting, but maintain plain text input
         self.setAcceptRichText(False)
         
         # Adjust minimum height to be single line by default
         self.document().documentLayout().documentSizeChanged.connect(self.adjustHeight)
         
-        # Drag support
+        # Drag support (only needed for editable fields)
         self.drag_start_position = None
         self.drag_address = None
+        
+        # Apply different background for read-only fields
+        if read_only:
+            palette = self.palette()
+            palette.setColor(QPalette.Base, palette.color(QPalette.Window))
+            self.setPalette(palette)
 
     def adjustHeight(self):
         """Adjust the height of the widget to fit the content."""
@@ -55,6 +65,11 @@ class AddressAwareTextEdit(QTextEdit):
 
     def mousePressEvent(self, event):
         """Handle mouse press events for potential drag operations."""
+        if self.isReadOnly():
+            # Skip drag setup for read-only fields
+            super().mousePressEvent(event)
+            return
+            
         if event.button() == Qt.LeftButton:
             self.drag_start_position = event.pos()
             
@@ -79,6 +94,11 @@ class AddressAwareTextEdit(QTextEdit):
 
     def mouseMoveEvent(self, event):
         """Handle mouse move events to initiate drag operations."""
+        if self.isReadOnly():
+            # Skip drag operations for read-only fields
+            super().mouseMoveEvent(event)
+            return
+            
         if not self.drag_start_position or not (event.buttons() & Qt.LeftButton):
             super().mouseMoveEvent(event)
             return
@@ -130,6 +150,11 @@ class AddressAwareTextEdit(QTextEdit):
 
     def dropEvent(self, event):
         """Handle drop events for email addresses."""
+        if self.isReadOnly():
+            # Skip drop handling for read-only fields
+            event.ignore()
+            return
+            
         if event.mimeData().hasText():
             dropped_text = event.mimeData().text().strip()
             
@@ -164,14 +189,6 @@ class AddressAwareTextEdit(QTextEdit):
                 return
                 
         super().dropEvent(event)
-
-
-class HeaderLabel(QLabel):
-    """Custom label for header fields with consistent styling."""
-    def __init__(self, text, parent=None):
-        super().__init__(text, parent)
-        self.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Preferred)
-        self.setAlignment(Qt.AlignRight | Qt.AlignTop)
 
 
 class MailHeaderEditableWidget(QScrollArea):
@@ -222,17 +239,28 @@ class MailHeaderEditableWidget(QScrollArea):
     def create_header_fields(self):
         """Create all header field labels and editors."""
         self.editors = {}  # Store references to editor widgets
+        self.labels = {}   # Store references to label widgets
         
         for row, (label_text, editor_name) in enumerate(self.header_fields):
-            # Create and add label
-            label = HeaderLabel(label_text)
-            label.setFont(self.label_font)
-            self.layout.addWidget(label, row, 0)
+            # Create label using the same widget class but read-only
+            label_widget = AddressAwareTextEdit(read_only=True)
+            label_widget.setFont(self.label_font)
+            label_widget.setPlainText(label_text)
+            label_widget.setAlignment(Qt.AlignLeft | Qt.AlignTop)
+            label_widget.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Preferred)
+            label_widget.setFixedWidth(120)  # Set a fixed width for all labels
             
-            # Create and add editor
+            # Store reference to the label
+            self.labels[editor_name + "_label"] = label_widget
+            
+            # Add to layout
+            self.layout.addWidget(label_widget, row, 0)
+            
+            # Create editor
             editor = AddressAwareTextEdit()
             editor.setFont(self.text_font)
             editor.setProperty("headerField", True)  # For styling
+            editor.setAlignment(Qt.AlignTop)
             
             # Store reference to the editor
             self.editors[editor_name] = editor
@@ -302,11 +330,6 @@ class MailHeaderEditableWidget(QScrollArea):
 if __name__ == "__main__":
     from email.message import EmailMessage
     
-    class DummyConfig:
-        """Dummy config class for testing."""
-        def get_text_font(self):
-            return QFont("Arial", 10)
-    
     app = QApplication(sys.argv)
     
     # Create a sample message
@@ -319,8 +342,6 @@ if __name__ == "__main__":
     window = QMainWindow()
     window.setWindowTitle("Editable Mail Header Widget Demo")
     window.setGeometry(100, 100, 800, 300)
-    
-    # config = DummyConfig()
     
     # Create layout with header widget and a body text area
     central_widget = QWidget()
