@@ -4,82 +4,72 @@ import sys
 import re
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QScrollArea,
-    QTextEdit, QGridLayout, QSizePolicy, QFrame, QHBoxLayout,
-    QLabel
+    QTextEdit, QGridLayout, QSizePolicy, QFrame, QHBoxLayout
 )
 from PySide6.QtGui import (
     QFont, QColor, QPainter, QTextCursor, QDrag, QTextCharFormat, 
-    QTextDocument, QPalette, QTextOption
+    QTextDocument, QPalette
 )
 from PySide6.QtCore import (
-    Qt, Signal, QMimeData, QPoint, QSize, QEvent, QRect, QMargins
+    Qt, Signal, QMimeData, QPoint, QSize, QEvent, QRect
 )
 
-# Import the real config
+# Import the real config instead of using a dummy
 from config import config
 
 # Shared comprehensive regex for RFC 5322 email addresses with or without display names
 EMAIL_ADDRESS_REGEX = re.compile(r'(?:"[^"]*"|[^,<>"])*?(?:<([^<>]+)>|([^,<>\s]+@[^,<>\s]+))')
 
 
-class HeaderLabel(QLabel):
-    """A simple label for header fields with right alignment."""
-    def __init__(self, text, parent=None):
-        super().__init__(text, parent)
-        self.setAlignment(Qt.AlignRight | Qt.AlignTop)
-        self.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Preferred)
-        self.setTextFormat(Qt.PlainText)
-
-
 class AddressAwareTextEdit(QTextEdit):
     """
-    A QTextEdit that knows about email addresses for drag-and-drop
-    but does not scroll internally.
+    A QTextEdit subclass that is aware of email addresses for drag-and-drop operations,
+    but otherwise behaves like a normal text editor.
     """
     addressDragged = Signal(str)  # Signal emitted when an address is dragged
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, read_only=False):
         super().__init__(parent)
-        self.setAcceptRichText(False)
+        self.setAcceptDrops(True)
         self.setLineWrapMode(QTextEdit.WidgetWidth)
-        
-        # Critical: Disable scrollbars so we use parent scrollarea instead
         self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        
         self.setFrameStyle(QFrame.NoFrame)
         self.setTabChangesFocus(True)  # Tab moves to next field
         
-        # Force text to top by setting top document margin
-        self.document().setDocumentMargin(0)
+        # Set read-only state if requested
+        self.setReadOnly(read_only)
         
-        # Drag support
+        # Enable rich text to allow for highlighting, but maintain plain text input
+        self.setAcceptRichText(False)
+        
+        # Adjust minimum height to be single line by default
+        self.document().documentLayout().documentSizeChanged.connect(self.adjustHeight)
+        
+        # Drag support (only needed for editable fields)
         self.drag_start_position = None
         self.drag_address = None
         
-        # Allow the widget to grow with content
-        self.document().documentLayout().documentSizeChanged.connect(self.updateGeometry)
-        self.setMinimumHeight(self.fontMetrics().height() + 10)
-    
-    def sizeHint(self):
-        """Return size based on content."""
-        size = super().sizeHint()
-        # Make sure our width is reasonable
-        size.setWidth(200)
-        # Calculate height based on document size
-        doc_height = self.document().size().height()
-        size.setHeight(doc_height + 10)  # Add some padding
-        return size
-    
-    def minimumSizeHint(self):
-        """Minimum size should be enough for one line plus padding."""
-        size = super().minimumSizeHint()
-        line_height = self.fontMetrics().height()
-        size.setHeight(line_height + 10)
-        return size
+        # Apply different background for read-only fields
+        if read_only:
+            palette = self.palette()
+            palette.setColor(QPalette.Base, palette.color(QPalette.Window))
+            self.setPalette(palette)
+
+    def adjustHeight(self):
+        """Adjust the height of the widget to fit the content."""
+        margins = self.contentsMargins()
+        doc_height = self.document().size().height() + margins.top() + margins.bottom() + 4
+        self.setMinimumHeight(min(doc_height, 100))  # Limit max height
+        self.setMaximumHeight(min(doc_height, 100))  # Limit max height
 
     def mousePressEvent(self, event):
         """Handle mouse press events for potential drag operations."""
+        if self.isReadOnly():
+            # Skip drag setup for read-only fields
+            super().mousePressEvent(event)
+            return
+            
         if event.button() == Qt.LeftButton:
             self.drag_start_position = event.pos()
             
@@ -104,6 +94,11 @@ class AddressAwareTextEdit(QTextEdit):
 
     def mouseMoveEvent(self, event):
         """Handle mouse move events to initiate drag operations."""
+        if self.isReadOnly():
+            # Skip drag operations for read-only fields
+            super().mouseMoveEvent(event)
+            return
+            
         if not self.drag_start_position or not (event.buttons() & Qt.LeftButton):
             super().mouseMoveEvent(event)
             return
@@ -155,6 +150,11 @@ class AddressAwareTextEdit(QTextEdit):
 
     def dropEvent(self, event):
         """Handle drop events for email addresses."""
+        if self.isReadOnly():
+            # Skip drop handling for read-only fields
+            event.ignore()
+            return
+            
         if event.mimeData().hasText():
             dropped_text = event.mimeData().text().strip()
             
@@ -194,25 +194,24 @@ class AddressAwareTextEdit(QTextEdit):
 class MailHeaderEditableWidget(QScrollArea):
     """
     A scrollable widget containing editable email header fields.
-    All fields share a single scrollbar from this QScrollArea.
+    Each field behaves like a mini text editor similar to the body editor.
     """
     def __init__(self, parent, config, message=None):
         super().__init__(parent)
         self.config = config
         self.message = message
         
-        # Setup scroll area - this will provide THE ONLY scrollbar
+        # Setup scroll area
         self.setWidgetResizable(True)
         self.setFrameStyle(QFrame.StyledPanel)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         
         # Container widget
-        self.container = QWidget()
-        self.setWidget(self.container)
+        container = QWidget()
+        self.setWidget(container)
         
         # Main layout
-        self.layout = QGridLayout(self.container)
+        self.layout = QGridLayout(container)
         self.layout.setContentsMargins(10, 10, 10, 10)
         self.layout.setSpacing(8)
         
@@ -240,27 +239,45 @@ class MailHeaderEditableWidget(QScrollArea):
     def create_header_fields(self):
         """Create all header field labels and editors."""
         self.editors = {}  # Store references to editor widgets
+        self.labels = {}   # Store references to label widgets
         
         for row, (label_text, editor_name) in enumerate(self.header_fields):
-            # Create label
-            label = HeaderLabel(label_text)
-            label.setFont(self.label_font)
-            label.setFixedWidth(80)  # Set a fixed width for all labels
-            self.layout.addWidget(label, row, 0, Qt.AlignTop)
+            # Create label using the same widget class but read-only
+            label_widget = AddressAwareTextEdit(read_only=True)
+            label_widget.setFont(self.label_font)
+            label_widget.setPlainText(label_text)
+            
+            # Critical: Set document margin to 0 to force text to the top
+            label_widget.document().setDocumentMargin(0)
+            
+            # Set right alignment for the label text
+            option = label_widget.document().defaultTextOption()
+            option.setAlignment(Qt.AlignLeft)
+            label_widget.document().setDefaultTextOption(option)
+            
+            # Fixed width and size policy for label
+            label_widget.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+            label_widget.setFixedWidth(120)  # Set a fixed width for all labels
+            
+            # Store reference to the label
+            self.labels[editor_name + "_label"] = label_widget
+            
+            # Add to layout WITH EXPLICIT ALIGNMENT FLAG
+            self.layout.addWidget(label_widget, row, 0, Qt.AlignTop)
             
             # Create editor
             editor = AddressAwareTextEdit()
             editor.setFont(self.text_font)
             editor.setProperty("headerField", True)  # For styling
             
-            # Allow the editor to expand with content
-            editor.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Minimum)
+            # Critical: Set document margin to 0 to force text to the top
+            editor.document().setDocumentMargin(0)
             
             # Store reference to the editor
             self.editors[editor_name] = editor
             
-            # Add to layout - align to top to ensure proper alignment with label
-            self.layout.addWidget(editor, row, 1)
+            # Add to layout WITH EXPLICIT ALIGNMENT FLAG
+            self.layout.addWidget(editor, row, 1, Qt.AlignTop)
             
             # Connect signals for drag-and-drop coordination
             editor.addressDragged.connect(self.handle_address_dragged)
@@ -326,16 +343,16 @@ if __name__ == "__main__":
     
     app = QApplication(sys.argv)
     
-    # Create a sample message with very long content
+    # Create a sample message
     msg = EmailMessage()
     msg["Subject"] = "Test Subject"
     msg["From"] = "John Doe <john@example.com>"
-    msg["To"] = "Jane Smith <jane@example.com>, Alice <alice@example.com>, Bob <bob@example.com>, Charlie <charlie@example.com>, David <david@example.com>, Eve <eve@example.com>, Frank <frank@example.com>, Grace <grace@example.com>, Heidi <heidi@example.com>, Ivan <ivan@example.com>, Julia <julia@example.com>, Karl <karl@example.com>, Linda <linda@example.com>"
-    msg["Cc"] = "Bob <bob@example.com>, Alice <alice@example.com>, Charlie <charlie@example.com>, David <david@example.com>"
+    msg["To"] = "Jane Smith <jane@example.com>, Alice <alice@example.com>"
+    msg["Cc"] = "Bob <bob@example.com>"
     
     window = QMainWindow()
     window.setWindowTitle("Editable Mail Header Widget Demo")
-    window.setGeometry(100, 100, 800, 600)
+    window.setGeometry(100, 100, 800, 300)
     
     # Create layout with header widget and a body text area
     central_widget = QWidget()
