@@ -164,7 +164,7 @@ class MailEditor(QMainWindow):
                 return email.message_from_binary_file(f, policy=policy.default)
         except Exception as e:
             logging.error(f"Failed to parse draft mail file: {e}")
-            display_error("Parsing Error", f"Failed to parse draft mail file:\n{e}")
+            display_error(self, "Parsing Error", f"Failed to parse draft mail file:\n{e}")
             return None
 
     def setup_ui(self):
@@ -189,20 +189,24 @@ class MailEditor(QMainWindow):
         top_bar_layout.addWidget(self.more_headers_button)
         top_bar_layout.addStretch()
 
-        self.send_button = QPushButton("Send")
-        self.save_button = QPushButton("Save")
         self.discard_button = QPushButton("Discard")
+        self.clone_button = QPushButton("Clone")
+        self.save_button = QPushButton("Save")
+        self.send_button = QPushButton("Send")
+        self.clone_button.setFont(config.get_interface_font())
         self.send_button.setFont(config.get_interface_font())
         self.save_button.setFont(config.get_interface_font())
         self.discard_button.setFont(config.get_interface_font())
         
         self.send_button.clicked.connect(self.send_message)
+        self.clone_button.clicked.connect(self.clone_message)
         self.save_button.clicked.connect(self.save_message)
         self.discard_button.clicked.connect(self.discard_draft)
 
-        top_bar_layout.addWidget(self.send_button)
-        top_bar_layout.addWidget(self.save_button)
         top_bar_layout.addWidget(self.discard_button)
+        top_bar_layout.addWidget(self.clone_button)
+        top_bar_layout.addWidget(self.save_button)
+        top_bar_layout.addWidget(self.send_button)
 
         headers_group_box = QWidget()
         self.headers_layout = QFormLayout(headers_group_box)
@@ -396,7 +400,7 @@ class MailEditor(QMainWindow):
                 self.attachments.append(part)
                 self.attachments_list.addItem(file_path.name)
         except Exception as e:
-            display_error("Failed to Add Attachment", f"Failed to add attachment:\n{e}")
+            display_error(self, "Failed to Add Attachment", f"Failed to add attachment:\n{e}")
 
     def remove_attachment(self, item):
         row = self.attachments_list.row(item)
@@ -416,15 +420,8 @@ class MailEditor(QMainWindow):
         # Fallback to the default if no match is found
         return Path("~/.local/share/kubux-mail-client/mail/drafts").expanduser()
 
-    def _save_draft(self):
-        """
-        Saves the current mail as a draft.
-        1. Creates a temporary file in the drafts directory of the selected identity.
-        2. Deletes the old mail file if it exists.
-        3. Renames the temporary file to a permanent draft filename.
-        """
+    def _save_draft_in_new_file(self):
         try:
-            # 1. Get the correct drafts directory and create a new filename
             drafts_dir = self._get_selected_identity_drafts_path()
             drafts_dir.mkdir(parents=True, exist_ok=True)
             
@@ -432,9 +429,8 @@ class MailEditor(QMainWindow):
             timestamp_str = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
             random_component = secrets.token_hex(16)
             new_draft_filename = f"{timestamp_str}-{random_component}.eml"
-            new_draft_path = drafts_dir / new_draft_filename
+            new_draft_path = ( drafts_dir / new_draft_filename ).expanduser()
 
-            # 2. Create the draft message object
             draft = email.message.EmailMessage()
             
             if self.draft_message:
@@ -466,41 +462,53 @@ class MailEditor(QMainWindow):
             for part in self.attachments:
                 draft.attach(part)
             
-            # 3. Write to a temporary file in the new drafts directory
-            tmp_path = drafts_dir / f"temp_{os.getpid()}.eml"
-            with open(tmp_path, 'wb') as tmp_file:
+            with open(new_draft_path, 'wb') as tmp_file:
                 tmp_file.write(draft.as_bytes())
 
-            # 4. Remove the old draft file if it exists
-            if self.mail_file_path and self.mail_file_path.exists():
-                os.remove(self.mail_file_path)
-            
-            # 5. Atomically rename the temporary file
-            shutil.move(tmp_path, new_draft_path)
-            self.mail_file_path = new_draft_path  # Update the path for future saves
-            logging.info(f"Draft saved to {self.mail_file_path}")
+            return new_draft_path;
 
         except Exception as e:
-            display_error("Draft Creation Error", f"Failed to save draft file:\n{e}")
+            display_error(self, "Draft Creation Error", f"Failed to save draft file:\n{e}")
             return None
+
+    def _save_draft(self):
+        new_file_path = self._save_draft_in_new_file()
+        if new_file_path: 
+            if os.path.exists( new_file_path ):
+                if self.mail_file_path.parent == new_file_path.parent:
+                    shutil.move( new_file_path, self.mail_file_path )
+                else:
+                    if self.mail_file_path and self.mail_file_path.exists():
+                        os.remove( self.mail_file_path )
+                    self.mail_file_path = new_file_path
+                    logging.info(f"Draft saved to {self.mail_file_path}")
 
     def save_message(self):
         self._save_draft()
         self.close()
 
+    def clone_message(self):
+        new_file_path = self._save_draft_in_new_file()
+        if new_file_path:
+            editor_path = os.path.join(os.path.dirname(__file__), "edit-mail.py")
+            if not ( os.path.exists( new_file_path ) and os.path.exists( editor_path ) ):
+                display_error(self, "Error", f"Could not find mail editor at {editor_path}" )
+                return
+            subprocess.Popen(["python3", editor_path, "--mail-file", new_file_path])
+ 
     def send_message(self):
         self._save_draft()
         try:
             send_mail_path = Path(__file__).parent / "send-mail.py"
             if not send_mail_path.exists():
-                QMessageBox.critical(self, "Error", f"Could not find send mail script at {send_mail_path}")
+                display_error(self, "Error", f"Could not find send mail script at {send_mail_path}")
                 return
 
             subprocess.Popen([sys.executable, str(send_mail_path), str(self.mail_file_path)])
             self.close()
 
         except Exception as e:
-            QMessageBox.critical(self, "Send Error", f"Failed to send mail: {e}")
+            display_error( self, "Send Error", f"Failed to send mail: {e}" )
 
     def discard_draft(self):
         if self.mail_file_path and self.mail_file_path.exists():
@@ -508,7 +516,7 @@ class MailEditor(QMainWindow):
                 os.remove(self.mail_file_path)
             except Exception as e:
                 logging.error(f"Failed to delete draft file: {e}")
-                display_error("Discard Error", f"Failed to delete draft file:\n{e}")
+                display_error(self, "Discard Error", f"Failed to delete draft file:\n{e}")
                 return
         
         self.close()
