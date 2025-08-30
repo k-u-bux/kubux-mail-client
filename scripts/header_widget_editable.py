@@ -163,11 +163,28 @@ class AddressAwareTextEdit(QTextEdit):
             # If it's an email address
             if EMAIL_ADDRESS_REGEX.fullmatch(dropped_text):
                 cursor = self.cursorForPosition(event.pos())
+                cursor_pos = cursor.position()
+                
+                # Check if the cursor is within an existing email address
+                text = self.toPlainText()
+                inside_address = False
+                
+                for match in EMAIL_ADDRESS_REGEX.finditer(text):
+                    start, end = match.span()
+                    if start < cursor_pos < end:  # Cursor is inside an address
+                        inside_address = True
+                        # Determine whether to move cursor before or after the address
+                        if cursor_pos - start < end - cursor_pos:  # Closer to start
+                            cursor.setPosition(start)
+                        else:  # Closer to end
+                            cursor.setPosition(end)
+                        break
+                
                 self.setTextCursor(cursor)
+                cursor_pos = cursor.position()  # Update cursor_pos after potential adjustment
                 
                 # Insert the text at cursor position with proper comma formatting
                 current_text = self.toPlainText()
-                cursor_pos = cursor.position()
                 
                 if current_text:
                     # Check if we need to add a comma before or after
@@ -188,6 +205,9 @@ class AddressAwareTextEdit(QTextEdit):
                 cursor.insertText(dropped_text)
                 event.accept()
                 event.setDropAction(Qt.MoveAction)
+                
+                # Ensure the inserted text is visible
+                self.ensureCursorVisible()
                 return
                 
         super().dropEvent(event)
