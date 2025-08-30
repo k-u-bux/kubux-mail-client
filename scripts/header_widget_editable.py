@@ -249,7 +249,9 @@ class MailHeaderEditableWidget(QScrollArea):
             label_widget.setAlignment(Qt.AlignLeft | Qt.AlignTop)
             label_widget.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Preferred)
             label_widget.setFixedWidth(120)  # Set a fixed width for all labels
-            
+            label_widget.document().setDocumentMargin(0)
+            label_widget.setContentsMargins(0, 0, 4, 0)  # Right margin for spacing
+
             # Store reference to the label
             self.labels[editor_name + "_label"] = label_widget
             
@@ -260,8 +262,10 @@ class MailHeaderEditableWidget(QScrollArea):
             editor = AddressAwareTextEdit()
             editor.setFont(self.text_font)
             editor.setProperty("headerField", True)  # For styling
-            editor.setAlignment(Qt.AlignTop)
-            
+            # editor.setAlignment(Qt.AlignTop)
+            editor.document().setDocumentMargin(0)
+            editor.setContentsMargins(4, 0, 0, 0)  # Left margin for spacing
+
             # Store reference to the editor
             self.editors[editor_name] = editor
             
