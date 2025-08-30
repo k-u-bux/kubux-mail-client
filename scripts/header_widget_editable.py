@@ -22,16 +22,18 @@ from config import config
 EMAIL_ADDRESS_REGEX = re.compile(r'(?:"[^"]*"|[^,<>"])*?(?:<([^<>]+)>|([^,<>\s]+@[^,<>\s]+))')
 
 
-class TopAlignedTextEdit(QPlainTextEdit):
+class TopAlignedTextEdit(QTextEdit):
     """
-    A QPlainTextEdit subclass that ensures text is always aligned at the top.
-    QPlainTextEdit is better for this purpose as it handles top alignment naturally.
+    A QTextEdit subclass that ensures text is always aligned at the top
+    and automatically adjusts its height to fit content.
     """
     addressDragged = Signal(str)  # Signal emitted when an address is dragged
+    heightChanged = Signal(int)   # Signal emitted when height changes
 
     def __init__(self, parent=None, read_only=False):
         super().__init__(parent)
-        self.setLineWrapMode(QPlainTextEdit.WidgetWidth)
+        self.setAcceptRichText(False)
+        self.setLineWrapMode(QTextEdit.WidgetWidth)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.setFrameStyle(QFrame.NoFrame)
@@ -40,8 +42,11 @@ class TopAlignedTextEdit(QPlainTextEdit):
         # Set read-only state if requested
         self.setReadOnly(read_only)
         
-        # Adjust minimum height to be single line by default
-        self.document().documentLayout().documentSizeChanged.connect(self.adjustHeight)
+        # Force text to top by setting minimal document margin
+        self.document().setDocumentMargin(0)
+        
+        # Connect to document change events to update height
+        self.document().contentsChanged.connect(self.adjustHeight)
         
         # Drag support
         self.drag_start_position = None
@@ -54,23 +59,44 @@ class TopAlignedTextEdit(QPlainTextEdit):
             self.setPalette(palette)
             
             # For right-aligned text in labels
-            if read_only:
-                option = QTextOption()
-                option.setAlignment(Qt.AlignRight | Qt.AlignTop)
-                self.document().setDefaultTextOption(option)
+            document = self.document()
+            option = document.defaultTextOption()
+            option.setAlignment(Qt.AlignRight)
+            document.setDefaultTextOption(option)
+        
+        # Initial height adjustment
+        QApplication.instance().processEvents()
+        self.adjustHeight()
+
+    def sizeHint(self):
+        """Override sizeHint to provide height based on content."""
+        size = super().sizeHint()
+        doc_size = self.document().size().toSize()
+        size.setHeight(doc_size.height() + 10)  # Add some padding
+        return size
 
     def adjustHeight(self):
         """Adjust the height of the widget to fit the content."""
+        # Get document size plus margins
+        doc_size = self.document().size().toSize()
         margins = self.contentsMargins()
-        doc_height = self.document().size().height() + margins.top() + margins.bottom() + 4
+        total_height = doc_size.height() + margins.top() + margins.bottom() + 4
         
         # Ensure minimum height is enough for at least one line
         font_metrics = self.fontMetrics()
         min_height = font_metrics.height() + margins.top() + margins.bottom() + 4
         
-        # Set height (with a reasonable maximum)
-        new_height = max(min_height, min(doc_height, 100))
-        self.setFixedHeight(new_height)
+        # Use maximum between minimum height and content height
+        new_height = max(min_height, total_height)
+        
+        # Set a reasonable maximum height to prevent excessive growth
+        max_height = 150  # Maximum height for multi-line content
+        new_height = min(new_height, max_height)
+        
+        # Only update if height changed
+        if self.height() != new_height:
+            self.setMinimumHeight(new_height)
+            self.heightChanged.emit(new_height)
 
     def mousePressEvent(self, event):
         """Handle mouse press events for potential drag operations."""
@@ -151,7 +177,7 @@ class TopAlignedTextEdit(QPlainTextEdit):
                 clean_text = re.sub(r'\s*,\s*,\s*', ', ', text)
                 clean_text = re.sub(r'^\s*,\s*|\s*,\s*$', '', clean_text)
                 if clean_text != text:
-                    self.setPlainText(clean_text)
+                    self.setText(clean_text)
         
         # Reset drag state
         self.drag_start_position = None
@@ -255,14 +281,14 @@ class MailHeaderEditableWidget(QScrollArea):
             label_widget = TopAlignedTextEdit(read_only=True)
             label_widget.setFont(self.label_font)
             label_widget.setPlainText(label_text)
-            label_widget.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Preferred)
+            label_widget.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Minimum)
             label_widget.setFixedWidth(80)  # Set a fixed width for all labels
             label_widget.setContentsMargins(0, 0, 5, 0)  # Add right margin for spacing
             
             # Store reference to the label
             self.labels[editor_name + "_label"] = label_widget
             
-            # Add to layout
+            # Add to layout - align to top
             self.layout.addWidget(label_widget, row, 0, Qt.AlignTop)
             
             # Create editor
@@ -270,11 +296,15 @@ class MailHeaderEditableWidget(QScrollArea):
             editor.setFont(self.text_font)
             editor.setProperty("headerField", True)  # For styling
             editor.setContentsMargins(5, 0, 0, 0)  # Add left margin for spacing
+            editor.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Minimum)
+            
+            # Connect height changes to ensure labels stay aligned
+            editor.heightChanged.connect(lambda h, lbl=label_widget: self.sync_label_height(lbl, h))
             
             # Store reference to the editor
             self.editors[editor_name] = editor
             
-            # Add to layout with explicit AlignTop alignment
+            # Add to layout - align to top
             self.layout.addWidget(editor, row, 1, Qt.AlignTop)
             
             # Connect signals for drag-and-drop coordination
@@ -282,6 +312,11 @@ class MailHeaderEditableWidget(QScrollArea):
         
         # Add a spacer at the bottom to push everything up
         self.layout.setRowStretch(len(self.header_fields), 1)
+
+    def sync_label_height(self, label_widget, height):
+        """Keep label height in sync with editor height for alignment."""
+        # This is optional but can help with alignment in some cases
+        pass
 
     def handle_address_dragged(self, address):
         """Handles notification that an address was dragged from one field to another."""
@@ -341,16 +376,16 @@ if __name__ == "__main__":
     
     app = QApplication(sys.argv)
     
-    # Create a sample message
+    # Create a sample message with very long content
     msg = EmailMessage()
     msg["Subject"] = "Test Subject"
     msg["From"] = "John Doe <john@example.com>"
-    msg["To"] = "Jane Smith <jane@example.com>, Alice <alice@example.com>, Bob <bob@example.com>, Charlie <charlie@example.com>, David <david@example.com>, Eve <eve@example.com>"
-    msg["Cc"] = "Bob <bob@example.com>"
+    msg["To"] = "Jane Smith <jane@example.com>, Alice <alice@example.com>, Bob <bob@example.com>, Charlie <charlie@example.com>, David <david@example.com>, Eve <eve@example.com>, Frank <frank@example.com>, Grace <grace@example.com>, Heidi <heidi@example.com>, Ivan <ivan@example.com>, Julia <julia@example.com>, Karl <karl@example.com>, Linda <linda@example.com>"
+    msg["Cc"] = "Bob <bob@example.com>, Alice <alice@example.com>, Charlie <charlie@example.com>, David <david@example.com>"
     
     window = QMainWindow()
     window.setWindowTitle("Editable Mail Header Widget Demo")
-    window.setGeometry(100, 100, 800, 300)
+    window.setGeometry(100, 100, 800, 600)
     
     # Create layout with header widget and a body text area
     central_widget = QWidget()
@@ -361,7 +396,7 @@ if __name__ == "__main__":
     layout.addWidget(header_widget)
     
     # Add a body text edit for comparison
-    body_edit = QPlainTextEdit()
+    body_edit = QTextEdit()
     body_edit.setFont(config.get_text_font())
     body_edit.setPlainText("This is the body of the email. You can type here just like in the header fields above.")
     layout.addWidget(body_edit)
