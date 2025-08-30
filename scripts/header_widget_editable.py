@@ -212,7 +212,7 @@ class MailHeaderEditableWidget(QScrollArea):
         
         # Main layout
         self.layout = QGridLayout(container)
-        self.layout.setContentsMargins(10, 10, 10, 10)
+        self.layout.setContentsMargins( 0, 0, 0, 0 )
         self.layout.setSpacing(8)
         
         # Configure fonts
@@ -239,6 +239,11 @@ class MailHeaderEditableWidget(QScrollArea):
         # Populate with message data if provided
         if message:
             self.populate_from_message(message)
+            
+        # Store message_id for the host application to use
+        self.message_id_loc = None
+        if message and message.get('Message-ID'):
+            self.message_id_loc, _ = message.get('Message-ID').split('@', 1)
 
     def create_header_fields(self):
         """Create all header field labels and editors."""
@@ -364,6 +369,14 @@ class MailHeaderEditableWidget(QScrollArea):
         if message.get("Bcc") or message.get("Reply-To"):
             self.more_headers_visible = True
             self.toggle_more_headers()
+            
+        # Extract message ID
+        message_id = message.get('Message-ID', '')
+        if message_id:
+            try:
+                self.message_id_loc, _ = message_id.split('@', 1)
+            except ValueError:
+                self.message_id_loc = None
 
     def get_header_values(self):
         """Return a dictionary of header field values."""

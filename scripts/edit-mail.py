@@ -146,10 +146,27 @@ class MailEditor(QMainWindow):
         self.attachments = []
         self.mail_file_path = Path(mail_file_path).expanduser() if mail_file_path else None
         self.draft_message = self.parse_draft_mail(self.mail_file_path) if self.mail_file_path else None
+        self.message_id_loc = None
         
         if self.draft_message is None and self.mail_file_path and self.mail_file_path.exists():
             self.close()
             return
+        
+        # Extract message ID before setting up UI
+        if self.draft_message:
+            message_id = self.draft_message.get('Message-ID', '')
+            if message_id:
+                try:
+                    self.message_id_loc, _ = message_id.split('@', 1)
+                except ValueError:
+                    # Generate a new message ID if splitting fails
+                    self.message_id_loc = email.utils.make_msgid().split('@')[0]
+            else:
+                # Generate a new message ID if none exists
+                self.message_id_loc = email.utils.make_msgid().split('@')[0]
+        else:
+            # Generate a new message ID for new messages
+            self.message_id_loc = email.utils.make_msgid().split('@')[0]
             
         self.setup_ui()
         self.setup_key_bindings()
@@ -209,12 +226,18 @@ class MailEditor(QMainWindow):
         top_bar_layout.addWidget(self.save_button)
         top_bar_layout.addWidget(self.send_button)
 
+        # Create header widget
+        self.headers_widget = MailHeaderEditableWidget(central_widget, config, self.draft_message)
+        # main_layout.addWidget(self.headers_widget)
+        
+        # Populate the "From" field with available identities
+        self.populate_from_field()
+
         self.splitter = QSplitter(Qt.Orientation.Vertical)
         main_layout.addWidget(self.splitter)
 
-        self.headers_widget = MailHeaderEditableWidget(central_widget, config, self.draft_message)
-        self.splitter.addWidget(self.headers_widget)
-        
+        self.splitter.addWidget( self.headers_widget );
+
         self.body_edit = QTextEdit()
         self.body_edit.setContentsMargins(0, 0, 0, 0)
         self.body_edit.setFont(config.text_font)
@@ -234,10 +257,11 @@ class MailEditor(QMainWindow):
         attachments_layout.addWidget(self.attachments_list)
         
         self.splitter.addWidget(attachments_group)
-        self.splitter.setSizes([400, 100])
+        self.splitter.setSizes([200, 400, 100])
 
-        self.splitter.setStretchFactor(0, 1)
-        self.splitter.setStretchFactor(1, 0)
+        self.splitter.setStretchFactor(0, 0)
+        self.splitter.setStretchFactor(1, 1)
+        self.splitter.setStretchFactor(2, 0)
         
         self.attachments_list.dragEnterEvent = self.dragEnterEvent
         self.attachments_list.dragMoveEvent = self.dragMoveEvent
@@ -271,6 +295,7 @@ class MailEditor(QMainWindow):
             self.addAction(discard_action)
             
     def populate_from_field(self):
+        """Populate the From field with available identities."""
         identities = config.get_setting("email_identities", "identities", [])
         from_options = []
         
@@ -281,10 +306,42 @@ class MailEditor(QMainWindow):
             elif isinstance(identity, str):
                 from_options.append((identity, identity))
         
+        # Pass the options to the header widget
         self.headers_widget.set_from_options(from_options)
+        
+        # If we have a draft message, set the current From value
+        if self.draft_message and 'From' in self.draft_message:
+            self.headers_widget.set_from_options(from_options, self.draft_message['From'])
+
+    def populate_from_draft(self):
+        """Populate body and attachments from the draft message."""
+        if not self.draft_message:
+            return
+            
+        # The headers are already populated by the MailHeaderEditableWidget
+        # Just populate the body and attachments
+        
+        # Find and set the body text
+        plain_text_body = ""
+        for part in self.draft_message.walk():
+            if part.get_content_type() == 'text/plain' and not part.get_filename():
+                plain_text_body = part.get_content()
+                break
+        self.body_edit.setPlainText(plain_text_body)
+
+        # Find and add any attachments
+        for part in self.draft_message.walk():
+            if part.get_content_disposition() == 'attachment':
+                filename = part.get_filename()
+                if filename:
+                    self.attachments.append(part)
+                    self.attachments_list.addItem(filename)
 
     def toggle_more_headers(self):
-        self.header_widget.toggle_more_headers()
+        """Toggle visibility of additional header fields."""
+        self.headers_widget.toggle_more_headers()
+        is_visible = any(self.headers_widget.editors[f].isVisible() for f in self.headers_widget.more_headers_fields)
+        self.more_headers_button.setText("Less Headers" if is_visible else "More Headers")
         
     def dragEnterEvent(self, event):
         if event.mimeData().hasUrls():
@@ -320,7 +377,7 @@ class MailEditor(QMainWindow):
         try:
             mimetype, _ = mimetypes.guess_type(file_path)
             if mimetype is None:
-                mimetype = 'application/octet-s'
+                mimetype = 'application/octet-stream'
             maintype, subtype = mimetype.split('/')
             
             with open(file_path, 'rb') as f:
@@ -374,17 +431,18 @@ class MailEditor(QMainWindow):
                 if references:
                     draft['References'] = references
 
+            # Get headers from our widget
             headers = self.headers_widget.get_header_values()
-        
+            
             # Set all headers from the widget
             for header_name, value in headers.items():
                 draft[header_name] = value
-            
+                
             # Get the From address for Message-ID
             from_address = email.utils.parseaddr(headers.get('From', ''))[1]
             domain = from_address.split('@')[1] if '@' in from_address else 'local.machine'
             draft['Message-ID'] = f"{self.message_id_loc}@{domain}"
-            
+
             draft.set_content(self.body_edit.toPlainText())
 
             for part in self.attachments:
@@ -393,7 +451,7 @@ class MailEditor(QMainWindow):
             with open(new_draft_path, 'wb') as tmp_file:
                 tmp_file.write(draft.as_bytes())
 
-            return new_draft_path;
+            return new_draft_path
 
         except Exception as e:
             display_error(self, "Draft Creation Error", f"Failed to save draft file:\n{e}")
@@ -402,12 +460,12 @@ class MailEditor(QMainWindow):
     def _save_draft(self):
         new_file_path = self._save_draft_in_new_file()
         if new_file_path: 
-            if os.path.exists( new_file_path ):
-                if self.mail_file_path.parent == new_file_path.parent:
-                    shutil.move( new_file_path, self.mail_file_path )
+            if os.path.exists(new_file_path):
+                if self.mail_file_path and self.mail_file_path.parent == new_file_path.parent:
+                    shutil.move(new_file_path, self.mail_file_path)
                 else:
                     if self.mail_file_path and self.mail_file_path.exists():
-                        os.remove( self.mail_file_path )
+                        os.remove(self.mail_file_path)
                     self.mail_file_path = new_file_path
                     logging.info(f"Draft saved to {self.mail_file_path}")
 
@@ -419,10 +477,10 @@ class MailEditor(QMainWindow):
         new_file_path = self._save_draft_in_new_file()
         if new_file_path:
             editor_path = os.path.join(os.path.dirname(__file__), "edit-mail.py")
-            if not ( os.path.exists( new_file_path ) and os.path.exists( editor_path ) ):
-                display_error(self, "Error", f"Could not find mail editor at {editor_path}" )
+            if not (os.path.exists(new_file_path) and os.path.exists(editor_path)):
+                display_error(self, "Error", f"Could not find mail editor at {editor_path}")
                 return
-            subprocess.Popen(["python3", editor_path, "--mail-file", new_file_path])
+            subprocess.Popen([sys.executable, editor_path, "--mail-file", str(new_file_path)])
  
     def send_message(self):
         self._save_draft()
@@ -436,7 +494,7 @@ class MailEditor(QMainWindow):
             self.close()
 
         except Exception as e:
-            display_error( self, "Send Error", f"Failed to send mail: {e}" )
+            display_error(self, "Send Error", f"Failed to send mail: {e}")
 
     def discard_draft(self):
         if self.mail_file_path and self.mail_file_path.exists():
