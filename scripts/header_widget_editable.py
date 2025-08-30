@@ -4,34 +4,34 @@ import sys
 import re
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QScrollArea,
-    QTextEdit, QGridLayout, QSizePolicy, QFrame, QHBoxLayout
+    QTextEdit, QGridLayout, QSizePolicy, QFrame, QHBoxLayout,
+    QPlainTextEdit, QLabel
 )
 from PySide6.QtGui import (
     QFont, QColor, QPainter, QTextCursor, QDrag, QTextCharFormat, 
-    QTextDocument, QPalette
+    QTextDocument, QPalette, QTextOption
 )
 from PySide6.QtCore import (
-    Qt, Signal, QMimeData, QPoint, QSize, QEvent, QRect
+    Qt, Signal, QMimeData, QPoint, QSize, QEvent, QRect, QMargins
 )
 
-# Import the real config instead of using a dummy
+# Import the real config
 from config import config
 
 # Shared comprehensive regex for RFC 5322 email addresses with or without display names
 EMAIL_ADDRESS_REGEX = re.compile(r'(?:"[^"]*"|[^,<>"])*?(?:<([^<>]+)>|([^,<>\s]+@[^,<>\s]+))')
 
 
-class AddressAwareTextEdit(QTextEdit):
+class TopAlignedTextEdit(QPlainTextEdit):
     """
-    A QTextEdit subclass that is aware of email addresses for drag-and-drop operations,
-    but otherwise behaves like a normal text editor.
+    A QPlainTextEdit subclass that ensures text is always aligned at the top.
+    QPlainTextEdit is better for this purpose as it handles top alignment naturally.
     """
     addressDragged = Signal(str)  # Signal emitted when an address is dragged
 
     def __init__(self, parent=None, read_only=False):
         super().__init__(parent)
-        self.setAcceptDrops(True)
-        self.setLineWrapMode(QTextEdit.WidgetWidth)
+        self.setLineWrapMode(QPlainTextEdit.WidgetWidth)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.setFrameStyle(QFrame.NoFrame)
@@ -40,13 +40,10 @@ class AddressAwareTextEdit(QTextEdit):
         # Set read-only state if requested
         self.setReadOnly(read_only)
         
-        # Enable rich text to allow for highlighting, but maintain plain text input
-        self.setAcceptRichText(False)
-        
         # Adjust minimum height to be single line by default
         self.document().documentLayout().documentSizeChanged.connect(self.adjustHeight)
         
-        # Drag support (only needed for editable fields)
+        # Drag support
         self.drag_start_position = None
         self.drag_address = None
         
@@ -55,13 +52,25 @@ class AddressAwareTextEdit(QTextEdit):
             palette = self.palette()
             palette.setColor(QPalette.Base, palette.color(QPalette.Window))
             self.setPalette(palette)
+            
+            # For right-aligned text in labels
+            if read_only:
+                option = QTextOption()
+                option.setAlignment(Qt.AlignRight | Qt.AlignTop)
+                self.document().setDefaultTextOption(option)
 
     def adjustHeight(self):
         """Adjust the height of the widget to fit the content."""
         margins = self.contentsMargins()
         doc_height = self.document().size().height() + margins.top() + margins.bottom() + 4
-        self.setMinimumHeight(min(doc_height, 100))  # Limit max height
-        self.setMaximumHeight(min(doc_height, 100))  # Limit max height
+        
+        # Ensure minimum height is enough for at least one line
+        font_metrics = self.fontMetrics()
+        min_height = font_metrics.height() + margins.top() + margins.bottom() + 4
+        
+        # Set height (with a reasonable maximum)
+        new_height = max(min_height, min(doc_height, 100))
+        self.setFixedHeight(new_height)
 
     def mousePressEvent(self, event):
         """Handle mouse press events for potential drag operations."""
@@ -142,7 +151,7 @@ class AddressAwareTextEdit(QTextEdit):
                 clean_text = re.sub(r'\s*,\s*,\s*', ', ', text)
                 clean_text = re.sub(r'^\s*,\s*|\s*,\s*$', '', clean_text)
                 if clean_text != text:
-                    self.setText(clean_text)
+                    self.setPlainText(clean_text)
         
         # Reset drag state
         self.drag_start_position = None
@@ -243,34 +252,30 @@ class MailHeaderEditableWidget(QScrollArea):
         
         for row, (label_text, editor_name) in enumerate(self.header_fields):
             # Create label using the same widget class but read-only
-            label_widget = AddressAwareTextEdit(read_only=True)
+            label_widget = TopAlignedTextEdit(read_only=True)
             label_widget.setFont(self.label_font)
             label_widget.setPlainText(label_text)
-            label_widget.setAlignment(Qt.AlignLeft | Qt.AlignTop)
             label_widget.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Preferred)
-            label_widget.setFixedWidth(120)  # Set a fixed width for all labels
-            label_widget.document().setDocumentMargin(0)
-            label_widget.setContentsMargins(0, 0, 4, 0)  # Right margin for spacing
-
+            label_widget.setFixedWidth(80)  # Set a fixed width for all labels
+            label_widget.setContentsMargins(0, 0, 5, 0)  # Add right margin for spacing
+            
             # Store reference to the label
             self.labels[editor_name + "_label"] = label_widget
             
             # Add to layout
-            self.layout.addWidget(label_widget, row, 0)
+            self.layout.addWidget(label_widget, row, 0, Qt.AlignTop)
             
             # Create editor
-            editor = AddressAwareTextEdit()
+            editor = TopAlignedTextEdit()
             editor.setFont(self.text_font)
             editor.setProperty("headerField", True)  # For styling
-            # editor.setAlignment(Qt.AlignTop)
-            editor.document().setDocumentMargin(0)
-            editor.setContentsMargins(4, 0, 0, 0)  # Left margin for spacing
-
+            editor.setContentsMargins(5, 0, 0, 0)  # Add left margin for spacing
+            
             # Store reference to the editor
             self.editors[editor_name] = editor
             
-            # Add to layout
-            self.layout.addWidget(editor, row, 1)
+            # Add to layout with explicit AlignTop alignment
+            self.layout.addWidget(editor, row, 1, Qt.AlignTop)
             
             # Connect signals for drag-and-drop coordination
             editor.addressDragged.connect(self.handle_address_dragged)
@@ -340,7 +345,7 @@ if __name__ == "__main__":
     msg = EmailMessage()
     msg["Subject"] = "Test Subject"
     msg["From"] = "John Doe <john@example.com>"
-    msg["To"] = "Jane Smith <jane@example.com>, Alice <alice@example.com>"
+    msg["To"] = "Jane Smith <jane@example.com>, Alice <alice@example.com>, Bob <bob@example.com>, Charlie <charlie@example.com>, David <david@example.com>, Eve <eve@example.com>"
     msg["Cc"] = "Bob <bob@example.com>"
     
     window = QMainWindow()
@@ -356,7 +361,7 @@ if __name__ == "__main__":
     layout.addWidget(header_widget)
     
     # Add a body text edit for comparison
-    body_edit = QTextEdit()
+    body_edit = QPlainTextEdit()
     body_edit.setFont(config.get_text_font())
     body_edit.setPlainText("This is the body of the email. You can type here just like in the header fields above.")
     layout.addWidget(body_edit)
