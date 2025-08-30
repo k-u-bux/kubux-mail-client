@@ -96,3 +96,36 @@ def create_new_mail_menu(parent):
     button_pos = parent.new_mail_button.mapToGlobal(QPoint(0, parent.new_mail_button.height()))
     menu.exec(button_pos)
 
+def create_draft_from_components_and_open_editor(parent, to_addrs, cc_addrs, subject_text, body_text, in_reply_to=None):
+    """
+    Creates a new mail draft and opens it in the external editor.
+    """
+    msg = email.message.EmailMessage()
+    msg['From'] = MY_EMAIL_ADDRESS
+    msg['To'] = ", ".join(to_addrs)
+    if cc_addrs:
+        msg['Cc'] = ", ".join(cc_addrs)
+
+    msg['Subject'] = subject_text
+    if in_reply_to:
+        msg['In-Reply-To'] = in_reply_to
+
+    msg.set_content(body_text)
+    create_draft_from_message_open_editor(parent, msg)
+
+def create_draft_from_message_open_editor(parent, msg):
+    try:
+        with tempfile.NamedTemporaryFile(mode='w+', delete=False, suffix=".eml") as temp_file:
+            temp_file.write(msg.as_string())
+            temp_path = temp_file.name
+
+        # Assuming edit-mail.py is in the same directory.
+        # You might need to adjust this path based on your project structure.
+        editor_path = os.path.join(os.path.dirname(__file__), "edit-mail.py")
+        if not os.path.exists(editor_path):
+            QMessageBox.critical(parent, "Error", f"Could not find mail editor at {editor_path}")
+            return
+
+        subprocess.Popen(["python3", editor_path, "--mail-file", temp_path])
+    except Exception as e:
+        QMessageBox.critical(parent, "Error", f"Failed to create or open draft: {e}")
