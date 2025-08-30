@@ -62,6 +62,8 @@ class AddressAwareTextEdit(QTextEdit):
         doc_height = self.document().size().height() + margins.top() + margins.bottom() + 4
         # self.setMinimumHeight(min(doc_height, 100))  # Limit max height
         # self.setMaximumHeight(min(doc_height, 100))  # Limit max height
+        self.setMinimumHeight( doc_height )  # Limit max height
+        self.setMaximumHeight( doc_height )  # Limit max height
 
     def mousePressEvent(self, event):
         """Handle mouse press events for potential drag operations."""
