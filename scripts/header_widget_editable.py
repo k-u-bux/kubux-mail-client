@@ -20,6 +20,30 @@ from config import config
 # Shared comprehensive regex for RFC 5322 email addresses with or without display names
 EMAIL_ADDRESS_REGEX = re.compile(r'(?:"[^"]*"|[^,<>"])*?(?:<([^<>]+)>|([^,<>\s]+@[^,<>\s]+))')
 
+def sanitize_email_list(address_text):
+    """
+    Sanitize a comma-separated list of email addresses.
+    
+    Fixes issues like multiple commas, extra whitespace, and ensures
+    consistent ", " formatting between addresses.
+    
+    Args:
+        address_text (str): The input text containing email addresses
+        
+    Returns:
+        str: Properly formatted list with addresses separated by ", "
+    """
+    if not address_text:
+        return ""
+        
+    # Step 1: Split the text by commas (this handles multiple commas)
+    addresses = address_text.split(',')
+    
+    # Step 2: Strip whitespace from each address and filter out empty ones
+    clean_addresses = [addr.strip() for addr in addresses if addr.strip()]
+    
+    # Step 3: Join with the standard ", " separator
+    return ", ".join(clean_addresses)
 
 class AddressAwareTextEdit(QTextEdit):
     """
@@ -277,24 +301,22 @@ class AddressAwareTextEdit(QTextEdit):
                 # Insert the properly formatted text
                 cursor.insertText(comma_handled_text)
                 
-                # Clean up any extra spaces/commas that may have been created
-                # This could happen when joining text creates patterns like ", , " or ",  ,"
+                # Save relative cursor position (as a percentage of text length)
                 full_text = self.toPlainText()
-                cleaned_text = re.sub(r'\s*,\s*,\s*', ', ', full_text)  # Replace multiple commas with single comma
-                cleaned_text = re.sub(r'^\s*,\s*', '', cleaned_text)     # Remove leading comma
-                cleaned_text = re.sub(r'\s*,\s*$', '', cleaned_text)     # Remove trailing comma
+                rel_pos = cursor.position() / len(full_text) if full_text else 0
                 
-                # Only update if cleaning actually changed something
-                if cleaned_text != full_text:
-                    # Save cursor position relative to the text
-                    rel_pos = cursor.position() / len(full_text) if full_text else 0
-                    
-                    # Update text
-                    self.setPlainText(cleaned_text)
+                # Apply the sanitization to the entire field
+                sanitized_text = sanitize_email_list(full_text)
+                
+                if sanitized_text != full_text:
+                    # Update the text field with properly sanitized content
+                    self.setPlainText(sanitized_text)
                     
                     # Restore cursor to approximately the same relative position
-                    new_pos = int(rel_pos * len(cleaned_text))
-                    new_pos = max(0, min(new_pos, len(cleaned_text)))
+                    new_text_length = len(sanitized_text)
+                    new_pos = int(rel_pos * new_text_length)
+                    new_pos = max(0, min(new_pos, new_text_length))
+                    
                     cursor = self.textCursor()
                     cursor.setPosition(new_pos)
                     self.setTextCursor(cursor)
