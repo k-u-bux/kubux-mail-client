@@ -257,7 +257,7 @@ class MailEditor(QMainWindow):
         attachments_layout.addWidget(self.attachments_list)
         
         self.splitter.addWidget(attachments_group)
-        self.splitter.setSizes([200, 400, 100])
+        self.splitter.setSizes([200, 700, 100])
 
         self.splitter.setStretchFactor(0, 0)
         self.splitter.setStretchFactor(1, 1)

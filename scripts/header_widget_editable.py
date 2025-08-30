@@ -245,6 +245,14 @@ class MailHeaderEditableWidget(QScrollArea):
         if message and message.get('Message-ID'):
             self.message_id_loc, _ = message.get('Message-ID').split('@', 1)
 
+    def _getWidthBold(self, text):
+        doc = QTextDocument()
+        bold_font = self.config.get_text_font()
+        bold_font.setBold(True)
+        doc.setDefaultFont(bold_font)
+        doc.setPlainText(f"{text} ")
+        return doc.idealWidth()
+
     def create_header_fields(self):
         """Create all header field labels and editors."""
         self.editors = {}  # Store references to editor widgets
@@ -266,7 +274,7 @@ class MailHeaderEditableWidget(QScrollArea):
             
             # Fixed width and size policy for label
             label_widget.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
-            label_widget.setFixedWidth(120)  # Set a fixed width for all labels
+            label_widget.setFixedWidth( self._getWidthBold( "Reply-To:" ) )  # Set a fixed width for all labels
             
             # Store reference to the label
             self.labels[editor_name + "_label"] = label_widget
