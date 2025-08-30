@@ -28,6 +28,7 @@ import secrets
 
 from config import config
 from common import display_error
+from header_widget_editable import MailHeaderEditableWidget
 
 # Set up basic logging to console
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -208,40 +209,12 @@ class MailEditor(QMainWindow):
         top_bar_layout.addWidget(self.save_button)
         top_bar_layout.addWidget(self.send_button)
 
-        headers_group_box = QWidget()
-        self.headers_layout = QFormLayout(headers_group_box)
-        self.headers_layout.setContentsMargins(0, 0, 0, 0)
-
-        self.from_combo = QComboBox()
-        self.populate_from_field()
-        
-        # Use our new custom widget for the address fields
-        self.to_edit = EmailAddressLineEdit()
-        self.cc_edit = EmailAddressLineEdit()
-        self.subject_edit = QLineEdit()
-        
-        self.headers_layout.addRow("From:", self.from_combo)
-        self.headers_layout.addRow("To:", self.to_edit)
-        self.headers_layout.addRow("Cc:", self.cc_edit)
-        self.headers_layout.addRow("Subject:", self.subject_edit)
-
-        self.more_headers_group = QGroupBox()
-        self.more_headers_layout = QFormLayout(self.more_headers_group)
-        
-        # Use the custom widget for Bcc as well
-        self.bcc_edit = EmailAddressLineEdit()
-        self.reply_to_edit = QLineEdit()
-        
-        self.more_headers_layout.addRow("Bcc:", self.bcc_edit)
-        self.more_headers_layout.addRow("Reply-To:", self.reply_to_edit)
-        self.more_headers_group.setVisible(False)
-        
-        main_layout.addWidget(headers_group_box)
-        main_layout.addWidget(self.more_headers_group)
-        
         self.splitter = QSplitter(Qt.Orientation.Vertical)
         main_layout.addWidget(self.splitter)
 
+        self.headers_widget = MailHeaderEditableWidget(central_widget, config, self.draft_message)
+        self.splitter.addWidget(self.headers_widget)
+        
         self.body_edit = QTextEdit()
         self.body_edit.setContentsMargins(0, 0, 0, 0)
         self.body_edit.setFont(config.text_font)
@@ -297,64 +270,21 @@ class MailEditor(QMainWindow):
             discard_action.triggered.connect(self.discard_draft)
             self.addAction(discard_action)
             
-    def populate_from_draft(self, draft_message=None):
-        if not draft_message and not self.draft_message:
-            return
-
-        message = draft_message or self.draft_message
-
-        # Populate the sender combo box based on the 'From' header
-        from_header = message.get('From', '')
-        if from_header:
-            from_addr = email.utils.parseaddr(from_header)[1]
-            _, from_domain = from_addr.split('@')
-            for i in range(self.from_combo.count()):
-                if self.from_combo.itemData(i) == from_addr:
-                    self.from_combo.setCurrentIndex(i)
-                    break
-        
-        message_id = message.get('Message-ID', '')
-        if not message_id:
-            message_id = email.utils.make_msgid(domain=from_domain)
-        self.message_id_loc, _ = message_id.split('@')
-            
-        self.to_edit.setText(message.get('To', ''))
-        self.cc_edit.setText(message.get('Cc', ''))
-        self.subject_edit.setText(message.get('Subject', ''))
-        
-        bcc = message.get('Bcc', '')
-        reply_to = message.get('Reply-To', '')
-        if bcc or reply_to:
-            self.bcc_edit.setText(bcc)
-            self.reply_to_edit.setText(reply_to)
-            self.toggle_more_headers()
-
-        plain_text_body = ""
-        for part in message.walk():
-            if part.get_content_type() == 'text/plain':
-                plain_text_body = part.get_content()
-                break
-        self.body_edit.setPlainText(plain_text_body)
-
-        for part in message.walk():
-            if part.get_content_disposition() == 'attachment':
-                filename = part.get_filename()
-                if filename:
-                    self.attachments_list.addItem(filename)
-
     def populate_from_field(self):
         identities = config.get_setting("email_identities", "identities", [])
+        from_options = []
+        
         for identity in identities:
             if isinstance(identity, dict) and "name" in identity and "email" in identity:
                 display_text = f"{identity['name']} <{identity['email']}>"
-                self.from_combo.addItem(display_text, identity['email'])
+                from_options.append((display_text, identity['email']))
             elif isinstance(identity, str):
-                self.from_combo.addItem(identity, identity)
+                from_options.append((identity, identity))
+        
+        self.headers_widget.set_from_options(from_options)
 
     def toggle_more_headers(self):
-        is_visible = self.more_headers_group.isVisible()
-        self.more_headers_group.setVisible(not is_visible)
-        self.more_headers_button.setText("Less Headers" if not is_visible else "More Headers")
+        self.header_widget.toggle_more_headers()
         
     def dragEnterEvent(self, event):
         if event.mimeData().hasUrls():
@@ -410,7 +340,10 @@ class MailEditor(QMainWindow):
 
     def _get_selected_identity_drafts_path(self):
         """Helper to get the drafts path for the currently selected identity."""
-        selected_email = self.from_combo.currentData()
+        headers = self.headers_widget.get_header_values()
+        from_header = headers.get('From', '')
+        selected_email = email.utils.parseaddr(from_header)[1]
+        
         identities = config.get_identities()
         for identity in identities:
             if identity.get('email') == selected_email:
@@ -441,22 +374,17 @@ class MailEditor(QMainWindow):
                 if references:
                     draft['References'] = references
 
-            from_address = email.utils.parseaddr(self.from_combo.currentText())[1]
+            headers = self.headers_widget.get_header_values()
+        
+            # Set all headers from the widget
+            for header_name, value in headers.items():
+                draft[header_name] = value
+            
+            # Get the From address for Message-ID
+            from_address = email.utils.parseaddr(headers.get('From', ''))[1]
             domain = from_address.split('@')[1] if '@' in from_address else 'local.machine'
             draft['Message-ID'] = f"{self.message_id_loc}@{domain}"
             
-            draft['From'] = self.from_combo.currentText()
-            if self.to_edit.text():
-                draft['To'] = self.to_edit.text()
-            if self.cc_edit.text():
-                draft['Cc'] = self.cc_edit.text()
-            if self.bcc_edit.text():
-                draft['Bcc'] = self.bcc_edit.text()
-            if self.reply_to_edit.text():
-                draft['Reply-To'] = self.reply_to_edit.text()
-            if self.subject_edit.text():
-                draft['Subject'] = self.subject_edit.text()
-
             draft.set_content(self.body_edit.toPlainText())
 
             for part in self.attachments:

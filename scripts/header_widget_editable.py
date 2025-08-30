@@ -4,7 +4,7 @@ import sys
 import re
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QScrollArea,
-    QTextEdit, QGridLayout, QSizePolicy, QFrame, QHBoxLayout
+    QTextEdit, QGridLayout, QSizePolicy, QFrame, QHBoxLayout, QComboBox
 )
 from PySide6.QtGui import (
     QFont, QColor, QPainter, QTextCursor, QDrag, QTextCharFormat, 
@@ -222,13 +222,17 @@ class MailHeaderEditableWidget(QScrollArea):
         
         # Define and create header fields
         self.header_fields = [
-            ("From:", "from_edit"),
-            ("To:", "to_edit"),
-            ("Cc:", "cc_edit"),
-            ("Bcc:", "bcc_edit"),
-            ("Reply-To:", "reply_to_edit"),
-            ("Subject:", "subject_edit")
+            ("From:", "from_edit", "combo"),  # Special case for "From:" - use combo box
+            ("To:", "to_edit", "text"),
+            ("Cc:", "cc_edit", "text"),
+            ("Bcc:", "bcc_edit", "text"),
+            ("Reply-To:", "reply_to_edit", "text"),
+            ("Subject:", "subject_edit", "text")
         ]
+        
+        # Track which fields should be shown in "more headers"
+        self.more_headers_fields = ["bcc_edit", "reply_to_edit"]
+        self.more_headers_visible = False
         
         self.create_header_fields()
         
@@ -241,8 +245,8 @@ class MailHeaderEditableWidget(QScrollArea):
         self.editors = {}  # Store references to editor widgets
         self.labels = {}   # Store references to label widgets
         
-        for row, (label_text, editor_name) in enumerate(self.header_fields):
-            # Create label using the same widget class but read-only
+        for row, (label_text, editor_name, editor_type) in enumerate(self.header_fields):
+            # Create label
             label_widget = AddressAwareTextEdit(read_only=True)
             label_widget.setFont(self.label_font)
             label_widget.setPlainText(label_text)
@@ -265,36 +269,81 @@ class MailHeaderEditableWidget(QScrollArea):
             # Add to layout WITH EXPLICIT ALIGNMENT FLAG
             self.layout.addWidget(label_widget, row, 0, Qt.AlignTop)
             
-            # Create editor
-            editor = AddressAwareTextEdit()
-            editor.setFont(self.text_font)
-            editor.setProperty("headerField", True)  # For styling
-            
-            # Critical: Set document margin to 0 to force text to the top
-            editor.document().setDocumentMargin(0)
+            # Create editor based on type
+            if editor_type == "combo":
+                # Create combo box for "From:" field
+                editor = QComboBox()
+                editor.setFont(self.text_font)
+                editor.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+                
+                # Make it tall enough to match other fields visually
+                editor.setMinimumHeight(30)
+            else:
+                # Create text editor for other fields
+                editor = AddressAwareTextEdit()
+                editor.setFont(self.text_font)
+                editor.setProperty("headerField", True)  # For styling
+                
+                # Critical: Set document margin to 0 to force text to the top
+                editor.document().setDocumentMargin(0)
+                
+                # Connect drag-and-drop signals (only for text editors)
+                editor.addressDragged.connect(self.handle_address_dragged)
             
             # Store reference to the editor
             self.editors[editor_name] = editor
             
+            # Set initial visibility based on more_headers setting
+            if editor_name in self.more_headers_fields:
+                editor.setVisible(self.more_headers_visible)
+                label_widget.setVisible(self.more_headers_visible)
+            
             # Add to layout WITH EXPLICIT ALIGNMENT FLAG
             self.layout.addWidget(editor, row, 1, Qt.AlignTop)
-            
-            # Connect signals for drag-and-drop coordination
-            editor.addressDragged.connect(self.handle_address_dragged)
         
         # Add a spacer at the bottom to push everything up
         self.layout.setRowStretch(len(self.header_fields), 1)
 
-    def handle_address_dragged(self, address):
-        """Handles notification that an address was dragged from one field to another."""
-        # This can be used for additional processing if needed
-        pass
+    def toggle_more_headers(self):
+        """Toggle the visibility of additional header fields."""
+        self.more_headers_visible = not self.more_headers_visible
+        
+        for field_name in self.more_headers_fields:
+            if field_name in self.editors:
+                self.editors[field_name].setVisible(self.more_headers_visible)
+                self.labels[field_name + "_label"].setVisible(self.more_headers_visible)
+        
+        return self.more_headers_visible
+
+    def set_from_options(self, from_options, current_value=None):
+        """Configure the From field with options from a dropdown."""
+        if "from_edit" in self.editors and isinstance(self.editors["from_edit"], QComboBox):
+            combo = self.editors["from_edit"]
+            combo.clear()
+            
+            for display_text, email_value in from_options:
+                combo.addItem(display_text, email_value)
+            
+            # Set current value if provided
+            if current_value:
+                for i in range(combo.count()):
+                    if combo.itemText(i) == current_value or combo.itemData(i) == current_value:
+                        combo.setCurrentIndex(i)
+                        break
 
     def populate_from_message(self, message):
         """Populate the header fields from an email message."""
+        # Handle the From field specially
+        from_header = message.get("From", "")
+        if from_header and "from_edit" in self.editors:
+            if isinstance(self.editors["from_edit"], QComboBox):
+                # For combo box, we'll set it through set_from_options later
+                self.current_from_value = from_header
+            else:
+                self.editors["from_edit"].setPlainText(from_header)
+        
         # Map message headers to editor fields
         header_mapping = {
-            "from_edit": message.get("From", ""),
             "to_edit": message.get("To", ""),
             "cc_edit": message.get("Cc", ""),
             "bcc_edit": message.get("Bcc", ""),
@@ -304,8 +353,17 @@ class MailHeaderEditableWidget(QScrollArea):
         
         # Set text for each editor
         for editor_name, value in header_mapping.items():
-            if editor_name in self.editors and value:
-                self.editors[editor_name].setPlainText(value)
+            if editor_name in self.editors:
+                if isinstance(self.editors[editor_name], AddressAwareTextEdit):
+                    self.editors[editor_name].setPlainText(value)
+                elif isinstance(self.editors[editor_name], QComboBox):
+                    # This should be handled by set_from_options
+                    pass
+                    
+        # Show more headers if they have content
+        if message.get("Bcc") or message.get("Reply-To"):
+            self.more_headers_visible = True
+            self.toggle_more_headers()
 
     def get_header_values(self):
         """Return a dictionary of header field values."""
@@ -324,17 +382,24 @@ class MailHeaderEditableWidget(QScrollArea):
         # Get values from each editor
         for editor_name, header_name in field_mapping.items():
             if editor_name in self.editors:
-                value = self.editors[editor_name].toPlainText().strip()
+                editor = self.editors[editor_name]
+                
+                if isinstance(editor, AddressAwareTextEdit):
+                    value = editor.toPlainText().strip()
+                elif isinstance(editor, QComboBox):
+                    value = editor.currentText().strip()
+                else:
+                    value = ""
+                    
                 if value:  # Only include non-empty headers
                     headers[header_name] = value
         
         return headers
-    
-    def set_from_options(self, from_options, current_value=None):
-        """Configure the From field with options from a dropdown."""
-        # If implementing a combo box for From, this would be modified
-        if "from_edit" in self.editors and current_value:
-            self.editors["from_edit"].setPlainText(current_value)
+
+    def handle_address_dragged(self, address):
+        """Handles notification that an address was dragged from one field to another."""
+        # This can be used for additional processing if needed
+        pass
 
 
 # Demo application
