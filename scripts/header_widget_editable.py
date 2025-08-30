@@ -5,7 +5,7 @@ import re
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QScrollArea,
     QTextEdit, QGridLayout, QSizePolicy, QFrame, QHBoxLayout,
-    QPlainTextEdit, QLabel
+    QLabel
 )
 from PySide6.QtGui import (
     QFont, QColor, QPainter, QTextCursor, QDrag, QTextCharFormat, 
@@ -22,89 +22,64 @@ from config import config
 EMAIL_ADDRESS_REGEX = re.compile(r'(?:"[^"]*"|[^,<>"])*?(?:<([^<>]+)>|([^,<>\s]+@[^,<>\s]+))')
 
 
-class TopAlignedTextEdit(QTextEdit):
+class HeaderLabel(QLabel):
+    """A simple label for header fields with right alignment."""
+    def __init__(self, text, parent=None):
+        super().__init__(text, parent)
+        self.setAlignment(Qt.AlignRight | Qt.AlignTop)
+        self.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Preferred)
+        self.setTextFormat(Qt.PlainText)
+
+
+class AddressAwareTextEdit(QTextEdit):
     """
-    A QTextEdit subclass that ensures text is always aligned at the top
-    and automatically adjusts its height to fit content.
+    A QTextEdit that knows about email addresses for drag-and-drop
+    but does not scroll internally.
     """
     addressDragged = Signal(str)  # Signal emitted when an address is dragged
-    heightChanged = Signal(int)   # Signal emitted when height changes
 
-    def __init__(self, parent=None, read_only=False):
+    def __init__(self, parent=None):
         super().__init__(parent)
         self.setAcceptRichText(False)
         self.setLineWrapMode(QTextEdit.WidgetWidth)
+        
+        # Critical: Disable scrollbars so we use parent scrollarea instead
         self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        
         self.setFrameStyle(QFrame.NoFrame)
         self.setTabChangesFocus(True)  # Tab moves to next field
         
-        # Set read-only state if requested
-        self.setReadOnly(read_only)
-        
-        # Force text to top by setting minimal document margin
+        # Force text to top by setting top document margin
         self.document().setDocumentMargin(0)
-        
-        # Connect to document change events to update height
-        self.document().contentsChanged.connect(self.adjustHeight)
         
         # Drag support
         self.drag_start_position = None
         self.drag_address = None
         
-        # Apply different background for read-only fields
-        if read_only:
-            palette = self.palette()
-            palette.setColor(QPalette.Base, palette.color(QPalette.Window))
-            self.setPalette(palette)
-            
-            # For right-aligned text in labels
-            document = self.document()
-            option = document.defaultTextOption()
-            option.setAlignment(Qt.AlignRight)
-            document.setDefaultTextOption(option)
-        
-        # Initial height adjustment
-        QApplication.instance().processEvents()
-        self.adjustHeight()
-
+        # Allow the widget to grow with content
+        self.document().documentLayout().documentSizeChanged.connect(self.updateGeometry)
+        self.setMinimumHeight(self.fontMetrics().height() + 10)
+    
     def sizeHint(self):
-        """Override sizeHint to provide height based on content."""
+        """Return size based on content."""
         size = super().sizeHint()
-        doc_size = self.document().size().toSize()
-        size.setHeight(doc_size.height() + 10)  # Add some padding
+        # Make sure our width is reasonable
+        size.setWidth(200)
+        # Calculate height based on document size
+        doc_height = self.document().size().height()
+        size.setHeight(doc_height + 10)  # Add some padding
         return size
-
-    def adjustHeight(self):
-        """Adjust the height of the widget to fit the content."""
-        # Get document size plus margins
-        doc_size = self.document().size().toSize()
-        margins = self.contentsMargins()
-        total_height = doc_size.height() + margins.top() + margins.bottom() + 4
-        
-        # Ensure minimum height is enough for at least one line
-        font_metrics = self.fontMetrics()
-        min_height = font_metrics.height() + margins.top() + margins.bottom() + 4
-        
-        # Use maximum between minimum height and content height
-        new_height = max(min_height, total_height)
-        
-        # Set a reasonable maximum height to prevent excessive growth
-        max_height = 150  # Maximum height for multi-line content
-        new_height = min(new_height, max_height)
-        
-        # Only update if height changed
-        if self.height() != new_height:
-            self.setMinimumHeight(new_height)
-            self.heightChanged.emit(new_height)
+    
+    def minimumSizeHint(self):
+        """Minimum size should be enough for one line plus padding."""
+        size = super().minimumSizeHint()
+        line_height = self.fontMetrics().height()
+        size.setHeight(line_height + 10)
+        return size
 
     def mousePressEvent(self, event):
         """Handle mouse press events for potential drag operations."""
-        if self.isReadOnly():
-            # Skip drag setup for read-only fields
-            super().mousePressEvent(event)
-            return
-            
         if event.button() == Qt.LeftButton:
             self.drag_start_position = event.pos()
             
@@ -129,11 +104,6 @@ class TopAlignedTextEdit(QTextEdit):
 
     def mouseMoveEvent(self, event):
         """Handle mouse move events to initiate drag operations."""
-        if self.isReadOnly():
-            # Skip drag operations for read-only fields
-            super().mouseMoveEvent(event)
-            return
-            
         if not self.drag_start_position or not (event.buttons() & Qt.LeftButton):
             super().mouseMoveEvent(event)
             return
@@ -185,11 +155,6 @@ class TopAlignedTextEdit(QTextEdit):
 
     def dropEvent(self, event):
         """Handle drop events for email addresses."""
-        if self.isReadOnly():
-            # Skip drop handling for read-only fields
-            event.ignore()
-            return
-            
         if event.mimeData().hasText():
             dropped_text = event.mimeData().text().strip()
             
@@ -229,24 +194,25 @@ class TopAlignedTextEdit(QTextEdit):
 class MailHeaderEditableWidget(QScrollArea):
     """
     A scrollable widget containing editable email header fields.
-    Each field behaves like a mini text editor similar to the body editor.
+    All fields share a single scrollbar from this QScrollArea.
     """
     def __init__(self, parent, config, message=None):
         super().__init__(parent)
         self.config = config
         self.message = message
         
-        # Setup scroll area
+        # Setup scroll area - this will provide THE ONLY scrollbar
         self.setWidgetResizable(True)
         self.setFrameStyle(QFrame.StyledPanel)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         
         # Container widget
-        container = QWidget()
-        self.setWidget(container)
+        self.container = QWidget()
+        self.setWidget(self.container)
         
         # Main layout
-        self.layout = QGridLayout(container)
+        self.layout = QGridLayout(self.container)
         self.layout.setContentsMargins(10, 10, 10, 10)
         self.layout.setSpacing(8)
         
@@ -274,49 +240,33 @@ class MailHeaderEditableWidget(QScrollArea):
     def create_header_fields(self):
         """Create all header field labels and editors."""
         self.editors = {}  # Store references to editor widgets
-        self.labels = {}   # Store references to label widgets
         
         for row, (label_text, editor_name) in enumerate(self.header_fields):
-            # Create label using the same widget class but read-only
-            label_widget = TopAlignedTextEdit(read_only=True)
-            label_widget.setFont(self.label_font)
-            label_widget.setPlainText(label_text)
-            label_widget.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Minimum)
-            label_widget.setFixedWidth(80)  # Set a fixed width for all labels
-            label_widget.setContentsMargins(0, 0, 5, 0)  # Add right margin for spacing
-            
-            # Store reference to the label
-            self.labels[editor_name + "_label"] = label_widget
-            
-            # Add to layout - align to top
-            self.layout.addWidget(label_widget, row, 0, Qt.AlignTop)
+            # Create label
+            label = HeaderLabel(label_text)
+            label.setFont(self.label_font)
+            label.setFixedWidth(80)  # Set a fixed width for all labels
+            self.layout.addWidget(label, row, 0, Qt.AlignTop)
             
             # Create editor
-            editor = TopAlignedTextEdit()
+            editor = AddressAwareTextEdit()
             editor.setFont(self.text_font)
             editor.setProperty("headerField", True)  # For styling
-            editor.setContentsMargins(5, 0, 0, 0)  # Add left margin for spacing
-            editor.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Minimum)
             
-            # Connect height changes to ensure labels stay aligned
-            editor.heightChanged.connect(lambda h, lbl=label_widget: self.sync_label_height(lbl, h))
+            # Allow the editor to expand with content
+            editor.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Minimum)
             
             # Store reference to the editor
             self.editors[editor_name] = editor
             
-            # Add to layout - align to top
-            self.layout.addWidget(editor, row, 1, Qt.AlignTop)
+            # Add to layout - align to top to ensure proper alignment with label
+            self.layout.addWidget(editor, row, 1)
             
             # Connect signals for drag-and-drop coordination
             editor.addressDragged.connect(self.handle_address_dragged)
         
         # Add a spacer at the bottom to push everything up
         self.layout.setRowStretch(len(self.header_fields), 1)
-
-    def sync_label_height(self, label_widget, height):
-        """Keep label height in sync with editor height for alignment."""
-        # This is optional but can help with alignment in some cases
-        pass
 
     def handle_address_dragged(self, address):
         """Handles notification that an address was dragged from one field to another."""
