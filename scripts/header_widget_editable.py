@@ -60,8 +60,8 @@ class AddressAwareTextEdit(QTextEdit):
         """Adjust the height of the widget to fit the content."""
         margins = self.contentsMargins()
         doc_height = self.document().size().height() + margins.top() + margins.bottom() + 4
-        self.setMinimumHeight(min(doc_height, 100))  # Limit max height
-        self.setMaximumHeight(min(doc_height, 100))  # Limit max height
+        # self.setMinimumHeight(min(doc_height, 100))  # Limit max height
+        # self.setMaximumHeight(min(doc_height, 100))  # Limit max height
 
     def mousePressEvent(self, event):
         """Handle mouse press events for potential drag operations."""
