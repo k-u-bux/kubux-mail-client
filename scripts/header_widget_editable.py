@@ -168,11 +168,15 @@ class AddressAwareTextEdit(QTextEdit):
                 # Check if the cursor is within an existing email address
                 text = self.toPlainText()
                 inside_address = False
+                address_start = None
+                address_end = None
                 
                 for match in EMAIL_ADDRESS_REGEX.finditer(text):
                     start, end = match.span()
                     if start < cursor_pos < end:  # Cursor is inside an address
                         inside_address = True
+                        address_start = start
+                        address_end = end
                         # Determine whether to move cursor before or after the address
                         if cursor_pos - start < end - cursor_pos:  # Closer to start
                             cursor.setPosition(start)
@@ -180,29 +184,121 @@ class AddressAwareTextEdit(QTextEdit):
                             cursor.setPosition(end)
                         break
                 
+                # Update cursor position after potential adjustment
                 self.setTextCursor(cursor)
-                cursor_pos = cursor.position()  # Update cursor_pos after potential adjustment
+                cursor_pos = cursor.position()
                 
-                # Insert the text at cursor position with proper comma formatting
+                # Now let's handle comma insertion properly
                 current_text = self.toPlainText()
                 
-                if current_text:
-                    # Check if we need to add a comma before or after
+                if not current_text:
+                    # Empty field, just insert the text
+                    comma_handled_text = dropped_text
+                else:
+                    # Check the position for proper comma handling
                     if cursor_pos == 0:
-                        # At start of text
-                        if not current_text.startswith(', '):
-                            dropped_text = dropped_text + ', '
+                        # At the beginning - ensure there's a comma after
+                        if text.startswith(',') or text.startswith(' '):
+                            # There's already a comma or space at the beginning
+                            comma_handled_text = dropped_text
+                        else:
+                            # Add a comma after the dropped text
+                            comma_handled_text = dropped_text + ', '
+                            
                     elif cursor_pos == len(current_text):
-                        # At end of text
-                        if not current_text.endswith(', '):
-                            dropped_text = ', ' + dropped_text
+                        # At the end - ensure there's a comma before
+                        if text.endswith(',') or text.endswith(' '):
+                            # There's already a comma or space at the end
+                            comma_handled_text = dropped_text
+                        else:
+                            # Add a comma before the dropped text
+                            comma_handled_text = ', ' + dropped_text
+                            
                     else:
-                        # In the middle - check surrounding characters
-                        if not (current_text[cursor_pos-1:cursor_pos] == ',' or 
-                                current_text[cursor_pos:cursor_pos+1] == ','):
-                            dropped_text = ', ' + dropped_text + ', '
+                        # In the middle - check both before and after
+                        # This is where we need to carefully check if we're at the boundary of an address
+                        
+                        # Check if we're right before an address
+                        at_start_of_address = False
+                        for match in EMAIL_ADDRESS_REGEX.finditer(text):
+                            if match.start() == cursor_pos:
+                                at_start_of_address = True
+                                break
+                        
+                        # Check if we're right after an address
+                        at_end_of_address = False
+                        for match in EMAIL_ADDRESS_REGEX.finditer(text):
+                            if match.end() == cursor_pos:
+                                at_end_of_address = True
+                                break
+                        
+                        # Get characters before and after
+                        char_before = text[cursor_pos-1:cursor_pos] if cursor_pos > 0 else ''
+                        char_after = text[cursor_pos:cursor_pos+1] if cursor_pos < len(text) else ''
+                        
+                        # Determine proper comma handling
+                        if at_start_of_address:
+                            # We're dropping right before an address
+                            if char_before == ',':
+                                # There's a comma before us, so just add the address
+                                comma_handled_text = dropped_text + ', '
+                            else:
+                                # No comma before us, we need to add one after
+                                comma_handled_text = dropped_text + ', '
+                                
+                        elif at_end_of_address:
+                            # We're dropping right after an address
+                            if char_after == ',':
+                                # There's a comma after us, so just add the address
+                                comma_handled_text = ', ' + dropped_text
+                            else:
+                                # No comma after us, we need to add one before
+                                comma_handled_text = ', ' + dropped_text
+                                
+                        else:
+                            # We're somewhere in the middle not directly adjacent to an address
+                            # Check if we're between commas
+                            has_comma_before = char_before == ','
+                            has_comma_after = char_after == ','
+                            
+                            if has_comma_before and has_comma_after:
+                                # Already have commas on both sides
+                                comma_handled_text = ' ' + dropped_text + ' '
+                            elif has_comma_before:
+                                # Only have comma before
+                                comma_handled_text = ' ' + dropped_text + ', '
+                            elif has_comma_after:
+                                # Only have comma after
+                                comma_handled_text = ', ' + dropped_text + ' '
+                            else:
+                                # No commas on either side
+                                comma_handled_text = ', ' + dropped_text + ', '
                 
-                cursor.insertText(dropped_text)
+                # Insert the properly formatted text
+                cursor.insertText(comma_handled_text)
+                
+                # Clean up any extra spaces/commas that may have been created
+                # This could happen when joining text creates patterns like ", , " or ",  ,"
+                full_text = self.toPlainText()
+                cleaned_text = re.sub(r'\s*,\s*,\s*', ', ', full_text)  # Replace multiple commas with single comma
+                cleaned_text = re.sub(r'^\s*,\s*', '', cleaned_text)     # Remove leading comma
+                cleaned_text = re.sub(r'\s*,\s*$', '', cleaned_text)     # Remove trailing comma
+                
+                # Only update if cleaning actually changed something
+                if cleaned_text != full_text:
+                    # Save cursor position relative to the text
+                    rel_pos = cursor.position() / len(full_text) if full_text else 0
+                    
+                    # Update text
+                    self.setPlainText(cleaned_text)
+                    
+                    # Restore cursor to approximately the same relative position
+                    new_pos = int(rel_pos * len(cleaned_text))
+                    new_pos = max(0, min(new_pos, len(cleaned_text)))
+                    cursor = self.textCursor()
+                    cursor.setPosition(new_pos)
+                    self.setTextCursor(cursor)
+                
                 event.accept()
                 event.setDropAction(Qt.MoveAction)
                 
@@ -211,7 +307,6 @@ class AddressAwareTextEdit(QTextEdit):
                 return
                 
         super().dropEvent(event)
-
 
 class MailHeaderEditableWidget(QScrollArea):
     """
