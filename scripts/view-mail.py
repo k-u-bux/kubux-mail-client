@@ -129,10 +129,10 @@ class MailViewer(QMainWindow):
         it is silently replaced with the $unseen tag.
         """
         current_tags = self.get_tags()
-        if '$new' in current_tags:
+        if '$unseen' in current_tags:
             logging.info("Found '$new' tag. Silently replacing with '$unseen'.")
             try:
-                command = ['notmuch', 'tag', '-new', '+unseen', f'id:{self.message_id}']
+                command = ['notmuch', 'tag', '-$unseen', '+$unused', f'id:{self.message_id}']
                 subprocess.run(command, check=True, capture_output=True, text=True)
             except subprocess.CalledProcessError as e:
                 logging.error(f"Failed to process initial tags: {e.stderr}")
