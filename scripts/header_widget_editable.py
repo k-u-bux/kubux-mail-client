@@ -92,6 +92,7 @@ class AddressAwareTextEdit(QTextEdit):
         self.completer.setWidget(self)
         self.completer.setCaseSensitivity(Qt.CaseInsensitive)
         self.completer.setCompletionMode(QCompleter.PopupCompletion)
+        self.completer.setFilterMode(Qt.MatchContains)
         self.completer.activated.connect(self.insert_completion)
         
         # Get autocomplete options from config
@@ -165,8 +166,18 @@ class AddressAwareTextEdit(QTextEdit):
             if self.completer and self.completer.popup() and self.completer.popup().isVisible():
                 # Keys that select the current completion
                 if key_event.key() in (Qt.Key_Enter, Qt.Key_Return, Qt.Key_Tab):
-                    self.completer.activated.emit(self.completer.currentCompletion())
-                    return True
+                    # Get the currently highlighted item from the popup
+                    current_index = self.completer.popup().currentIndex()
+                    if current_index.isValid():
+                        # Get the text of the highlighted item
+                        current_completion = self.completer.completionModel().data(current_index, Qt.DisplayRole)
+                        # Manually insert the selected completion
+                        self.insert_completion(current_completion)
+                        return True
+                    else:
+                        # If no item is highlighted, use the current completion
+                        self.completer.activated.emit(self.completer.currentCompletion())
+                        return True
                     
                 # Keys for navigation within the popup
                 if key_event.key() in (Qt.Key_Up, Qt.Key_Down, Qt.Key_PageUp, Qt.Key_PageDown):
@@ -190,11 +201,11 @@ class AddressAwareTextEdit(QTextEdit):
                         completion = model.data(completion_index, Qt.DisplayRole)
                         
                         # Insert it
-                        self.completer.activated.emit(completion)
+                        self.insert_completion(completion)
                         return True
         
         return super().eventFilter(obj, event)
-    
+        
     def handle_text_changed(self):
         """Called when the text content changes."""
         # Update autocomplete suggestions
@@ -276,7 +287,16 @@ class AddressAwareTextEdit(QTextEdit):
         # If Tab key pressed and completer is visible, use it for completion
         if hasattr(self, 'completer') and event.key() == Qt.Key_Tab and self.completer_active:
             if self.completer.popup().isVisible():
-                self.completer.activated.emit(self.completer.currentCompletion())
+                # Get the currently highlighted item
+                current_index = self.completer.popup().currentIndex()
+                if current_index.isValid():
+                    # Get the text of the highlighted item
+                    current_completion = self.completer.completionModel().data(current_index, Qt.DisplayRole)
+                    # Manually insert the selected completion
+                    self.insert_completion(current_completion)
+                else:
+                    # Fall back to current completion if nothing is highlighted
+                    self.completer.activated.emit(self.completer.currentCompletion())
                 event.accept()
                 return
                 
@@ -285,8 +305,8 @@ class AddressAwareTextEdit(QTextEdit):
             # This is handled in the event filter
             return
             
-        super().keyPressEvent(event)
-    
+        super().keyPressEvent(event)    
+
     def sanitize_email_list(self):
         """Clean up the email list formatting."""
         # Get current text
