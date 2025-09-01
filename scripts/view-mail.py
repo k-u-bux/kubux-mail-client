@@ -16,8 +16,9 @@ from PySide6.QtWidgets import (
     QFormLayout, QLabel, QInputDialog, QScrollArea, QDialog, QDialogButtonBox,
     QFileDialog, QSizePolicy
 )
-from PySide6.QtCore import Qt, QSize, Signal
-from PySide6.QtGui import QFont, QKeySequence, QAction
+from PySide6.QtCore import Qt, QSize, Signal, QUrl, QRegularExpression, QEvent
+from PySide6.QtGui import QFont, QKeySequence, QAction, QTextCursor, QTextCharFormat, QColor, QDesktopServices, QCursor
+
 import logging
 import subprocess
 import json
@@ -143,6 +144,7 @@ class MailViewer(QMainWindow):
         central_widget.setFont(config.get_interface_font())
         self.setCentralWidget(central_widget)
         main_layout = QVBoxLayout(central_widget)
+        main_layout.setContentsMargins(8, 8, 8, 8)
 
         # Top section for action buttons
         top_bar = QWidget()
@@ -213,6 +215,7 @@ class MailViewer(QMainWindow):
 
         # Splitter for Headers, Content, and Attachments
         self.splitter = QSplitter(Qt.Orientation.Vertical)
+        self.splitter.setContentsMargins(0, 0, 0, 0)
         main_layout.addWidget(self.splitter)
 
         # Mail Headers section as a GroupBox
@@ -286,6 +289,7 @@ class MailViewer(QMainWindow):
                 action.triggered.connect(func)
                 self.addAction(action)
 
+   
     def display_message(self):
         if not self.message:
             return
@@ -293,9 +297,189 @@ class MailViewer(QMainWindow):
         self.update_tags_ui()
 
         if self.is_html_body:
-            self.mail_content.setHtml( self.mail_body )
+            self.mail_content.setHtml(self.mail_body)
+            # For HTML content, Qt will automatically make links clickable
+            self.mail_content.setOpenLinks(False)  # Prevent automatic opening
+            self.mail_content.anchorClicked.connect(self.handle_link_clicked)
         else:
-            self.mail_content.setPlainText( self.mail_body )
+            self.mail_content.setPlainText(self.mail_body)
+            # For plain text, we need to detect URLs manually
+            self.highlight_urls_in_plain_text()
+        
+        # Set up cursor tracking to detect when hovering over URLs
+        self.mail_content.setCursorWidth(1)  # Ensure cursor is visible
+        self.mail_content.viewport().setCursor(Qt.IBeamCursor)  # Default cursor
+        
+        # Install event filter to track mouse movement and clicks
+        self.mail_content.viewport().installEventFilter(self)
+
+    def highlight_urls_in_plain_text(self):
+        """Find and highlight URLs in plain text content."""
+        # Comprehensive URL regex pattern
+        url_pattern = r'(https?://[^\s<>"]+|www\.[^\s<>"]+|file://[^\s<>"\[\]]+)'
+        
+        # Create a QRegularExpression for matching
+        url_regex = QRegularExpression(url_pattern)
+        
+        # Get the document from the QTextEdit
+        document = self.mail_content.document()
+        
+        # Create a format for highlighting URLs
+        url_format = QTextCharFormat()
+        url_format.setForeground(QColor("#0000FF"))  # Blue color for links
+        url_format.setUnderlineStyle(QTextCharFormat.SingleUnderline)
+        url_format.setProperty(QTextCharFormat.UserProperty, True)  # Mark as URL
+        
+        # Start finding all matches in the document
+        cursor = QTextCursor(document)
+        
+        while not cursor.isNull() and not cursor.atEnd():
+            # Search for the URL pattern
+            match = url_regex.match(document.toPlainText(), cursor.position())
+            
+            if not match.hasMatch():
+                break
+                
+            # Get the matched URL
+            url = match.captured(0)
+            start = match.capturedStart(0)
+            end = match.capturedEnd(0)
+            
+            # Select the text range
+            cursor.setPosition(start)
+            cursor.setPosition(end, QTextCursor.KeepAnchor)
+            
+            # Apply URL format
+            cursor.setCharFormat(url_format)
+            
+            # Store the URL as user data in the format
+            cursor.setPosition(end)
+            
+            # Update the cursor position to search for the next match
+            cursor.setPosition(end)
+    
+    def eventFilter(self, obj, event):
+        """
+        Filter events to handle mouse movement over and clicking on URLs.
+        """
+        if obj is self.mail_content.viewport():
+            if event.type() == QEvent.MouseMove:
+                # Check if cursor is over a URL
+                pos = event.pos()
+                cursor = self.mail_content.cursorForPosition(pos)
+                url = self.get_url_at_cursor(cursor)
+                
+                if url:
+                    # Change cursor to pointing hand when over a URL
+                    self.mail_content.viewport().setCursor(Qt.PointingHandCursor)
+                    self.mail_content.setToolTip(url)
+                else:
+                    # Reset cursor when not over a URL
+                    self.mail_content.viewport().setCursor(Qt.IBeamCursor)
+                    self.mail_content.setToolTip("")
+                    
+            elif event.type() == QEvent.MouseButtonPress:
+                # Handle mouse clicks on URLs
+                if event.button() == Qt.LeftButton:
+                    pos = event.pos()
+                    cursor = self.mail_content.cursorForPosition(pos)
+                    url = self.get_url_at_cursor(cursor)
+                    
+                    if url:
+                        self.handle_link_clicked(url)
+                        return True  # Event handled
+        
+        return super().eventFilter(obj, event)
+        
+    def get_url_at_cursor(self, cursor):
+        """
+        Determine if the cursor is positioned over a URL.
+        
+        Args:
+            cursor: QTextCursor at the position to check
+            
+        Returns:
+            str: The URL if cursor is over one, or None otherwise
+        """
+        # For HTML content, URLs are already detected by Qt
+        if self.is_html_body:
+            # Try to get anchor at this position
+            cursor_pos = self.mail_content.mapFromGlobal(QCursor.pos())
+            anchor = self.mail_content.anchorAt(cursor_pos)
+            if anchor:
+                return anchor
+            return None
+            
+        # For plain text, check if the cursor is within a text span with our URL format
+        format = cursor.charFormat()
+        
+        # Check if this format was marked as a URL
+        if format.hasProperty(QTextCharFormat.UserProperty):
+            # Get the text of the URL
+            # We need to select the entire URL by expanding to word boundaries
+            start_pos = cursor.position()
+            
+            # Move to the start of the word/URL
+            cursor.movePosition(QTextCursor.StartOfWord)
+            start = cursor.position()
+            
+            # Move to the end of the word/URL
+            cursor.movePosition(QTextCursor.EndOfWord)
+            end = cursor.position()
+            
+            # Select the URL text
+            cursor.setPosition(start)
+            cursor.setPosition(end, QTextCursor.KeepAnchor)
+            
+            url = cursor.selectedText()
+            
+            # Restore cursor position
+            cursor.setPosition(start_pos)
+            
+            return url
+            
+        return None
+            
+    def handle_link_clicked(self, url):
+        """Handle clicking on a URL by opening it in the default browser."""
+        if isinstance(url, str):
+            url = QUrl(url)
+            
+        # Check for relative URLs and convert them to absolute if needed
+        if url.isRelative():
+            # Try to determine base URL from message
+            base_url = None
+            for header in ["List-Post", "List-Id", "Reply-To", "From"]:
+                if self.message.get(header):
+                    domain = self.extract_domain_from_header(self.message.get(header))
+                    if domain:
+                        base_url = f"https://{domain}"
+                        break
+            
+            if base_url:
+                url = QUrl(base_url).resolved(url)
+        
+        # Validate the URL scheme for security
+        scheme = url.scheme().lower()
+        if scheme in ["http", "https", "file"]:
+            # Open the URL in the default browser or file handler
+            QDesktopServices.openUrl(url)
+        else:
+            # For security, only allow http, https, and file schemes
+            QMessageBox.warning(
+                self,
+                "Unsafe URL Scheme",
+                f"The URL uses an unsafe scheme: {scheme}://"
+                "\n\nOnly http://, https://, and file:// URLs can be opened."
+            )
+    
+    def extract_domain_from_header(self, header_value):
+        """Extract domain from email address in header."""
+        # Simple regex to extract domain from email
+        match = re.search(r'@([^>\s]+)', header_value)
+        if match:
+            return match.group(1)
+        return None
 
 
     def sanitize_html_fonts(self, html_content: str) -> str:
