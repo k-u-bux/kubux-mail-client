@@ -438,6 +438,7 @@ def main():
     args = parser.parse_args()
     
     app = QApplication(sys.argv)
+    app.setApplicationName( "Kubux Mail Client" )
     manager = DraftsManager(drafts_dir_path=args.drafts_dir)
     manager.show()
     sys.exit(app.exec())

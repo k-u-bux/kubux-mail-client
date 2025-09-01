@@ -514,6 +514,7 @@ def main():
     args = parser.parse_args()
     
     app = QApplication(sys.argv)
+    app.setApplicationName( "Kubux Mail Client" )
     editor = MailEditor(mail_file_path=args.mail_file)
     editor.show()
     sys.exit(app.exec())

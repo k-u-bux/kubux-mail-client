@@ -205,6 +205,7 @@ def main():
     args = parser.parse_args()
     
     app = QApplication(sys.argv)
+    app.setApplicationName( "Kubux Mail Client" )
     viewer = ThreadViewer(args.thread_id)
     viewer.show()
     sys.exit(app.exec())

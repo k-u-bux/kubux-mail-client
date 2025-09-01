@@ -51,7 +51,7 @@ process_batch() {
         message_id=$( python3 "$GET_MESSAGE_ID_SCRIPT" "$full_path" );
 
         if [[ -n "$message_id" ]]; then
-            tags_to_add='$unseen'
+            tags_to_add='+$unseen +$tagged'
             for tag in "${predicted_tags[@]}"; do
                 tags_to_add+=" +$tag"
             done
@@ -68,8 +68,7 @@ total_files=0
 batch=()
 
 # Get the list of new mail files and process them in batches
-# Correctly using 'tag:unread'
-notmuch search --output=files "tag:unread" | while IFS= read -r full_path; do
+while IFS= read -r full_path; do
     total_files=$((total_files + 1))
     batch+=("$full_path")
     # Process the batch if it reaches the batch size
@@ -77,8 +76,7 @@ notmuch search --output=files "tag:unread" | while IFS= read -r full_path; do
         process_batch "${batch[@]}"
         batch=() # Clear the array for the next batch
     fi
-done
-
+done < <(notmuch search --output=files not tag:'$tagged')
 # Process any remaining files in the last batch
 if [ ${#batch[@]} -gt 0 ]; then
     process_batch "${batch[@]}"

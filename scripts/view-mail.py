@@ -125,12 +125,12 @@ class MailViewer(QMainWindow):
 
     def process_initial_tags(self):
         """
-        Manages initial tag state. If a mail has the $new tag,
-        it is silently replaced with the $unseen tag.
+        Manages initial tag state. If a mail has the $unseen tag,
+        it is silently replaced with the $unused tag.
         """
         current_tags = self.get_tags()
         if '$unseen' in current_tags:
-            logging.info("Found '$new' tag. Silently replacing with '$unseen'.")
+            logging.info("Found '$unseen' tag. Silently replacing with '$unused'.")
             try:
                 command = ['notmuch', 'tag', '-$unseen', '+$unused', f'id:{self.message_id}']
                 subprocess.run(command, check=True, capture_output=True, text=True)
@@ -165,20 +165,20 @@ class MailViewer(QMainWindow):
         # Tags button with menu
         self.tags_button = QPushButton("Tags")
         self.tags_menu = QMenu(self)
-        self.tags_menu.addAction("Add/Remove Spam").triggered.connect(lambda: self.show_mock_action("Message will be tagged as +spam."))
-        self.tags_menu.addAction("Add/Remove Todo").triggered.connect(lambda: self.show_mock_action("Message will be tagged as +todo."))
-        self.tags_menu.addAction("Add/Remove Read").triggered.connect(lambda: self.show_mock_action("Message will be tagged as +read."))
+        for tag in config.get_tags():
+            l = lambda checked, dummy=f"{tag}": self.really_toggle_tag( dummy )
+            action = self.tags_menu.addAction(f"+/- {tag}")
+            action.triggered.connect( l )
         self.tags_menu.addSeparator()
-        self.tags_menu.addAction("Edit All Tags").triggered.connect(lambda: self.show_mock_action("Full tag management to be implemented."))
+        self.tags_menu.addAction("+/- spam").triggered.connect( lambda: self.really_toggle_tag("spam") )
+        self.tags_menu.addAction("+/- deleted").triggered.connect( lambda: self.really_toggle_tag("deleted") )
+        self.tags_menu.addSeparator()
+        self.tags_menu.addAction("Add Tags").triggered.connect( lambda: self.add_tag_dialog() )
         self.tags_button.setMenu(self.tags_menu)
         top_bar_layout.addWidget(self.tags_button)
 
-        self.delete_button = QPushButton("Delete")
-        self.delete_button.clicked.connect(lambda: self.show_mock_action("Message will be tagged as +deleted."))
-        top_bar_layout.addWidget(self.delete_button)
-
         self.view_thread_button = QPushButton("View Thread")
-        self.view_thread_button.clicked.connect(lambda: self.show_mock_action("Thread viewer to be implemented."))
+        self.view_thread_button.clicked.connect( lambda: self.view_thread() )
         top_bar_layout.addWidget(self.view_thread_button)
 
         self.toggle_header_visibility_button =  QPushButton("Hide Headers")
@@ -187,7 +187,12 @@ class MailViewer(QMainWindow):
         
         top_bar_layout.addStretch()
 
-        # Add the Quit button here to be flush right
+        self.delete_button = QPushButton("Delete")
+        self.delete_button.clicked.connect( lambda: self.delete_message() )
+        top_bar_layout.addWidget(self.delete_button)
+
+        top_bar_layout.addStretch()
+
         self.quit_button = QPushButton("Quit")
         self.quit_button.clicked.connect(self.close)
         top_bar_layout.addWidget(self.quit_button)
@@ -298,15 +303,31 @@ class MailViewer(QMainWindow):
         # This regex finds any font-size declaration in a style attribute and removes it.
         return re.sub(r'font-size:\s*[^;"]+;?', '', html_content, flags=re.IGNORECASE)
 
+    def delete_message(self):
+        self.add_tag("deleted")
+        self.close()
+
+    def view_thread(self):
+        if self.message_id:
+            command = ['notmuch', 'search', '--output=threads', '--format=text', f'id:{self.message_id} and (tag:spam or not tag:spam)']
+            result = subprocess.run(command, capture_output=True, text=True, check=True)
+            threads = result.stdout.strip().split('\n')
+            for thread_id in threads:
+                try:
+                    viewer_path = os.path.join(os.path.dirname(__file__), "view-thread.py")
+                    subprocess.Popen(["python3", viewer_path, thread_id.replace("thread:","")])
+                except Exception as e:
+                    display_error(self, "Error", f"Could not launch mail viewer: {e}")
+
     def get_tags(self):
         """Queries the notmuch database for tags of the current mail's message ID."""
         if not self.message_id:
             return []
         
         try:
-            command = ['notmuch', 'search', '--output=tags', '--format=text', f'id:{self.message_id}']
-            result = subprocess.run(command, capture_output=True, text=True, check=True)
-            
+            command = ['notmuch', 'search', '--output=tags', '--format=text', f'id:{self.message_id} and (tag:spam or not tag:spam)']
+            # command = ['notmuch', 'search', '--output=tags', '--format=text', f'id:{self.message_id}']
+            result = subprocess.run(command, capture_output=True, text=True, check=True)            
             tags_list = [tag.strip() for tag in result.stdout.strip().split('\n') if tag.strip()]
             self.tags = sorted(tags_list)
         except subprocess.CalledProcessError as e:
@@ -359,8 +380,6 @@ class MailViewer(QMainWindow):
         else:
             self.add_tag(tag)
 
-        self.update_tags_ui() # Refresh the UI to reflect the change
-
     def add_tag_dialog(self):
         """Opens a dialog to add new tags."""
         text, ok = QInputDialog.getText(self, "Add Tags", "Enter tag(s) to add (comma-separated):")
@@ -373,15 +392,26 @@ class MailViewer(QMainWindow):
     def remove_tag(self, tag):
         """Removes a tag from the current mail using the notmuch command."""
         try:
-            # Use the more reliable id:<message-id> query
-            command = ['notmuch', 'tag', f'-{tag}', f'id:{self.message_id}']
+            command = ['notmuch', 'tag', f'-{tag}', f'tag:{tag} and id:{self.message_id}']
             subprocess.run(command, check=True, capture_output=True, text=True)
             logging.info(f"Tag '{tag}' removed successfully.")
+            self.update_tags_ui()
         except subprocess.CalledProcessError as e:
             display_error("Failed to Remove Tag", f"Failed to remove tag '{tag}':\n\n{e.stderr}")
         except FileNotFoundError:
             display_eerro("Notmuch Not Found", "The 'notmuch' command was not found. Please ensure it is installed and in your PATH.")
     
+    def really_remove_tag(self, tag):
+        self.tags_state.pop(tag)
+        self.remove_tag(tag)
+
+    def really_toggle_tag(self, tag):
+        is_attached = self.tags_state.get(tag, False)
+        if is_attached:
+            self.really_remove_tag(tag)
+        else:
+            self.add_tag(tag)
+
     def add_tag(self, tag):
         """Adds a new tag to the current mail."""
         try:
@@ -389,6 +419,7 @@ class MailViewer(QMainWindow):
             command = ['notmuch', 'tag', f'+{tag}', f'id:{self.message_id}']
             subprocess.run(command, check=True, capture_output=True, text=True)
             logging.info(f"Tag '{tag}' added successfully.")
+            self.update_tags_ui()
         except subprocess.CalledProcessError as e:
             display_error("Failed to Add Tag", f"Failed to add tag '{tag}':\n\n{e.stderr}")
 
@@ -432,6 +463,22 @@ class MailViewer(QMainWindow):
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to create or open draft: {e}")
 
+    def all_involved(self):
+        sender = self.message.get("From")
+        sender_addr = getaddresses([sender])[0][1] if sender else ""
+        original_to = self.message.get("To", "")
+        original_cc = self.message.get("Cc", "")
+        all_recipients = {addr for name, addr in getaddresses([original_to, original_cc])}
+        if sender:
+            all_recipients.add(sender_addr)
+        return all_recipients
+        
+    def all_my_identities(self):
+        return { addr for addr in self.all_involved() if config.is_me( [addr] ) }
+
+    def all_other_identities(self):
+        return { addr for addr in self.all_involved() if not config.is_me( [addr] ) }
+
     def reply(self):
         """
         Creates a reply draft for the single sender.
@@ -443,7 +490,7 @@ class MailViewer(QMainWindow):
         sender_addr = getaddresses([sender])[0][1] if sender else ""
         
         to_list = [sender_addr]
-        cc_list = [MY_EMAIL_ADDRESS]
+        cc_list = list( self.all_my_identities() )
         
         original_subject = self.message.get("Subject", "")
         if not original_subject.lower().startswith("re:"):
@@ -470,17 +517,10 @@ class MailViewer(QMainWindow):
         
         sender = self.message.get("From")
         sender_addr = getaddresses([sender])[0][1] if sender else ""
-        
-        original_to = self.message.get("To", "")
-        original_cc = self.message.get("Cc", "")
-        
-        all_recipients = {addr for name, addr in getaddresses([original_to, original_cc])}
-        all_recipients.add(sender_addr)
-        
         to_list = [sender_addr]
-
+       
+        all_recipients = self.all_involved()
         all_recipients.discard(sender_addr)
-        all_recipients.discard(MY_EMAIL_ADDRESS)
         cc_list = list(all_recipients)
         
         original_subject = self.message.get("Subject", "")
@@ -508,7 +548,7 @@ class MailViewer(QMainWindow):
             return
 
         to_list = list(self.selected_addresses)
-        cc_list = [MY_EMAIL_ADDRESS]
+        cc_list = self.all_my_identities()
         
         original_subject = self.message.get("Subject", "")
         if not original_subject.lower().startswith("re:"):
@@ -540,6 +580,10 @@ class MailViewer(QMainWindow):
         if not self.message:
             return
 
+        to_list = []
+       
+        all_recipients = self.all_involved()
+        cc_list = list(all_recipients)
         # Prepare forwarded body
         headers = ["From", "To", "Cc", "Subject", "Date"]
         forwarded_body = f"---------- Forwarded message ----------\n"
@@ -561,7 +605,7 @@ class MailViewer(QMainWindow):
         else:
             subject = original_subject
 
-        self._create_draft_and_open_editor([], [], subject, forwarded_body)
+        self._create_draft_and_open_editor([], cc_list, subject, forwarded_body)
 
     def show_attachment_context_menu(self, pos):
         """Shows a context menu with actions for the clicked attachment."""
@@ -643,6 +687,7 @@ def main():
     args = parser.parse_args()
     
     app = QApplication(sys.argv)
+    app.setApplicationName( "Kubux Mail Client" )
     viewer = MailViewer(args.mail_file)
     viewer.show()
     sys.exit(app.exec())

@@ -24,6 +24,9 @@ class Config:
                 "text_font": "monospace",
                 "text_font_size": 12
             },
+            "tags": [
+                "todo", "done", "read"
+            ],
             "bindings": {
                 "quit_action": "Ctrl+Q",
                 "zoom_in": "Ctrl++",
@@ -107,6 +110,12 @@ class Config:
 
     def get_identities(self):
         return self.data.get("email_identities", {}).get("identities", [])
+
+    def get_tags(self):
+        return self.data.get("tags", {}).get("tags", [])
+
+    def get_autocompletions(self, category):
+        return self.data.get("autocomplete", {}).get(category, "headers")
 
     def is_me(self, address_string_list) -> bool:
         from_addresses = getaddresses(address_string_list)

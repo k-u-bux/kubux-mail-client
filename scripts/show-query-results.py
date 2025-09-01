@@ -280,6 +280,7 @@ def main():
     args = parser.parse_args()
     
     app = QApplication(sys.argv)
+    app.setApplicationName( "Kubux Mail Client" )
     viewer = QueryResultsViewer(args.query)
     viewer.show()
     sys.exit(app.exec())
