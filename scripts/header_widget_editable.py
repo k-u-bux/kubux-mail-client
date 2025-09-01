@@ -258,10 +258,6 @@ class AddressAwareTextEdit(QTextEdit):
         text_cursor.movePosition(QTextCursor.NextCharacter, QTextCursor.KeepAnchor)
         next_char = text_cursor.selectedText()
         
-        if not next_char or next_char not in [',', ' ']:
-            text_cursor.movePosition(QTextCursor.PreviousCharacter, QTextCursor.MoveAnchor)
-            text_cursor.insertText(", ")
-        
         self.setTextCursor(text_cursor)
         self.completer.popup().hide()
         
