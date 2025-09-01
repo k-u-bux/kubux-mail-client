@@ -114,7 +114,7 @@ class Config:
     def get_tags(self):
         return self.data.get("tags", {}).get("tags", [])
 
-    def get_autocompletions(self, category):
+    def get_autocompletions(self, category="headers"):
         return self.data.get("autocomplete", {}).get(category, "headers")
 
     def is_me(self, address_string_list) -> bool:

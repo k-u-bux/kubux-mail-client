@@ -4,14 +4,15 @@ import sys
 import re
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QScrollArea,
-    QTextEdit, QGridLayout, QSizePolicy, QFrame, QHBoxLayout, QComboBox
+    QTextEdit, QGridLayout, QSizePolicy, QFrame, QHBoxLayout, QComboBox,
+    QCompleter
 )
 from PySide6.QtGui import (
     QFont, QColor, QPainter, QTextCursor, QDrag, QTextCharFormat, 
-    QTextDocument, QPalette
+    QTextDocument, QPalette, QKeySequence, QShortcut
 )
 from PySide6.QtCore import (
-    Qt, Signal, QMimeData, QPoint, QSize, QEvent, QRect
+    Qt, Signal, QMimeData, QPoint, QSize, QEvent, QRect, QStringListModel
 )
 
 # Import the real config instead of using a dummy
@@ -48,7 +49,7 @@ def sanitize_email_list(address_text):
 class AddressAwareTextEdit(QTextEdit):
     """
     A QTextEdit subclass that is aware of email addresses for drag-and-drop operations,
-    but otherwise behaves like a normal text editor.
+    and provides autocomplete functionality for email addresses.
     """
     addressDragged = Signal(str)  # Signal emitted when an address is dragged
 
@@ -79,15 +80,238 @@ class AddressAwareTextEdit(QTextEdit):
             palette = self.palette()
             palette.setColor(QPalette.Base, palette.color(QPalette.Window))
             self.setPalette(palette)
+            return  # Skip autocomplete setup for read-only fields
+        
+        # Set up autocomplete functionality
+        self.setup_autocomplete()
+        
+    def setup_autocomplete(self):
+        """Set up autocomplete for email addresses"""
+        # Create completer
+        self.completer = QCompleter(self)
+        self.completer.setWidget(self)
+        self.completer.setCaseSensitivity(Qt.CaseInsensitive)
+        self.completer.setCompletionMode(QCompleter.PopupCompletion)
+        self.completer.activated.connect(self.insert_completion)
+        
+        # Get autocomplete options from config
+        self.update_autocomplete_model()
+        
+        # Install event filter to catch key events
+        self.installEventFilter(self)
+        
+        # Flag to track if completer is visible
+        self.completer_active = False
+        
+        # Connect signals
+        self.textChanged.connect(self.handle_text_changed)
+        
+        # Create keyboard shortcut for autocomplete
+        self.autocomplete_shortcut = QShortcut(QKeySequence("Ctrl+Space"), self)
+        self.autocomplete_shortcut.activated.connect(self.force_show_completer)
+    
+    def update_autocomplete_model(self):
+        """Update the completer with options from config"""
+        # Get autocomplete options from config
+        autocomplete_options = config.get_autocompletions()
+        
+        # Set the model for the completer
+        model = QStringListModel(autocomplete_options)
+        self.completer.setModel(model)
+        
+    def force_show_completer(self):
+        """Force the completer to show even if current word is short."""
+        text_cursor = self.textCursor()
+        
+        # Find the current word under cursor
+        pos = text_cursor.position()
+        text_cursor.movePosition(QTextCursor.StartOfWord, QTextCursor.MoveAnchor)
+        text_cursor.movePosition(QTextCursor.EndOfWord, QTextCursor.KeepAnchor)
+        
+        current_word = text_cursor.selectedText().strip()
+        
+        # Reset cursor position
+        text_cursor.setPosition(pos)
+        self.setTextCursor(text_cursor)
+        
+        # Update completer with more lenient criteria
+        rect = self.cursorRect()
+        rect.setWidth(self.completer.popup().sizeHintForColumn(0) + 
+                     self.completer.popup().verticalScrollBar().sizeHint().width())
+        
+        if current_word:  # Even if it's just 1 character
+            # Filter completions based on current text
+            self.completer.setCompletionPrefix(current_word)
+        else:
+            # If no current word, show all completions
+            self.completer.setCompletionPrefix("")
+            
+        # Show popup if there are completions
+        if self.completer.completionCount() > 0:
+            self.completer.complete(rect)
+            self.completer_active = True
+    
+    def eventFilter(self, obj, event):
+        """Filter events to handle key presses for the completer."""
+        if obj is self and event.type() == QEvent.KeyPress:
+            key_event = event
+            
+            # Handle key combinations
+            if key_event.modifiers() == Qt.ControlModifier and key_event.key() == Qt.Key_Space:
+                # Ctrl+Space - already handled by shortcut
+                return False
+                
+            # If completer popup is visible, handle navigation and selection keys
+            if self.completer and self.completer.popup() and self.completer.popup().isVisible():
+                # Keys that select the current completion
+                if key_event.key() in (Qt.Key_Enter, Qt.Key_Return, Qt.Key_Tab):
+                    self.completer.activated.emit(self.completer.currentCompletion())
+                    return True
+                    
+                # Keys for navigation within the popup
+                if key_event.key() in (Qt.Key_Up, Qt.Key_Down, Qt.Key_PageUp, Qt.Key_PageDown):
+                    # Pass these to the popup
+                    QApplication.sendEvent(self.completer.popup(), key_event)
+                    return True
+                    
+                # Escape closes the popup
+                if key_event.key() == Qt.Key_Escape:
+                    self.completer.popup().hide()
+                    return True
+                    
+                # Custom shortcut keys for selecting options
+                # Alt+1 through Alt+9 select items 1-9 in the completer
+                if key_event.modifiers() == Qt.AltModifier and Qt.Key_1 <= key_event.key() <= Qt.Key_9:
+                    index = key_event.key() - Qt.Key_1  # 0-based index
+                    if index < self.completer.completionCount():
+                        # Get the completion at the specified index
+                        model = self.completer.model()
+                        completion_index = model.index(index, 0)
+                        completion = model.data(completion_index, Qt.DisplayRole)
+                        
+                        # Insert it
+                        self.completer.activated.emit(completion)
+                        return True
+        
+        return super().eventFilter(obj, event)
+    
+    def handle_text_changed(self):
+        """Called when the text content changes."""
+        # Update autocomplete suggestions
+        if hasattr(self, 'completer'):
+            self.update_completer()
+        
+        # Adjust the height based on content
+        self.adjustHeight()
+    
+    def update_completer(self):
+        """Update the completer popup with relevant suggestions."""
+        text_cursor = self.textCursor()
+        
+        # Find the current word under cursor by moving to word boundaries
+        pos = text_cursor.position()
+        text_cursor.movePosition(QTextCursor.StartOfWord, QTextCursor.MoveAnchor)
+        text_cursor.movePosition(QTextCursor.EndOfWord, QTextCursor.KeepAnchor)
+        
+        current_word = text_cursor.selectedText().strip()
+        
+        # Only show completer if we have text to complete and it's at least 2 chars
+        if current_word and len(current_word) >= 2:
+            # Reset cursor position
+            text_cursor.setPosition(pos)
+            self.setTextCursor(text_cursor)
+            
+            # Update completer
+            rect = self.cursorRect()
+            rect.setWidth(self.completer.popup().sizeHintForColumn(0) + 
+                         self.completer.popup().verticalScrollBar().sizeHint().width())
+            
+            # Filter completions based on current text
+            self.completer.setCompletionPrefix(current_word)
+            
+            # Show popup if there are completions
+            if self.completer.completionCount() > 0:
+                self.completer.complete(rect)
+                self.completer_active = True
+            else:
+                self.completer.popup().hide()
+                self.completer_active = False
+        else:
+            self.completer.popup().hide()
+            self.completer_active = False
+    
+    def insert_completion(self, completion):
+        """Insert the selected completion into the text."""
+        if self.completer.widget() != self:
+            return
+            
+        text_cursor = self.textCursor()
+        
+        # Replace the current word with the completion
+        text_cursor.movePosition(QTextCursor.StartOfWord, QTextCursor.MoveAnchor)
+        text_cursor.movePosition(QTextCursor.EndOfWord, QTextCursor.KeepAnchor)
+        
+        # Insert completion and add a comma if not at the end
+        text_cursor.insertText(completion)
+        
+        # Check if we need to add a comma and space
+        text_cursor.movePosition(QTextCursor.NextCharacter, QTextCursor.KeepAnchor)
+        next_char = text_cursor.selectedText()
+        
+        if not next_char or next_char not in [',', ' ']:
+            text_cursor.movePosition(QTextCursor.PreviousCharacter, QTextCursor.MoveAnchor)
+            text_cursor.insertText(", ")
+        
+        self.setTextCursor(text_cursor)
+        self.completer.popup().hide()
+        
+        # Apply sanitization to ensure consistent formatting
+        self.sanitize_email_list()
 
     def adjustHeight(self):
         """Adjust the height of the widget to fit the content."""
         margins = self.contentsMargins()
         doc_height = self.document().size().height() + margins.top() + margins.bottom() + 4
-        # self.setMinimumHeight(min(doc_height, 100))  # Limit max height
-        # self.setMaximumHeight(min(doc_height, 100))  # Limit max height
-        self.setMinimumHeight( doc_height )  # Limit max height
-        self.setMaximumHeight( doc_height )  # Limit max height
+        self.setMinimumHeight(doc_height)
+        self.setMaximumHeight(doc_height)
+
+    def keyPressEvent(self, event):
+        """Override keyPressEvent to handle special keys."""
+        # If Tab key pressed and completer is visible, use it for completion
+        if hasattr(self, 'completer') and event.key() == Qt.Key_Tab and self.completer_active:
+            if self.completer.popup().isVisible():
+                self.completer.activated.emit(self.completer.currentCompletion())
+                event.accept()
+                return
+                
+        # Handle keyboard shortcuts for selecting completions
+        if hasattr(self, 'completer') and event.modifiers() == Qt.AltModifier and Qt.Key_1 <= event.key() <= Qt.Key_9:
+            # This is handled in the event filter
+            return
+            
+        super().keyPressEvent(event)
+    
+    def sanitize_email_list(self):
+        """Clean up the email list formatting."""
+        # Get current text
+        current_text = self.toPlainText()
+        
+        # Sanitize it
+        clean_text = sanitize_email_list(current_text)
+        
+        # Only update if it actually changed
+        if clean_text != current_text:
+            # Preserve cursor position
+            cursor = self.textCursor()
+            rel_pos = cursor.position() / max(1, len(current_text))
+            
+            # Update text
+            self.setPlainText(clean_text)
+            
+            # Restore cursor to approximately the same relative position
+            new_pos = min(int(rel_pos * len(clean_text)), len(clean_text))
+            cursor.setPosition(new_pos)
+            self.setTextCursor(cursor)
 
     def mousePressEvent(self, event):
         """Handle mouse press events for potential drag operations."""
@@ -229,30 +453,14 @@ class AddressAwareTextEdit(QTextEdit):
                 # Insert the text
                 cursor.insertText(comma_handled_text)
                 
-                # Save relative cursor position (as a percentage of text length)
-                full_text = self.toPlainText()
-                rel_pos = cursor.position() / len(full_text) if full_text else 0
-                
                 # Apply the sanitization to the entire field
-                sanitized_text = sanitize_email_list(full_text)
-                
-                # Update the text field with properly sanitized content
-                self.setPlainText(sanitized_text)
-                
-                # Restore cursor to approximately the same relative position
-                new_text_length = len(sanitized_text)
-                new_pos = int(rel_pos * new_text_length)
-                new_pos = max(0, min(new_pos, new_text_length))
-                
-                cursor = self.textCursor()
-                cursor.setPosition(new_pos)
-                self.setTextCursor(cursor)
-                
-                event.accept()
-                event.setDropAction(Qt.MoveAction)
+                self.sanitize_email_list()
                 
                 # Ensure the inserted text is visible
                 self.ensureCursorVisible()
+                
+                event.accept()
+                event.setDropAction(Qt.MoveAction)
                 return
                 
         super().dropEvent(event)
