@@ -691,7 +691,8 @@ class MailHeaderEditableWidget(QScrollArea):
             "cc_edit": "Cc",
             "bcc_edit": "Bcc",
             "reply_to_edit": "Reply-To",
-            "subject_edit": "Subject"
+            "subject_edit": "Subject",
+            "date_edit": "Date"
         }
         
         # Get values from each editor
