@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=Kubux Mail Client
+Comment=mail client based on notmuch
+Exec=manage-mail
+Icon=mail-client
+Terminal=false
+Type=Application
+Categories=Network;Email;
+Keywords=mail;email;e-mail;inbox;client;
+StartupNotify=true
