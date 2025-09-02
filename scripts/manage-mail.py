@@ -144,6 +144,13 @@ class QueryEditor(QMainWindow):
         top_bar_layout.addWidget(self.edit_drafts_button)
         
         top_bar_layout.addStretch()
+
+        self.edit_config_button = QPushButton("Edit Config")
+        self.edit_config_button.setFont(config.get_interface_font())
+        self.edit_config_button.clicked.connect(self.edit_config_action)
+        top_bar_layout.addWidget(self.edit_config_button)
+        
+        top_bar_layout.addStretch()
         
         self.quit_button = QPushButton("Quit")
         self.quit_button.setFont(config.get_interface_font())
@@ -578,6 +585,16 @@ class QueryEditor(QMainWindow):
         except Exception as e:
             logging.error(f"Failed to launch drafts manager: {e}")
             display_error(self, "Launch Error", f"Could not launch open-drafts.py:\n\n{e}")
+
+    def edit_config_action(self):
+        try:
+            subprocess.Popen(["xdg-open", config.config_path])
+            logging.info(f"Launched xdg-open {config.config_path}")
+        except Exception as e:
+            logging.error(f"Failed to launch config editor: {e}")
+            display_error(self, "Launch Error", f"Could not launch config editor:\n\n{e}")
+
+
 
 # --- Main Entry Point ---
 def main():
