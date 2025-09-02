@@ -2,6 +2,7 @@
 
 import sys
 import re
+import datetime
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QScrollArea,
     QTextEdit, QGridLayout, QSizePolicy, QFrame, QHBoxLayout, QComboBox,
@@ -518,11 +519,12 @@ class MailHeaderEditableWidget(QScrollArea):
             ("Cc:", "cc_edit", "text"),
             ("Bcc:", "bcc_edit", "text"),
             ("Reply-To:", "reply_to_edit", "text"),
-            ("Subject:", "subject_edit", "text")
+            ("Subject:", "subject_edit", "text"),
+            ("Date:", "date_edit", "text")
         ]
         
         # Track which fields should be shown in "more headers"
-        self.more_headers_fields = ["bcc_edit", "reply_to_edit"]
+        self.more_headers_fields = ["bcc_edit", "reply_to_edit", "date_edit"]
         self.more_headers_visible = False
         
         self.create_header_fields()
@@ -652,7 +654,8 @@ class MailHeaderEditableWidget(QScrollArea):
             "cc_edit": message.get("Cc", ""),
             "bcc_edit": message.get("Bcc", ""),
             "reply_to_edit": message.get("Reply-To", ""),
-            "subject_edit": message.get("Subject", "")
+            "subject_edit": message.get("Subject", ""),
+            "date_edit": f"{datetime.datetime.now(datetime.timezone.utc).strftime("%a, %d %b %Y %H:%M:%S %z")}"
         }
         
         # Set text for each editor
