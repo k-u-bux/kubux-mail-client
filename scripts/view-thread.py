@@ -78,11 +78,49 @@ class ThreadViewer(QMainWindow):
         self.results_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         self.results_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Interactive)
         self.results_table.verticalHeader().setVisible(False)
+        self.results_table.setSelectionMode(QAbstractItemView.MultiSelection)
         self.results_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.results_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.results_table.setSortingEnabled(True)
         self.results_table.doubleClicked.connect(self.open_selected_item)
+        # Enable context menu
+        self.results_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.results_table.customContextMenuRequested.connect(self.show_context_menu)
+
         main_layout.addWidget(self.results_table)
+
+    def show_context_menu(self, position):
+        """Show context menu with options to delete, edit, or execute a query."""
+        # Get the row and column at the context menu position
+        row = self.results_table.rowAt(position.y())
+        column = self.results_table.columnAt(position.x())
+        
+        # Skip if we're outside the table or on the empty input row
+        if row < 0 or column < 0 or row == 0:
+            return
+        
+        # Store the row and column for later use
+        self.context_menu_row = row
+        self.context_menu_column = column
+        
+        # Create context menu
+        context_menu = QMenu(self)
+        context_menu.setFont(config.get_text_font())
+        
+        selected_items = self.results_table.selectedItems();
+
+        # Add actions
+        open_action = QAction("Open", self)
+        if selected_items:
+            open_action.triggered.connect( self.open_selected_items )
+        else:
+            open_action.triggered.connect( lambda r=row: self.open_selected_row( r ) )
+        
+        # Add actions to menu in the preferred order
+        context_menu.addAction(open_action)
+        
+        # Show context menu at the right position
+        context_menu.exec(self.results_table.viewport().mapToGlobal(position))
 
     def showEvent(self, event):
         """Called when the widget is shown."""
@@ -182,10 +220,15 @@ class ThreadViewer(QMainWindow):
         else:
             return "to: " + message.get("headers", {}).get("To", "unknown <nobody@nowhere.net>")
 
+    def open_selected_items(self):
+        for row in list( set( [ item.row() for item in self.results_table.selectedItems() ] ) ):
+            self.open_selected_row( row )
+
     def open_selected_item(self, index):
-        """Launches the mail viewer based on the selected item."""
+        self.open_selected_row( index.row() )
         
-        mail_data = self.results_table.item(index.row(), 0).data(Qt.ItemDataRole.UserRole)
+    def open_selected_row(self, row):
+        mail_data = self.results_table.item(row, 0).data(Qt.ItemDataRole.UserRole)
             
         if mail_data:
             mail_file_path = mail_data.get("filename")
