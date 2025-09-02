@@ -68,6 +68,7 @@ def create_draft(parent, identity_dict):
             with open(draft_path, "w") as f:
                 f.write(f"From: {identity_dict['name']} <{identity_dict['email']}>\n")
                 f.write("To: \n")
+                f.write(f"Cc: {identity_dict['name']} <{identity_dict['email']}>\n")
                 f.write("Subject: \n\n")
 
         # Launch the mail editor on the new draft file

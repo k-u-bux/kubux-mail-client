@@ -299,8 +299,8 @@ class MailViewer(QMainWindow):
         if self.is_html_body:
             self.mail_content.setHtml(self.mail_body)
             # For HTML content, Qt will automatically make links clickable
-            self.mail_content.setOpenLinks(False)  # Prevent automatic opening
-            self.mail_content.anchorClicked.connect(self.handle_link_clicked)
+            # self.mail_content.setOpenLinks(False)  # Prevent automatic opening
+            # self.mail_content.anchorClicked.connect(self.handle_link_clicked)
         else:
             self.mail_content.setPlainText(self.mail_body)
             # For plain text, we need to detect URLs manually

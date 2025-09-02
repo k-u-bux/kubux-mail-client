@@ -47,6 +47,7 @@ class ThreadViewer(QMainWindow):
         central_widget.setFont(config.get_text_font())
         self.setCentralWidget(central_widget)
         main_layout = QVBoxLayout(central_widget)
+        main_layout.setContentsMargins(8, 8, 8, 8)
 
         # Top bar with buttons
         top_bar_layout = QHBoxLayout()

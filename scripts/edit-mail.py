@@ -190,6 +190,7 @@ class MailEditor(QMainWindow):
         central_widget.setFont(config.get_text_font())
         self.setCentralWidget(central_widget)
         main_layout = QVBoxLayout(central_widget)
+        main_layout.setContentsMargins(8, 8, 8, 8)
 
         top_bar = QWidget()
         top_bar_layout = QHBoxLayout(top_bar)

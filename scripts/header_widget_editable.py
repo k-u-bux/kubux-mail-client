@@ -2,7 +2,7 @@
 
 import sys
 import re
-import datetime
+import subprocess
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QScrollArea,
     QTextEdit, QGridLayout, QSizePolicy, QFrame, QHBoxLayout, QComboBox,
@@ -655,7 +655,7 @@ class MailHeaderEditableWidget(QScrollArea):
             "bcc_edit": message.get("Bcc", ""),
             "reply_to_edit": message.get("Reply-To", ""),
             "subject_edit": message.get("Subject", ""),
-            "date_edit": f"{datetime.datetime.now(datetime.timezone.utc).strftime("%a, %d %b %Y %H:%M:%S %z")}"
+            "date_edit": f"{subprocess.run( [ 'date', '-R' ], capture_output=True, text=True).stdout.strip('\n')}"
         }
         
         # Set text for each editor
