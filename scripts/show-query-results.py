@@ -70,7 +70,13 @@ class QueryResultsViewer(QMainWindow):
         self.refresh_button.clicked.connect(self.execute_query)
         top_bar_layout.addWidget(self.refresh_button)
 
-        # Spacer to push the quit button to the right
+        top_bar_layout.addStretch()
+
+        self.manager_button = QPushButton("Searches")
+        self.manager_button.setFont(config.get_interface_font())
+        self.manager_button.clicked.connect(self.launch__manager)
+        top_bar_layout.addWidget(self.manager_button)
+
         top_bar_layout.addStretch()
         
         # Quit button
@@ -317,6 +323,16 @@ class QueryResultsViewer(QMainWindow):
                     QMessageBox.critical(self, "Error", f"Could not launch mail viewer: {e}")
             else:
                 logging.warning("Could not find mail file path for selected row.")
+
+    def launch__manager(self):
+        try:
+            manager_path = os.path.join(os.path.dirname(__file__), "manage-mail.py")
+            subprocess.Popen(["python3", manager_path ])
+            logging.info(f"Launched manage-mail")
+        except Exception as e:
+            logging.error(f"Failed to launch mail manager: {e}")
+            display_error(self, "Launch Error", f"Could not launch manage-mail.py:\n\n{e}")
+
 
 # --- Main Entry Point ---
 def main():
