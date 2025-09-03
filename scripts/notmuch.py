@@ -108,3 +108,33 @@ def notmuch_search(query, output, sort, flag_error):
 def find_matching_threads(query, flag_error):
     list_of_threads = notmuch_search(query, "summary", "newest-first", flag_error)
     return list_of_threads
+
+
+
+def apply_tag_to_query(pm_tag, query, flag_error):
+    # notmuch tag <pm_tag> <query>
+    try:
+        command = [
+            'notmuch',
+            'tag',
+            f"{pm_tag}",
+            '--',
+            f"{query}"
+        ]
+        print(f"applying tag = {pm_tag} to query = {query}" )
+        result = subprocess.run(command, check=True)
+
+    except subprocess.CalledProcessError as e:
+        flag_error(
+            "Notmuch Query Failed",
+            f"An error occurred while running notmuch:\n\n{e.stderr}"
+        )
+        os.exit(1)
+
+    except Exception as e:
+        flag_error(
+            "Something happened.",
+            f"Caught Exception: {e}"
+        )
+        os.exit(1)
+
