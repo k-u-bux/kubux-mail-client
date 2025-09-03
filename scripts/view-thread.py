@@ -13,14 +13,14 @@ from datetime import datetime, timezone
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLineEdit, QPushButton, QTableWidget, QTableWidgetItem, QHeaderView,
-    QMessageBox, QDialog, QDialogButtonBox, QLabel, QTextEdit,
+    QMessageBox, QDialog, QDialogButtonBox, QLabel, QTextEdit, QInputDialog,
     QCheckBox, QAbstractItemView, QMenu
 )
 from PySide6.QtCore import Qt, QSize
 from PySide6.QtGui import QFont, QKeySequence, QAction
 import logging
 
-from notmuch import notmuch_show, flatten_message_tree, find_matching_messages, find_matching_threads
+from notmuch import notmuch_show, flatten_message_tree, find_matching_messages, find_matching_threads, apply_tag_to_query
 from config import config
 from common import display_error
 
@@ -111,13 +111,25 @@ class ThreadViewer(QMainWindow):
 
         # Add actions
         open_action = QAction("Open", self)
+        flag_action = QAction("+spam", self)
+        delete_action = QAction("Delete", self)
+        modify_action = QAction("Edit Tags", self)
         if selected_items:
             open_action.triggered.connect( self.open_selected_items )
+            flag_action.triggered.connect( self.flag_spam_selected_items )
+            delete_action.triggered.connect( self.delete_selected_items )
+            modify_action.triggered.connect( self.modify_selected_items )
         else:
             open_action.triggered.connect( lambda r=row: self.open_selected_row( r ) )
+            flag_action.triggered.connect( lambda r=row: self.flag_spam_row( r ) )
+            delete_action.triggered.connect( lambda r=row: self.delete_row( r ) )
+            modify_action.triggered.connect( lambda r=row: self.modify_row( r ) )
         
         # Add actions to menu in the preferred order
         context_menu.addAction(open_action)
+        context_menu.addAction(flag_action)
+        context_menu.addAction(delete_action)
+        context_menu.addAction(modify_action)
         
         # Show context menu at the right position
         context_menu.exec(self.results_table.viewport().mapToGlobal(position))
@@ -241,6 +253,65 @@ class ThreadViewer(QMainWindow):
                     QMessageBox.critical(self, "Error", f"Could not launch mail viewer: {e}")
             else:
                 logging.warning("Could not find mail file path for selected row.")
+
+    # other actions
+    def show_error(self, title, message):
+        display_error( self, title, message )
+
+    def row_to_query(self, row):
+        item_data = self.results_table.item(row, 0).data(Qt.ItemDataRole.UserRole)        
+        if self.view_mode == "threads":
+            thread_id = item_data.get("thread")
+            return f"thread:{thread_id}"
+        else:
+            message_id = item_data.get("id")
+            return f"id:{message_id}"
+
+    def apply_tag_to_row(self, pm_tag, row):
+        apply_tag_to_query( pm_tag, self.row_to_query(row), self.show_error )
+
+    def tag_dialog(self):
+        text, ok = QInputDialog.getText(self, "Tags", "+/-tag(s) (separated by commas):")
+        if ok and text:
+            return [t.strip() for t in text.split(',')]
+        return []
+
+    # spam
+    def flag_spam_row(self, row):
+        self.apply_tag_to_row("+spam", row)
+
+    def flag_spam_selected_items(self):
+        for row in list( set( [ item.row() for item in self.results_table.selectedItems() ] ) ):
+            self.flag_spam_row( row )
+
+    def flag_spam_selected_item(self, index):
+        row = index.row()
+        self.flag_spam_row( row )
+
+    # delete
+    def delete_row(self, row):
+        self.apply_tag_to_row("+delete", row)
+
+    def delete_selected_items(self):
+        for row in list( set( [ item.row() for item in self.results_table.selectedItems() ] ) ):
+            self.delete_row( row )
+
+    def delete_selected_item(self, index):
+        row = index.row()
+        self.delete_row( row )
+
+    # modify tags
+    def modify_selected_items(self):
+        tags = self.tag_dialog()
+        for row in list( set( [ item.row() for item in self.results_table.selectedItems() ] ) ):
+            for tag in tags:
+                self.apply_tag_to_row( tag, row )
+
+    def modify_row(self, index):
+        tags = self.tag_button()
+        row = index.row()
+        for tag in tags:
+            self.apply_tag_to_row( tag, row )
 
 # --- Main Entry Point ---
 def main():
