@@ -61,7 +61,7 @@
             chmod +x $out/bin/*.py
             # chmod +x $out/bin/*.sh
             chmod +x $out/bin/post-new
-            cp $src/scripts/decrypt-or-pass-through $out/bin/
+            chmod +x $out/bin/decrypt-or-pass-through
 
 	          # Copy the man page
 	          # cp kubux-mail-client.1 $out/share/man/man1
