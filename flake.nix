@@ -67,8 +67,8 @@
 
             # Make icons for all sizes
             for size in 16x16 22x22 24x24 32x32 48x48 64x64 96x96 128x128 192x192 256x256; do
- 	          mkdir -p $out/share/icons/hicolor/$size/apps
-	          magick convert $src/app-icon.png -resize $size $out/share/icons/hicolor/$size/apps/kubux-mail-client.png
+ 	            mkdir -p $out/share/icons/hicolor/$size/apps
+	            magick convert $src/app-icon.png -resize $size $out/share/icons/hicolor/$size/apps/kubux-mail-client.png
             done
           '';
           
