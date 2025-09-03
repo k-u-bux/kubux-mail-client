@@ -114,6 +114,12 @@ class Config:
     def get_tags(self):
         return self.data.get("tags", {}).get("tags", [])
 
+    def get_model(self):
+        path = self.data.get("predicting", {}).get("model", None)
+        if path:
+            path = Path( path ).expanduser()
+        return path
+
     def get_autocompletions(self, category="headers"):
         return self.data.get("autocomplete", {}).get(category, "headers")
 

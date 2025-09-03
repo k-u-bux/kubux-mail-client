@@ -7,6 +7,7 @@ from pathlib import Path
 import email
 from email import policy
 from typing import List
+from config import config
 
 def extract_email_text(file_path: Path) -> str:
     """
@@ -39,7 +40,7 @@ def extract_email_text(file_path: Path) -> str:
 
 def main():
     parser = argparse.ArgumentParser(description="Predict tags for email files using a trained model.")
-    parser.add_argument("--model", required=True, help="Path to the trained model file.")
+    parser.add_argument("--model", default=config.get_model(), help="Path to the trained model file.")
     parser.add_argument("mail_files", nargs='+', type=Path, help="Paths to the email files to classify.")
     args = parser.parse_args()
 

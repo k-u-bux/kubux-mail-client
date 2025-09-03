@@ -41,7 +41,7 @@ process_batch() {
     done
 
     # Call the AI classifier script and process its output
-    python3 "$AI_CLASSIFY_SCRIPT" --model "$MODEL_PATH" "${batch[@]}" | while IFS= read -r line; do
+    python3 "$AI_CLASSIFY_SCRIPT" "${batch[@]}" | while IFS= read -r line; do
         filename_and_tags=($line)
         filename=${filename_and_tags[0]}
         # The remaining elements are the predicted tags

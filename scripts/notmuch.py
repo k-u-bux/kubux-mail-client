@@ -138,3 +138,16 @@ def apply_tag_to_query(pm_tag, query, flag_error):
         )
         os.exit(1)
 
+def get_tags_from_query(query, flag_error):
+    try:
+        command = ['notmuch', 'search', '--output=tags', '--format=text', f'{query} and (tag:spam or not tag:spam)']
+        result = subprocess.run(command, capture_output=True, text=True, check=True)            
+        tags_list = [tag.strip() for tag in result.stdout.strip().split('\n') if tag.strip()]
+        tags = sorted(tags_list)
+    except subprocess.CalledProcessError as e:
+        flag_error(
+            "Notmuch Command Failed",
+            f"An error occurred while running notmuch:\n\n{e.stderr}\n\nCommand was: {' '.join(command)}"
+        )
+        tags = []
+    return tags
