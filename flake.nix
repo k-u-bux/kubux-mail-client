@@ -65,7 +65,7 @@
 	          # cp kubux-mail-client.1 $out/share/man/man1
 
             # Create wrapper using makeWrapper for proper desktop integration
-            for file in ai-classify ai-train edit-mail view-mail view-thread open-drafts manage-mail show-search-results send-mail get-message-id; do
+            for file in ai-classify ai-train edit-mail view-mail view-thread open-drafts manage-mail show-query-results send-mail get-message-id; do
               makeWrapper ${pythonEnv}/bin/python $out/bin/$file \
                 --add-flags "$out/bin/$file.py" \
                 --set-default TMPDIR "/tmp";
