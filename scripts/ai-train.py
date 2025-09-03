@@ -35,6 +35,8 @@ def filter(tag):
         return False
     if tag == "read":
         return False
+    if tag == "mark_for_training":
+        return False
     return True
 
 def extract_email_text(file_path: Path) -> str:
@@ -151,6 +153,8 @@ def main():
     }
     joblib.dump(model_data, args.model)
     print("Training complete.")
+
+    print( f"tags = {tag_list}" )
 
 def old_main():
     parser = argparse.ArgumentParser(description="Retrain an existing AI classifier with new data.")
