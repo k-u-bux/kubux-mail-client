@@ -8,3 +8,4 @@ Type=Application
 Categories=Network;Email;
 Keywords=mail;email;e-mail;inbox;client;
 StartupNotify=true
+StartupWMClass=KubuxMailClient

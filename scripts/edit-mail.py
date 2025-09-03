@@ -540,7 +540,8 @@ def main():
     app.installEventFilter(drag_filter)
     
     # go on
-    app.setApplicationName( "Kubux Mail Client" )
+    app.setApplicationDisplayName( "Kubux Mail Client" )
+    app.setApplicationName( "KubuxMailClient" )
     editor = MailEditor(mail_file_path=args.mail_file)
     editor.show()
     sys.exit(app.exec())
