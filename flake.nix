@@ -1,69 +1,106 @@
 {
-  description = "A Notmuch email client with AI pre-tagging";
+  description = "A Notmuch email client with predictive pre-tagging";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.05";
+    flake-utils.url = "github:numtide/flake-utils";
   };
 
-  outputs = { self, nixpkgs }: let
-    system = "x86_64-linux";
-    pkgs = nixpkgs.legacyPackages.${system};
-    pythonEnv = pkgs.python3.withPackages (pyPkgs: [
-      pyPkgs.pyside6
-      pyPkgs.notmuch
-      pyPkgs.scikit-learn
-      pyPkgs.toml
-      pyPkgs.watchdog
-      pyPkgs.mail-parser
-      pyPkgs.pytest
-    ]);
-  in {
-    apps.kubux-notmuch-mail-client = {
-      type = "app";
-      program = "${self.packages.${system}.kubux-notmuch-mail-client}/bin/kubux-notmuch-mail-client";
-    };
+  outputs = { self, nixpkgs, flake-utils }:
+    flake-utils.lib.eachDefaultSystem (system:
+      let
+        pkgs = nixpkgs.legacyPackages.${system};
+        pythonEnv = pkgs.python3.withPackages (pyPkgs: [
+          pyPkgs.pyside6
+          pyPkgs.notmuch
+          pyPkgs.scikit-learn
+          pyPkgs.toml
+          pyPkgs.watchdog
+          pyPkgs.mail-parser
+          pyPkgs.pytest
+        ]);
+      in {
+        packages.default = pkgs.stdenv.mkDerivation {
+          pname = "kubux-mail-client";
+          version = "0.1";
+          
+          src = ./.;
+          
+          buildInputs = [ 
+            pythonEnv 
+            pkgs.imagemagick 
+          ];
+          nativeBuildInputs = [ 
+            pkgs.makeWrapper
+            pythonEnv
+            pkgs.notmuch
+            pkgs.isync
+            pkgs.gnupg
+            pkgs.msmtp
+          ];
 
-    packages.${system}.kubux-notmuch-mail-client = pkgs.python3Packages.buildPythonApplication rec {
-      pname = "kubux-notmuch-mail-client";
-      version = "0.1.0";
+          installPhase = ''
+            mkdir -p $out/bin
+            mkdir -p $out/share/applications
+	          mkdir -p $out/share/man/man1
+	    
+            # Copy the Python scripts
+            cp $src/scripts/*.py $out/bin/
+            cp $src/scripts/*.jq $out/bin/
+            cp $src/scripts/post-new $out/bin/
+            chmod +x $out/bin/*.py
+            # chmod +x $out/bin/*.sh
+            chmod +x $out/bin/post-new
 
-      src = ./.;
+	          # Copy the man page
+	          # cp kubux-mail-client.1 $out/share/man/man1
 
-      buildInputs = [
-        pythonEnv
-        pkgs.notmuch
-        pkgs.isync
-        pkgs.gnupg
-        pkgs.msmtp
-      ];
-      
-      installPhase = ''
-        runHook preInstall
-        mkdir -p $out/lib/${pname}
-        cp -r core_library $out/lib/${pname}/
-      '';
-    };
+            # Create wrapper using makeWrapper for proper desktop integration
+            for file in ai-classify ai-train edit-mail view-mail view-thread open-drafts manage-mail; do
+              makeWrapper ${pythonEnv}/bin/python $out/bin/$file \
+                --add-flags "$out/bin/$file.py" \
+                --set-default TMPDIR "/tmp";
+	          done
+    
+            # Copy desktop file
+            cp kubux-mail-client.desktop $out/share/applications/
 
-    devShell.${system} = pkgs.mkShell {
-      buildInputs = [
-        pythonEnv
-        pkgs.isync
-        pkgs.poetry
-        pkgs.black
-        pkgs.isort
-        pkgs.mypy
-        pkgs.notmuch
-        pkgs.gnupg
-        pkgs.msmtp
-        pkgs.jq
-      ];
+            # Make icons for all sizes
+            for size in 16x16 22x22 24x24 32x32 48x48 64x64 96x96 128x128 192x192 256x256; do
+ 	          mkdir -p $out/share/icons/hicolor/$size/apps
+	          magick convert $src/app-icon.png -resize $size $out/share/icons/hicolor/$size/apps/kubux-mail-client.png
+            done
+          '';
+          
+          meta = with pkgs.lib; {
+            description = "A Notmuch email client with predictive pre-tagging";
+            homepage = "https://github.com/kubux/kubux-image-manager";
+            license = licenses.asl20;
+            maintainers = [ ];
+            platforms = platforms.linux;
+          };
+        };
 
-      shellHook = ''
-        echo "Welcome to the kubux-notmuch-mail-client development shell!"
-        echo "Python environment is ready with PySide6, Notmuch, Scikit-learn, and TOML."
-        echo "System tools like notmuch, mbsync, gpg, and msmtp are also available."
-        export KUBUIX_NOTMUCH_CONFIG_DIR=$HOME/.config/kubux-notmuch-mail-client
-      '';
-    };
-  };
+        devShells.default = pkgs.mkShell {
+          buildInputs = [
+            pythonEnv
+            pkgs.isync
+            pkgs.poetry
+            pkgs.black
+            pkgs.isort
+            pkgs.mypy
+            pkgs.notmuch
+            pkgs.gnupg
+            pkgs.msmtp
+            pkgs.jq
+          ];
+    
+          shellHook = ''
+            echo "Welcome to the kubux-notmuch-mail-client development shell!"
+            echo "Python environment is ready with PySide6, Notmuch, Scikit-learn, and TOML."
+            echo "System tools like notmuch, mbsync, gpg, and msmtp are also available."
+            export KUBUIX_NOTMUCH_CONFIG_DIR=$HOME/.config/kubux-notmuch-mail-client
+          '';
+        };
+      });   
 }
