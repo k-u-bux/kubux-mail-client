@@ -620,7 +620,7 @@ class MailViewer(QMainWindow):
         Creates a new mail draft and opens it in the external editor.
         """
         msg = email.message.EmailMessage()
-        msg['From'] = MY_EMAIL_ADDRESS
+        msg['From'] = self.my_first_identity()
         msg['To'] = ", ".join(to_addrs)
         if cc_addrs:
             msg['Cc'] = ", ".join(cc_addrs)
@@ -660,6 +660,12 @@ class MailViewer(QMainWindow):
     def all_my_identities(self):
         return { addr for addr in self.all_involved() if config.is_me( [addr] ) }
 
+    def my_first_identity(self):
+        dummy = list( self.all_my_identities() )
+        if dummy:
+            return dummy[0]
+        return ""
+
     def all_other_identities(self):
         return { addr for addr in self.all_involved() if not config.is_me( [addr] ) }
 
@@ -673,6 +679,8 @@ class MailViewer(QMainWindow):
         sender = self.message.get("From")
         sender_addr = getaddresses([sender])[0][1] if sender else ""
         
+        from_addr = self.my_first_identity()
+
         to_list = [sender_addr]
         cc_list = list( self.all_my_identities() )
         
