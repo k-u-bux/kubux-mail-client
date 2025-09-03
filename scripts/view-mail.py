@@ -365,7 +365,7 @@ class MailViewer(QMainWindow):
         if obj is self.mail_content.viewport():
             if event.type() == QEvent.MouseMove:
                 # Check if cursor is over a URL
-                pos = event.pos()
+                pos = event.position().toPoint()
                 cursor = self.mail_content.cursorForPosition(pos)
                 url = self.get_url_at_cursor(cursor)
                 
@@ -381,7 +381,7 @@ class MailViewer(QMainWindow):
             elif event.type() == QEvent.MouseButtonPress:
                 # Handle mouse clicks on URLs
                 if event.button() == Qt.LeftButton:
-                    pos = event.pos()
+                    pos = event.position().toPoint()
                     cursor = self.mail_content.cursorForPosition(pos)
                     url = self.get_url_at_cursor(cursor)
                     

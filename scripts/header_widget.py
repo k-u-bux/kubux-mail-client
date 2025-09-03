@@ -15,7 +15,7 @@ from PySide6.QtCore import (
 
 class MailHeaderTableWidget(QTableWidget):
     def mousePressEvent(self, event: QMouseEvent):
-        item = self.itemAt(event.pos())
+        item = self.itemAt(event.position().toPoint())
         if item and item.column() == 1:
             # Allow the base class to handle the event for column 1
             super().mousePressEvent(event)
@@ -97,7 +97,7 @@ class AddressDelegate(QStyledItemDelegate):
             doc.setPlainText(text)
             doc.setTextWidth(option.rect.width())
             
-            hit_point = event.pos() - option.rect.topLeft()
+            hit_point = event.position().toPoint() - option.rect.topLeft()
             
             char_pos = doc.documentLayout().hitTest(hit_point, Qt.HitTestAccuracy.ExactHit)
             

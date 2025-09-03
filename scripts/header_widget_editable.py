@@ -338,10 +338,10 @@ class AddressAwareTextEdit(QTextEdit):
             return
             
         if event.button() == Qt.LeftButton:
-            self.drag_start_position = event.pos()
+            self.drag_start_position = event.position().toPoint()
             
             # Check if cursor is within an email address
-            cursor = self.cursorForPosition(event.pos())
+            cursor = self.cursorForPosition(event.position().toPoint())
             cursor_pos = cursor.position()
             
             # Only set up for potential drag if no text is already selected
@@ -371,7 +371,7 @@ class AddressAwareTextEdit(QTextEdit):
             return
             
         # Check if the mouse has moved far enough to start a drag
-        if ((event.pos() - self.drag_start_position).manhattanLength() 
+        if ((event.position().toPoint() - self.drag_start_position).manhattanLength() 
                 < QApplication.startDragDistance()):
             super().mouseMoveEvent(event)
             return
@@ -427,7 +427,7 @@ class AddressAwareTextEdit(QTextEdit):
             
             # If it's an email address
             if EMAIL_ADDRESS_REGEX.fullmatch(dropped_text):
-                cursor = self.cursorForPosition(event.pos())
+                cursor = self.cursorForPosition(event.position().toPoint())
                 cursor_pos = cursor.position()
                 
                 # Check if the cursor is within an existing email address
