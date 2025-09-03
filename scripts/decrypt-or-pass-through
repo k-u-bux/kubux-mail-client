@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+
+# Use a temporary file to store the incoming stream
+# This allows it to be read multiple times.
+tempfile=$(mktemp)
+# Ensure the temporary file is deleted on exit
+trap 'rm -f "$tempfile"' EXIT
+
+# Read the entire stdin stream into the temporary file
+cat > "$tempfile"
+
+# Check if the message is valid GPG data from the temporary file
+if gpg --list-packets --dry-run "$tempfile" &>/dev/null; then
+  # If it is valid, decrypt the temporary file
+  gpg --decrypt "$tempfile"
+else
+  # Otherwise, cat the original content of the temporary file to stdout
+  cat "$tempfile"
+fi
