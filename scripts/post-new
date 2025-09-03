@@ -10,7 +10,7 @@ set -e
 # Define the directory where your scripts are located
 SCRIPT_DIR=$( dirname $( realpath "${BASH_SOURCE[0]}" ) )
 AI_CLASSIFY_SCRIPT="${SCRIPT_DIR}/ai-classify"
-GET_MESSAGE_ID_SCRIPT="${SCRIPT_DIR}/get-message-id.py"
+GET_MESSAGE_ID_SCRIPT="${SCRIPT_DIR}/get-message-id"
 MODEL_PATH="${SCRIPT_DIR}/classify.pkl"
 
 # Set the batch size
