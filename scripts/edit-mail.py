@@ -496,21 +496,21 @@ class MailEditor(QMainWindow):
     def clone_message(self):
         new_file_path = self._save_draft_in_new_file()
         if new_file_path:
-            editor_path = os.path.join(os.path.dirname(__file__), "edit-mail.py")
+            editor_path = os.path.join(os.path.dirname(__file__), "edit-mail")
             if not (os.path.exists(new_file_path) and os.path.exists(editor_path)):
                 display_error(self, "Error", f"Could not find mail editor at {editor_path}")
                 return
-            subprocess.Popen([sys.executable, editor_path, "--mail-file", str(new_file_path)])
+            subprocess.Popen([editor_path, "--mail-file", str(new_file_path)])
  
     def send_message(self):
         self._save_draft()
         try:
-            send_mail_path = Path(__file__).parent / "send-mail.py"
+            send_mail_path = Path(__file__).parent / "send-mail"
             if not send_mail_path.exists():
                 display_error(self, "Error", f"Could not find send mail script at {send_mail_path}")
                 return
 
-            subprocess.Popen([sys.executable, str(send_mail_path), str(self.mail_file_path)])
+            subprocess.Popen([str(send_mail_path), str(self.mail_file_path)])
             self.close()
 
         except Exception as e:

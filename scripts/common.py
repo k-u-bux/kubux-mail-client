@@ -72,8 +72,8 @@ def create_draft(parent, identity_dict):
                 f.write("Subject: \n\n")
 
         # Launch the mail editor on the new draft file
-        viewer_path = os.path.join(os.path.dirname(__file__), "edit-mail.py")
-        subprocess.Popen(["python3", viewer_path, "--mail-file", str(draft_path)])
+        viewer_path = os.path.join(os.path.dirname(__file__), "edit-mail")
+        subprocess.Popen([viewer_path, "--mail-file", str(draft_path)])
         logging.info(f"Launched mail editor for new draft: {draft_path}")
     except Exception as e:
         logging.error(f"Failed to create draft or launch editor: {e}")
@@ -122,11 +122,11 @@ def create_draft_from_message_open_editor(parent, msg):
 
         # Assuming edit-mail.py is in the same directory.
         # You might need to adjust this path based on your project structure.
-        editor_path = os.path.join(os.path.dirname(__file__), "edit-mail.py")
+        editor_path = os.path.join(os.path.dirname(__file__), "edit-mail")
         if not os.path.exists(editor_path):
             QMessageBox.critical(parent, "Error", f"Could not find mail editor at {editor_path}")
             return
 
-        subprocess.Popen(["python3", editor_path, "--mail-file", temp_path])
+        subprocess.Popen([editor_path, "--mail-file", temp_path])
     except Exception as e:
         QMessageBox.critical(parent, "Error", f"Failed to create or open draft: {e}")

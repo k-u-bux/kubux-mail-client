@@ -541,8 +541,8 @@ class QueryEditor(QMainWindow):
             final_query = query_expression
         
         try:
-            viewer_path = os.path.join(os.path.dirname(__file__), "show-query-results.py")
-            subprocess.Popen(["python3", viewer_path, "--query", final_query])
+            viewer_path = os.path.join(os.path.dirname(__file__), "show-query-results")
+            subprocess.Popen([viewer_path, "--query", final_query])
             logging.info(f"Launched query viewer with query: {final_query}")
         except Exception as e:
             logging.error(f"Failed to launch query viewer: {e}")
@@ -579,8 +579,8 @@ class QueryEditor(QMainWindow):
             drafts_path_str = identity_dict.get('drafts', "~/.local/share/kubux-mail-client/mail/drafts")
             drafts_path = Path(drafts_path_str).expanduser()
 
-            viewer_path = os.path.join(os.path.dirname(__file__), "open-drafts.py")
-            subprocess.Popen(["python3", viewer_path, "--drafts-dir", str(drafts_path)])
+            viewer_path = os.path.join(os.path.dirname(__file__), "open-drafts")
+            subprocess.Popen([viewer_path, "--drafts-dir", str(drafts_path)])
             logging.info(f"Launched drafts manager for directory: {drafts_path}")
         except Exception as e:
             logging.error(f"Failed to launch drafts manager: {e}")

@@ -418,8 +418,8 @@ class DraftsManager(QMainWindow):
             if not file_path:
                 return
 
-            editor_path = os.path.join(os.path.dirname(__file__), "edit-mail.py")
-            subprocess.Popen(["python3", editor_path, "--mail-file", file_path])
+            editor_path = os.path.join(os.path.dirname(__file__), "edit-mail")
+            subprocess.Popen([editor_path, "--mail-file", file_path])
             logging.info(f"Launched mail editor for draft: {file_path}")
         except Exception as e:
             logging.error(f"Failed to launch mail editor: {e}")
