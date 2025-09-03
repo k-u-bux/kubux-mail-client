@@ -28,6 +28,15 @@
           
           buildInputs = [ 
             pythonEnv 
+            pkgs.isync
+            pkgs.poetry
+            pkgs.black
+            pkgs.isort
+            pkgs.mypy
+            pkgs.notmuch
+            pkgs.gnupg
+            pkgs.msmtp
+            pkgs.jq
             pkgs.imagemagick 
           ];
           nativeBuildInputs = [ 
