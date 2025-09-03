@@ -16,7 +16,7 @@ from PySide6.QtWidgets import (
     QFormLayout, QLabel, QFileDialog, QSizePolicy, QMenu, QComboBox,
     QDialogButtonBox, QGroupBox
 )
-from PySide6.QtCore import Qt, QSize, QUrl, QMimeData
+from PySide6.QtCore import Qt, QSize, QUrl, QMimeData, QObject, QEvent
 from PySide6.QtGui import QFont, QAction, QKeySequence, QDrag
 import logging
 import mimetypes
@@ -32,6 +32,25 @@ from header_widget_editable import MailHeaderEditableWidget
 
 # Set up basic logging to console
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+# --- Cancel Drag ---
+
+class GlobalDragFilter(QObject):
+    def eventFilter(self, watched, event):
+        """Intercepts events to manage drag-and-drop state."""
+        
+        # Check for a mouse button release event
+        if event.type() == QEvent.Type.MouseButtonRelease:
+            if event.button() == Qt.MouseButton.LeftButton:
+                logging.info("Mouse release detected. Cancel active drag.")
+                # This will cancel any active drag operation, allowing
+                # the QDrag.exec() call to return.
+                QDrag.cancel()
+        
+        # Always return False so that the event continues to be processed
+        # by its intended target widget.
+        return False
+
 
 # --- Custom Widgets ---
 
@@ -515,6 +534,12 @@ def main():
     args = parser.parse_args()
     
     app = QApplication(sys.argv)
+
+    # Create the filter and install it on the application instance
+    drag_filter = GlobalDragFilter()
+    app.installEventFilter(drag_filter)
+    
+    # go on
     app.setApplicationName( "Kubux Mail Client" )
     editor = MailEditor(mail_file_path=args.mail_file)
     editor.show()
