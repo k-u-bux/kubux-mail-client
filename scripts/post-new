@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 
-# This script is a wrapper for the `notmuch` post-new hook.
-# It queries the notmuch database for newly imported messages (those with the 'unread' tag),
+# This script queries the notmuch database for newly imported messages (those with the 'unread' tag),
 # processes them in batches, and applies additional tags based on a classifier.
 
 # Exit immediately if a command exits with a non-zero status.
