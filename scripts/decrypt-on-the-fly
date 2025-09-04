@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+for file in $@; do
+    tempfile=$(mktemp)
+    # Ensure the temporary file is deleted on exit
+    trap 'rm -f "$tempfile"' EXIT
+    if gpg -d "$file" >"$tempfile" 2>/dev/null; then
+        mv "$tempfile" "$file"
+    else
+        rm "$tempfile"
+    fi
+done
