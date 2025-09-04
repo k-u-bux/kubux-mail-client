@@ -57,11 +57,13 @@
             cp $src/scripts/*.py $out/bin/
             cp $src/scripts/*.jq $out/bin/
             cp $src/scripts/predict-tags $out/bin/
-            cp $src/scripts/decrypt-or-pass-through $out/bin/
+            cp $src/scripts/decrypt-on-the-fly $out/bin/
+            cp $src/scripts/mbsync-and-decrypt $out/bin/
             chmod +x $out/bin/*.py
             # chmod +x $out/bin/*.sh
             chmod +x $out/bin/predict-tags
-            chmod +x $out/bin/decrypt-or-pass-through
+            chmod +x $out/bin/decrypt-on-the-fly
+            chmod +x $out/bin/mbsync-and-decrypt
 
 	          # Copy the man page
 	          # cp kubux-mail-client.1 $out/share/man/man1
