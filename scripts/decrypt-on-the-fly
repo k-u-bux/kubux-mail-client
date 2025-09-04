@@ -4,6 +4,11 @@ for file in $@; do
     # Ensure the temporary file is deleted on exit
     trap 'rm -f "$tempfile"' EXIT
     if gpg -d "$file" >"$tempfile" 2>/dev/null; then
+        key_temp=$(mktemp)
+        trap 'rm -f "$key_temp"' EXIT
+        if sed -n '/-----BEGIN PGP PUBLIC KEY BLOCK-----/,/-----END PGP PUBLIC KEY BLOCK-----/p' "$tempfile" > "$key_temp"; then
+            gpg --import "$key_temp" 2>/dev/null
+        fi
         mv "$tempfile" "$file"
     else
         rm "$tempfile"
