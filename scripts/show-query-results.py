@@ -413,7 +413,7 @@ def main():
     args = parser.parse_args()
     
     app = QApplication(sys.argv)
-    app.setApplicationDisplayName( "Kubux Mail Client" )
+    # app.setApplicationDisplayName( "Kubux Mail Client" )
     app.setApplicationName( "KubuxMailClient" )
     viewer = QueryResultsViewer(args.query)
     viewer.show()

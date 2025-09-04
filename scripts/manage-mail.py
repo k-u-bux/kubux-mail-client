@@ -599,7 +599,7 @@ class QueryEditor(QMainWindow):
 # --- Main Entry Point ---
 def main():
     app = QApplication(sys.argv)
-    app.setApplicationDisplayName( "Kubux Mail Client" )
+    # app.setApplicationDisplayName( "Kubux Mail Client" )
     app.setApplicationName( "KubuxMailClient" )
     editor = QueryEditor()
     editor.show()
