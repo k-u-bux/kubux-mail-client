@@ -1,0 +1,12 @@
+#! /usr/bin/env bash
+
+SCRIPT_DIR=$( dirname $( realpath "${BASH_SOURCE[0]}" ) )
+DECRYPT="${SCRIPT_DIR}/decrypt-on-the-fly"
+
+tempfile=$(mktemp)
+trap 'rm -f "$tempfile"' EXIT
+touch "$tempfile"
+
+mbsync -a -V
+
+find ${HOME}/.maildir -type f -newer "$tempfile" -exec "${DECRYPT}" {} \;
