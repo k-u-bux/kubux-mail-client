@@ -56,11 +56,11 @@
             # Copy the Python scripts
             cp $src/scripts/*.py $out/bin/
             cp $src/scripts/*.jq $out/bin/
-            cp $src/scripts/post-new $out/bin/
+            cp $src/scripts/predict-tags $out/bin/
             cp $src/scripts/decrypt-or-pass-through $out/bin/
             chmod +x $out/bin/*.py
             # chmod +x $out/bin/*.sh
-            chmod +x $out/bin/post-new
+            chmod +x $out/bin/predict-tags
             chmod +x $out/bin/decrypt-or-pass-through
 
 	          # Copy the man page
