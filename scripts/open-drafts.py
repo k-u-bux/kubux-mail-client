@@ -20,7 +20,7 @@ from PySide6.QtWidgets import (
     QAbstractItemView, QMenu
 )
 from PySide6.QtCore import Qt, QSize, QTimer, QObject, Signal, QThread
-from PySide6.QtGui import QFont
+from PySide6.QtGui import QFont, QAction
 
 # Import watchdog for directory monitoring
 from watchdog.observers import Observer
@@ -197,8 +197,49 @@ class DraftsManager(QMainWindow):
 
         self.drafts_table.cellDoubleClicked.connect(self.open_selected_draft)
 
+        # Enable context menu
+        self.drafts_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.drafts_table.customContextMenuRequested.connect(self.show_context_menu)
+
         main_layout.addWidget(self.drafts_table)
     
+    def show_context_menu(self, position):
+        """Show context menu with options to delete, edit, or execute a query."""
+        # Get the row and column at the context menu position
+        row = self.drafts_table.rowAt(position.y())
+        column = self.drafts_table.columnAt(position.x())
+        
+        # Skip if we're outside the table or on the empty input row
+        if row < 0 or column < 0 or row == 0:
+            return
+        
+        # Store the row and column for later use
+        self.context_menu_row = row
+        self.context_menu_column = column
+        
+        # Create context menu
+        context_menu = QMenu(self)
+        context_menu.setFont(config.get_text_font())
+        
+        selected_items = self.drafts_table.selectedItems();
+
+        # Add actions
+        open_action = QAction("Open", self)
+        delete_action = QAction("Delete", self)
+        if selected_items:
+            open_action.triggered.connect( self.open_selected_items )
+            delete_action.triggered.connect( self.delete_selected_items )
+        else:
+            open_action.triggered.connect( lambda r=row: self.open_row( r ) )
+            delete_action.triggered.connect( lambda r=row: self.delete_row( r ) )
+        
+        # Add actions to menu in the preferred order
+        context_menu.addAction(open_action)
+        context_menu.addAction(delete_action)
+        
+        # Show context menu at the right position
+        context_menu.exec(self.drafts_table.viewport().mapToGlobal(position))
+
     def adjust_initial_column_widths(self):
         """Adjust initial column widths once the UI is visible."""
         total_width = self.drafts_table.width()
@@ -408,8 +449,10 @@ class DraftsManager(QMainWindow):
         create_new_mail_menu(self)
 
     def open_selected_draft(self, row, column):
-        """Opens the selected draft file in edit-mail.py."""
-        try:
+        self.open_row(row)
+
+    def open_row(self, row):
+       try:
             file_path_item = self.drafts_table.item(row, 0)
             if not file_path_item:
                 return
@@ -421,11 +464,36 @@ class DraftsManager(QMainWindow):
             editor_path = os.path.join(os.path.dirname(__file__), "edit-mail")
             subprocess.Popen([editor_path, "--mail-file", file_path])
             logging.info(f"Launched mail editor for draft: {file_path}")
-        except Exception as e:
+       except Exception as e:
             logging.error(f"Failed to launch mail editor: {e}")
             logging.debug(traceback.format_exc())
             display_error(self, "Launch Error", f"Could not launch edit-mail.py:\n\n{e}")
     
+    def open_selected_items(self):
+        for row in list( set( [ item.row() for item in self.drafts_table.selectedItems() ] ) ):
+            self.open_row( row )
+    
+    # delete
+    def delete_row(self, row):
+       try:
+            file_path_item = self.drafts_table.item(row, 0)
+            if not file_path_item:
+                return
+                
+            file_path = file_path_item.data(Qt.ItemDataRole.UserRole)
+            if not file_path:
+                return
+
+            os.remove( file_path )
+            logging.info(f"Deleted draft: {file_path}")
+       except Exception as e:
+            logging.error(f"Failed to delete draft: {e}")
+            logging.debug(traceback.format_exc())
+ 
+    def delete_selected_items(self):
+        for row in list( set( [ item.row() for item in self.drafts_table.selectedItems() ] ) ):
+            self.delete_row( row )
+
     def resizeEvent(self, event):
         """Handle window resize events to adjust column widths."""
         super().resizeEvent(event)

@@ -50,7 +50,7 @@ process_batch() {
         message_id=$( $GET_MESSAGE_ID_SCRIPT "$full_path" );
 
         if [[ -n "$message_id" ]]; then
-            tags_to_add='+$unseen +$tagged'
+            tags_to_add='+$unseen +$tagged +unread'
             for tag in "${predicted_tags[@]}"; do
                 tags_to_add+=" +$tag"
             done
