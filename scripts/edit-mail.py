@@ -5,6 +5,8 @@ import argparse
 import os
 import email
 from email.message import EmailMessage
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 from email.utils import formataddr, getaddresses
 from email import policy
 from pathlib import Path
