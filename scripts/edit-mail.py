@@ -441,7 +441,16 @@ class MailEditor(QMainWindow):
             new_draft_filename = f"{timestamp_str}-{random_component}.eml"
             new_draft_path = ( drafts_dir / new_draft_filename ).expanduser()
 
-            draft = email.message.EmailMessage()
+            if self.attachments:
+                draft = MIMEMultipart()
+                body_part = MIMEText(self.body_edit.toPlainText(), 'plain', 'utf-8')
+                draft.attach(body_part)
+                for part in self.attachments:
+                    draft.attach(part)
+            else:
+                # Case 2: No attachments, use a simple EmailMessage
+                draft = email.message.EmailMessage()
+                draft.set_content(self.body_edit.toPlainText(), 'plain', 'utf-8')
             
             if self.draft_message:
                 in_reply_to = self.draft_message.get('In-Reply-To')
@@ -462,11 +471,6 @@ class MailEditor(QMainWindow):
             from_address = email.utils.parseaddr(headers.get('From', ''))[1]
             domain = from_address.split('@')[1] if '@' in from_address else 'local.machine'
             draft['Message-ID'] = f"{self.message_id_loc}@{domain}"
-
-            draft.set_content(self.body_edit.toPlainText())
-
-            for part in self.attachments:
-                draft.attach(part)
             
             with open(new_draft_path, 'wb') as tmp_file:
                 tmp_file.write(draft.as_bytes())
