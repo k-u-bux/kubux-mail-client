@@ -18,6 +18,7 @@
           pyPkgs.watchdog
           pyPkgs.mail-parser
           pyPkgs.pytest
+          pyPkgs.scancode-toolkit
         ]);
       in {
         packages.default = pkgs.stdenv.mkDerivation {
