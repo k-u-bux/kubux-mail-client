@@ -472,7 +472,7 @@ class MailEditor(QMainWindow):
             # Get the From address for Message-ID
             from_address = email.utils.parseaddr(headers.get('From', ''))[1]
             domain = from_address.split('@')[1] if '@' in from_address else 'local.machine'
-            draft['Message-ID'] = f"{self.message_id_loc}@{domain}"
+            draft['Message-ID'] = f"{self.message_id_loc}@{domain}>"
             
             with open(new_draft_path, 'wb') as tmp_file:
                 tmp_file.write(draft.as_bytes())
