@@ -124,7 +124,7 @@ class MailViewer(QMainWindow):
         if isinstance(mail.message_id, list):
             if not mail.message_id:
                 raise ValueError("Message-ID list is empty.")
-            self.message_id = mail.message_id[-1].strip('<>')
+            self.message_id = mail.message_id[0].strip('<>')
         else:
             self.message_id = mail.message_id.strip('<>')
         print(f"Message-ID = {self.message_id}")
