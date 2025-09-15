@@ -120,7 +120,13 @@ class MailViewer(QMainWindow):
                 self.mail_body = sanitized_html
                 self.is_html_body = True
         self.attachments = mail.attachments 
-        self.message_id = mail.message_id.strip('<>')
+        # unfortunately not all mail have only one id
+        if isinstance(mail.message_id, list):
+            if not mail.message_id:
+                raise ValueError("Message-ID list is empty.")
+            self.message_id = message_id[-1].strip('<>')
+        else:
+            self.message_id = mail.message_id.strip('<>')
         print(f"Message-ID = {self.message_id}")
 
 
