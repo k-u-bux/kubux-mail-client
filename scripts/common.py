@@ -130,3 +130,16 @@ def create_draft_from_message_open_editor(parent, msg):
         subprocess.Popen([editor_path, "--mail-file", temp_path])
     except Exception as e:
         QMessageBox.critical(parent, "Error", f"Failed to create or open draft: {e}")
+
+def launch_drafts_manager(parent, identity_dict):
+    """Launches the drafts manager script for a given identity's drafts folder."""
+    try:
+        drafts_path_str = identity_dict.get('drafts', "~/.local/share/kubux-mail-client/mail/drafts")
+        drafts_path = Path(drafts_path_str).expanduser()
+
+        viewer_path = os.path.join(os.path.dirname(__file__), "open-drafts")
+        subprocess.Popen([viewer_path, "--drafts-dir", str(drafts_path)])
+        logging.info(f"Launched drafts manager for directory: {drafts_path}")
+    except Exception as e:
+        logging.error(f"Failed to launch drafts manager: {e}")
+        display_error(parent, "Launch Error", f"Could not launch open-drafts.py:\n\n{e}")

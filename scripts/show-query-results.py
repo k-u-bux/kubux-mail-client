@@ -22,7 +22,7 @@ import logging
 
 from notmuch import find_matching_messages, find_matching_threads, apply_tag_to_query
 from config import config
-from common import display_error
+from common import display_error, create_draft, create_new_mail_menu, launch_drafts_manager
 from query import QueryParser
 
 # Set up basic logging to console
@@ -71,6 +71,16 @@ class QueryResultsViewer(QMainWindow):
         top_bar_layout.addWidget(self.refresh_button)
 
         top_bar_layout.addStretch()
+
+        self.new_mail_button = QPushButton("New Mail")
+        self.new_mail_button.setFont(config.get_interface_font())
+        top_bar_layout.addWidget(self.new_mail_button)
+        self.new_mail_button.clicked.connect(self.new_mail_action)
+        
+        self.edit_drafts_button = QPushButton("Edit Draft")
+        self.edit_drafts_button.setFont(config.get_interface_font())
+        self.edit_drafts_button.clicked.connect(self.edit_drafts_action)
+        top_bar_layout.addWidget(self.edit_drafts_button)
 
         self.manager_button = QPushButton("Searches")
         self.manager_button.setFont(config.get_interface_font())
@@ -300,6 +310,31 @@ class QueryResultsViewer(QMainWindow):
             return from_field
         else:
             return "to: " + message.get("headers", {}).get("To", "unknown <nobody@nowhere.net>")
+
+    def new_mail_action(self):
+        """Creates and displays a menu for selecting an email identity."""
+        create_new_mail_menu(self)
+                    
+    def edit_drafts_action(self):
+        """
+        Displays a menu of identities and launches open-drafts.py
+        for the selected identity's drafts folder.
+        """
+        identities = config.get_identities()
+        if not identities:
+            display_error(self, "Identities not found", "No email identities are configured. Please check your config file.")
+            return
+
+        menu = QMenu(self)
+        menu.setFont(config.get_text_font())
+        for identity in identities:
+            action_text = f"From: {identity.get('name', '')} <{identity.get('email', '')}>"
+            action = menu.addAction(action_text)
+            action.triggered.connect(lambda checked, i=identity: launch_drafts_manager(self,i))
+
+        # Get the position of the Edit Drafts button and show the menu
+        button_pos = self.edit_drafts_button.mapToGlobal(self.edit_drafts_button.rect().bottomLeft())
+        menu.exec(button_pos)
 
     def launch__manager(self):
         try:

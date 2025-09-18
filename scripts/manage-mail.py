@@ -23,7 +23,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 from config import config
 from query import QueryParser
-from common import display_error, create_draft, create_new_mail_menu
+from common import display_error, create_draft, create_new_mail_menu, launch_drafts_manager
 
 
 class CustomLineEdit(QLineEdit):
@@ -567,24 +567,11 @@ class QueryEditor(QMainWindow):
         for identity in identities:
             action_text = f"From: {identity.get('name', '')} <{identity.get('email', '')}>"
             action = menu.addAction(action_text)
-            action.triggered.connect(lambda checked, i=identity: self._launch_drafts_manager(i))
+            action.triggered.connect(lambda checked, i=identity: launch_drafts_manager(self,i))
 
         # Get the position of the Edit Drafts button and show the menu
         button_pos = self.edit_drafts_button.mapToGlobal(self.edit_drafts_button.rect().bottomLeft())
         menu.exec(button_pos)
-
-    def _launch_drafts_manager(self, identity_dict):
-        """Launches the drafts manager script for a given identity's drafts folder."""
-        try:
-            drafts_path_str = identity_dict.get('drafts', "~/.local/share/kubux-mail-client/mail/drafts")
-            drafts_path = Path(drafts_path_str).expanduser()
-
-            viewer_path = os.path.join(os.path.dirname(__file__), "open-drafts")
-            subprocess.Popen([viewer_path, "--drafts-dir", str(drafts_path)])
-            logging.info(f"Launched drafts manager for directory: {drafts_path}")
-        except Exception as e:
-            logging.error(f"Failed to launch drafts manager: {e}")
-            display_error(self, "Launch Error", f"Could not launch open-drafts.py:\n\n{e}")
 
     def edit_config_action(self):
         try:
