@@ -49,7 +49,7 @@ class GlobalDragFilter(QObject):
                 # This will cancel any active drag operation, allowing
                 # the QDrag.exec() call to return.
                 QDrag.cancel()
-        
+                
         # Always return False so that the event continues to be processed
         # by its intended target widget.
         return False
@@ -121,7 +121,7 @@ class EmailAddressLineEdit(QLineEdit):
                     new_text = f"{current_text}, {dropped_text}"
                 else:
                     new_text = dropped_text
-                
+                    
                 self.setText(new_text)
                 
                 # Accept the event as a move action to signal the source to clear
@@ -328,7 +328,7 @@ class MailEditor(QMainWindow):
                 from_options.append((display_text, identity['email']))
             elif isinstance(identity, str):
                 from_options.append((identity, identity))
-        
+                
         # Pass the options to the header widget
         self.headers_widget.set_from_options(from_options)
         
@@ -340,7 +340,7 @@ class MailEditor(QMainWindow):
         """Populate body and attachments from the draft message."""
         if not self.draft_message:
             return
-            
+        
         # The headers are already populated by the MailHeaderEditableWidget
         # Just populate the body and attachments
         
@@ -350,7 +350,7 @@ class MailEditor(QMainWindow):
             if part.get_content_type() == 'text/plain' and not part.get_filename():
                 plain_text_body = part.get_content()
                 break
-        self.body_edit.setPlainText(plain_text_body)
+            self.body_edit.setPlainText(plain_text_body)
 
         # Find and add any attachments
         for part in self.draft_message.walk():
@@ -379,7 +379,7 @@ class MailEditor(QMainWindow):
             file_path = url.toLocalFile()
             if os.path.isfile(file_path):
                 self.add_attachment(file_path)
-        event.acceptProposedAction()
+                event.acceptProposedAction()
 
     def show_attachment_context_menu(self, pos):
         item = self.attachments_list.itemAt(pos)
@@ -404,8 +404,8 @@ class MailEditor(QMainWindow):
             mimetype, _ = mimetypes.guess_type(file_path)
             if mimetype is None:
                 mimetype = 'application/octet-stream'
-            maintype, subtype = mimetype.split('/')
-            
+                maintype, subtype = mimetype.split('/')
+                
             with open(file_path, 'rb') as f:
                 part = email.message.EmailMessage()
                 part.set_content(f.read(), maintype=maintype, subtype=subtype)
@@ -437,7 +437,7 @@ class MailEditor(QMainWindow):
             # However, for parts added via set_content() with a binary read, 
             # it consistently provides the raw data.
             payload_data = attachment_part.get_payload(decode=True) 
-                
+            
             if not isinstance(payload_data, bytes):
                 # This is the fail-hard/fast point where we handle text parts.
                 # If it's a string (a text attachment), encode it back to bytes 
@@ -446,7 +446,7 @@ class MailEditor(QMainWindow):
                 payload_bytes = payload_data.encode('utf-8', errors='replace')
             else:
                 payload_bytes = payload_data
-    
+                
 
     def open_attachment(self, item):
         """
@@ -459,7 +459,7 @@ class MailEditor(QMainWindow):
             if not (0 <= part_index < len(self.attachments)):
                 # Fail hard: index out of bounds
                 raise IndexError(f"Invalid attachment index: {part_index}")
-                
+            
             attachment_part = self.attachments[part_index]
             
             # 1. Get the filename from the Content-Disposition header
@@ -470,13 +470,13 @@ class MailEditor(QMainWindow):
                 match = re.search(r'filename=["\']?([^;"\s]+)["\']?', content_disp)
                 if match:
                     filename = match.group(1)
-                
+                    
             if not filename:
                 filename = f"attachment_{part_index}.bin" # Default extension for safety
-    
+                
             # 2. Get the content, accommodating both bytes (binary) and string (text) payloads
             payload_data = attachment_part.get_payload(decode=True) 
-                
+            
             if isinstance(payload_data, bytes):
                 payload_bytes = payload_data
             elif isinstance(payload_data, str):
@@ -488,7 +488,7 @@ class MailEditor(QMainWindow):
                 )
             else:
                 display_error("type error", f"Attachment payload has unexpected type: {type(payload_data).__name__}")
-    
+                
     
             # 3. Write to a temporary file
             temp_file_descriptor, temp_path = tempfile.mkstemp(prefix="mail_attach_", suffix=f"_{filename}")
@@ -519,7 +519,7 @@ class MailEditor(QMainWindow):
             if identity.get('email') == selected_email:
                 drafts_path_str = identity.get('drafts', "~/.local/share/kubux-mail-client/mail/drafts")
                 return Path(drafts_path_str).expanduser()
-        
+            
         # Fallback to the default if no match is found
         return Path("~/.local/share/kubux-mail-client/mail/drafts").expanduser()
 
@@ -544,12 +544,12 @@ class MailEditor(QMainWindow):
                 # Case 2: No attachments, use a simple EmailMessage
                 draft = email.message.EmailMessage()
                 draft.set_content(self.body_edit.toPlainText(), 'plain', 'utf-8')
-            
+                
             if self.draft_message:
                 in_reply_to = self.draft_message.get('In-Reply-To')
                 if in_reply_to:
                     draft['In-Reply-To'] = in_reply_to
-                references = self.draft_message.get('References')
+                    references = self.draft_message.get('References')
                 if references:
                     draft['References'] = references
 
@@ -583,8 +583,8 @@ class MailEditor(QMainWindow):
                 else:
                     if self.mail_file_path and self.mail_file_path.exists():
                         os.remove(self.mail_file_path)
-                    self.mail_file_path = new_file_path
-                    logging.info(f"Draft saved to {self.mail_file_path}")
+                        self.mail_file_path = new_file_path
+                        logging.info(f"Draft saved to {self.mail_file_path}")
 
     def save_message(self):
         self._save_draft()
@@ -598,7 +598,7 @@ class MailEditor(QMainWindow):
                 display_error(self, "Error", f"Could not find mail editor at {editor_path}")
                 return
             subprocess.Popen([editor_path, "--mail-file", str(new_file_path)])
- 
+            
     def send_message(self):
         self._save_draft()
         try:
@@ -621,7 +621,7 @@ class MailEditor(QMainWindow):
                 logging.error(f"Failed to delete draft file: {e}")
                 display_error(self, "Discard Error", f"Failed to delete draft file:\n{e}")
                 return
-        
+            
         self.close()
 
 # --- Main Entry Point ---
