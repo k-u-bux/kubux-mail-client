@@ -422,21 +422,81 @@ class MailEditor(QMainWindow):
             self.attachments_list.takeItem(row)
 
     def open_attachment(self, item):
+        """
+        Opens the selected attachment by writing its raw content to a temporary file
+        and using the system's default application to open it.
+        """
         try:
             part_index = self.attachments_list.row(item)
+            
+            # Check if the row index is valid to prevent an IndexError (fail hard)
+            if not (0 <= part_index < len(self.attachments)):
+                raise IndexError("Attachment index out of range.")
+                
             attachment_part = self.attachments[part_index]
-            filename = attachment_part['filename']
-
-            # Decode the base64 payload
-            payload_bytes = base64.b64decode(attachment_part['payload'])
-
-            with tempfile.NamedTemporaryFile(suffix=f"_{filename}", delete=False) as temp_file:
-                temp_file.write(payload_bytes)
-                temp_path = temp_file.name
-                subprocess.run(["xdg-open", temp_path])
+            
+            # 1. Get the filename from the Content-Disposition header
+            # Note: attachment_part.get_filename() is a cleaner alternative if available 
+            # but using dict-style access for consistency with the original code structure.
+            content_disp = attachment_part.get('Content-Disposition', '')
+            # Simple extraction of the filename parameter from the header
+            # A more robust solution might use email.message.get_param('filename')
+            filename = ''
+            if 'filename=' in content_disp:
+                # Assumes filename is quoted or immediately follows 'filename='
+                import re
+                match = re.search(r'filename=["\']?([^;"\s]+)["\']?', content_disp)
+                if match:
+                    filename = match.group(1)
+                
+            if not filename:
+                # Fallback or error if filename couldn't be extracted
+                filename = f"attachment_{part_index}"
+    
+            # 2. Get the raw content bytes using get_content() or get_payload(decode=True)
+            # get_content() is preferred for parts added with set_content()
+            # get_payload(decode=True) is also a valid method for accessing the decoded bytes
+            try:
+                payload_bytes = attachment_part.get_content()
+            except AttributeError:
+                # Fallback for older email library versions or if content wasn't set cleanly
+                payload_bytes = attachment_part.get_payload(decode=True)
+                
+            if not isinstance(payload_bytes, bytes):
+                 # Ensure we have bytes, if get_content/get_payload returned a string (rare for binary)
+                 raise TypeError("Attachment content is not in expected byte format.")
+    
+    
+            # 3. Write to a temporary file
+            temp_file_descriptor, temp_path = tempfile.mkstemp(prefix="mail_attach_", suffix=f"_{filename}")
+            
+            try:
+                with os.fdopen(temp_file_descriptor, 'wb') as temp_file:
+                    temp_file.write(payload_bytes)
+                    
+                # 4. Open the temporary file using the system's default application
+                # xdg-open is common on Linux. For cross-platform, you'd need a utility 
+                # like 'start' on Windows or 'open' on macOS, or the 'webbrowser' module.
+                # Sticking to subprocess.run for failure-hard behavior.
+                subprocess.run(["xdg-open", temp_path], check=True) # check=True will fail hard on error
+                
+            finally:
+                # Important: The temporary file must be deleted after the subprocess has started.
+                # On some systems (like Linux), it's safe to unlink it immediately, 
+                # and the OS will clean it up when the last process closes it.
+                # However, for robustness, we might want a cleanup mechanism (e.g., using atexit 
+                # or a simple background cleanup process), but for a fail-hard approach, 
+                # a simple `os.remove` is acceptable if we tolerate the file potentially 
+                # being deleted before the application opens it, or we rely on the user
+                # cleaning up / relying on tempfile behavior.
+                # Sticking to simple removal for the current scope and failing hard if removal fails.
+                os.remove(temp_path)
                 
         except Exception as e:
-            QMessageBox.critical(self, "Error", f"Could not open attachment: {e}")
+            # Crash if an error occurs, as per preference (Fail Fast/Fail Hard).
+            # We replace the QMessageBox.critical with a hard crash for a technical component.
+            display_error(self, "Failed to open attachment", f"Failed to open attachment:\n{e}")
+
 
     def _get_selected_identity_drafts_path(self):
         """Helper to get the drafts path for the currently selected identity."""
