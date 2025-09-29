@@ -27,7 +27,6 @@ import email.utils
 import shutil
 from datetime import datetime
 import secrets
-import base64
 
 from config import config
 from common import display_error
