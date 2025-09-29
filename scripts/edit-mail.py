@@ -387,6 +387,9 @@ class MailEditor(QMainWindow):
             remove_action = QAction("Remove", self)
             remove_action.triggered.connect(lambda: self.remove_attachment(item))
             menu.addAction(remove_action)
+            open_action = QAction("Open", self)
+            open_action.triggered.connect(lambda: self.open_attachment(item))
+            menu.addAction(open_action)
             menu.exec(self.attachments_list.mapToGlobal(pos))
 
     def add_attachment(self, file_path=None):
@@ -416,6 +419,23 @@ class MailEditor(QMainWindow):
         if 0 <= row < len(self.attachments):
             del self.attachments[row]
             self.attachments_list.takeItem(row)
+
+    def open_attachment(self, item):
+        try:
+            part_index = self.attachments_list.row(item)
+            attachment_part = self.attachments[part_index]
+            filename = attachment_part['filename']
+
+            # Decode the base64 payload
+            payload_bytes = base64.b64decode(attachment_part['payload'])
+
+            with tempfile.NamedTemporaryFile(suffix=f"_{filename}", delete=False) as temp_file:
+                temp_file.write(payload_bytes)
+                temp_path = temp_file.name
+                subprocess.run(["xdg-open", temp_path])
+                
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Could not open attachment: {e}")
 
     def _get_selected_identity_drafts_path(self):
         """Helper to get the drafts path for the currently selected identity."""

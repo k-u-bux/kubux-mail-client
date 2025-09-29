@@ -854,7 +854,7 @@ class MailViewer(QMainWindow):
                 payload_bytes = base64.b64decode(attachment_part['payload'])
                 with open(save_path, 'wb') as f:
                     f.write(payload_bytes)
-                QMessageBox.information(self, "Success", f"Attachment saved to:\n{save_path}")
+                # QMessageBox.information(self, "Success", f"Attachment saved to:\n{save_path}")
             
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Could not save attachment: {e}")
