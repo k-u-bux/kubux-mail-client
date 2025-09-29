@@ -476,7 +476,8 @@ class MailEditor(QMainWindow):
                 
             finally:
                 # Delete the temporary file immediately after the command starts
-                os.remove(temp_path)
+                # os.remove(temp_path)
+                pass
 
         except Exception as e:
             display_error(self, "Failed to open attachment", f"Failed to open attachment:\n{e}")
