@@ -422,33 +422,6 @@ class MailEditor(QMainWindow):
             self.attachments_list.takeItem(row)
 
     def open_attachment(self, item):
-        try:
-            part_index = self.attachments_list.row(item)
-            
-            # ... (rest of the setup logic) ...
-                
-            attachment_part = self.attachments[part_index]
-            
-            # ... (filename extraction logic) ...
-    
-            # Get the raw, decoded content bytes.
-            # This function is guaranteed to return bytes if the message part 
-            # represents a binary payload, or a decoded string for text.
-            # However, for parts added via set_content() with a binary read, 
-            # it consistently provides the raw data.
-            payload_data = attachment_part.get_payload(decode=True) 
-            
-            if not isinstance(payload_data, bytes):
-                # This is the fail-hard/fast point where we handle text parts.
-                # If it's a string (a text attachment), encode it back to bytes 
-                # (assuming UTF-8, which is common) before writing to the file.
-                # This ensures we always write bytes to the binary file handle.
-                payload_bytes = payload_data.encode('utf-8', errors='replace')
-            else:
-                payload_bytes = payload_data
-                
-
-    def open_attachment(self, item):
         """
         Opens the selected attachment by writing its raw content to a temporary file
         and using the system's default application to open it.
@@ -503,7 +476,7 @@ class MailEditor(QMainWindow):
             finally:
                 # Delete the temporary file immediately after the command starts
                 os.remove(temp_path)
-                
+
         except Exception as e:
             display_error(self, "Failed to open attachment", f"Failed to open attachment:\n{e}")
 
