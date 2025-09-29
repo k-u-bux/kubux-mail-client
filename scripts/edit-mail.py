@@ -404,7 +404,8 @@ class MailEditor(QMainWindow):
             mimetype, _ = mimetypes.guess_type(file_path)
             if mimetype is None:
                 mimetype = 'application/octet-stream'
-                maintype, subtype = mimetype.split('/')
+            
+            maintype, subtype = mimetype.split('/')
                 
             with open(file_path, 'rb') as f:
                 part = email.message.EmailMessage()
