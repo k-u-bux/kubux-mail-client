@@ -350,7 +350,7 @@ class MailEditor(QMainWindow):
             if part.get_content_type() == 'text/plain' and not part.get_filename():
                 plain_text_body = part.get_content()
                 break
-            self.body_edit.setPlainText(plain_text_body)
+        self.body_edit.setPlainText(plain_text_body)
 
         # Find and add any attachments
         for part in self.draft_message.walk():
@@ -379,7 +379,7 @@ class MailEditor(QMainWindow):
             file_path = url.toLocalFile()
             if os.path.isfile(file_path):
                 self.add_attachment(file_path)
-                event.acceptProposedAction()
+        event.acceptProposedAction()
 
     def show_attachment_context_menu(self, pos):
         item = self.attachments_list.itemAt(pos)
@@ -524,7 +524,7 @@ class MailEditor(QMainWindow):
                 in_reply_to = self.draft_message.get('In-Reply-To')
                 if in_reply_to:
                     draft['In-Reply-To'] = in_reply_to
-                    references = self.draft_message.get('References')
+                references = self.draft_message.get('References')
                 if references:
                     draft['References'] = references
 
@@ -558,8 +558,8 @@ class MailEditor(QMainWindow):
                 else:
                     if self.mail_file_path and self.mail_file_path.exists():
                         os.remove(self.mail_file_path)
-                        self.mail_file_path = new_file_path
-                        logging.info(f"Draft saved to {self.mail_file_path}")
+                    self.mail_file_path = new_file_path
+                    logging.info(f"Draft saved to {self.mail_file_path}")
 
     def save_message(self):
         self._save_draft()
