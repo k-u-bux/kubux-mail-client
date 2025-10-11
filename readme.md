@@ -1,10 +1,10 @@
 # Kubux Mail Client
 
-A privacy-focused, terminal-first email client built on top of [Notmuch](https://notmuchmail.org/) with AI-powered email classification and tag management.
+A email client built on top of [Notmuch](https://notmuchmail.org/) using Bayesian classification for tag management.
 
 ## Overview
 
-Kubux Mail Client is a modular email management system designed for users who value privacy, customization, and efficiency. It combines the power of Notmuch's fast email indexing with modern GUI components and machine learning capabilities for intelligent email organization.
+Kubux Mail Client is a modular email management system designed to find mails quickly. It combines the power of Notmuch's fast email indexing with GUI components and machine learning capabilities for intelligent email organization.
 
 ### Key Features
 
