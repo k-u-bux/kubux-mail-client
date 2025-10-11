@@ -243,11 +243,10 @@ kubux-mail-client/
 │   ├── config.py         # Configuration management
 │   ├── common.py         # Shared utilities
 │   └── ...
-├── my_config/            # Example configuration files
-├── tests/                # Test data and scripts
-├── play_ground/          # Experimental features
-├── outline.md            # Architectural overview
-└── README.md             # This file
+├── flake.nix             # the flake
+├── flake.lock            # and its lock
+├── readme.md             # this file
+└── ...
 ```
 
 ## Privacy & Security
