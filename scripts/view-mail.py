@@ -11,7 +11,7 @@ from email.utils import getaddresses
 import re
 from pathlib import Path
 from PySide6.QtWidgets import (
-    QApplication, QMainWindow, QWidget, QVBoxLayout, QTextEdit, QHBoxLayout,
+    QApplication, QMainWindow, QWidget, QVBoxLayout, QTextBrowser, QHBoxLayout,
     QPushButton, QListWidget, QSplitter, QMessageBox, QMenu, QGroupBox,
     QFormLayout, QLabel, QInputDialog, QScrollArea, QDialog, QDialogButtonBox,
     QFileDialog, QSizePolicy
@@ -230,10 +230,11 @@ class MailViewer(QMainWindow):
         self.show_or_hide_headers()
 
         # Mail Content area
-        self.mail_content = QTextEdit()
+        self.mail_content = QTextBrowser()
         self.mail_content.setFont(config.get_text_font())
         self.mail_content.setReadOnly(True)
         self.mail_content.setFont(config.get_text_font())
+        self.mail_content.setOpenLinks(False) 
         self.splitter.addWidget(self.mail_content)
         
         # Add a context menu for clipboard actions and view raw
