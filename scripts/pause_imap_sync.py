@@ -7,7 +7,7 @@ from imapclient import IMAPClient
 import toml
 
 # --- Configuration Constants ---
-DEFAULT_CONFIG = "~/.auth/imap_config.toml"
+DEFAULT_CONFIG = "~/.config/kubux-mail-client/imap-config.toml"
 DEFAULT_MAILBOX = 'INBOX'
 DEFAULT_TIMEOUT = 300 # seconds
 # -------------------------------
