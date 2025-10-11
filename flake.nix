@@ -15,6 +15,7 @@
           pyPkgs.notmuch
           pyPkgs.scikit-learn
           pyPkgs.toml
+          pyPkgs.imapclient
           pyPkgs.watchdog
           pyPkgs.mail-parser
           pyPkgs.pytest
