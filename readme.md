@@ -309,21 +309,12 @@ logging.basicConfig(level=logging.DEBUG)
 
 See [LICENSE](LICENSE) file for details.
 
-## Acknowledgments
+## Acknowledgments / History
+
+This mail client was concieved long ago when my distro decided to ditch exmh. The project got shelved because I estimated that (a) python with its libraries would be the language of choice, (b) that it would require several thousand lines of code, and that (c) it therefore is not a good project to learn a new programming language. Thus, the project got shelved for about a decade. Now, with the help of AI tools, I was able to summon the code into existence.
 
 - Built on top of [Notmuch](https://notmuchmail.org/)
 - Uses [PySide6](https://www.qt.io/qt-for-python) for GUI components
-- Inspired by Unix philosophy and email standards
-
-## Roadmap
-
-- [ ] Tag synchronization across devices
-- [ ] S/MIME signing and encryption
-- [ ] Calendar integration
-- [ ] Contact management
-- [ ] Advanced search query language
-- [ ] Vim-like keybindings in composer
-- [ ] Plugin system for extensibility
 
 ---
 
