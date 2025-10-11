@@ -302,23 +302,20 @@ class MailViewer(QMainWindow):
 
         self.update_tags_ui()
 
+        try:
+            self.mail_content.anchorClicked.disconnect(self.handle_link_clicked)
+        except TypeError:
+            pass # Ignore if not connected yet
+        self.mail_content.anchorClicked.connect(self.handle_link_clicked)
+        self.mail_content.setTextInteractionFlags(Qt.TextBrowserInteraction)
+
         if self.is_html_body:
             self.mail_content.setHtml(self.mail_body)
-            # For HTML content, Qt will automatically make links clickable
-            # self.mail_content.setOpenLinks(False)  # Prevent automatic opening
-            # self.mail_content.anchorClicked.connect(self.handle_link_clicked)
         else:
             self.mail_content.setPlainText(self.mail_body)
             # For plain text, we need to detect URLs manually
             self.highlight_urls_in_plain_text()
         
-        # Set up cursor tracking to detect when hovering over URLs
-        self.mail_content.setCursorWidth(1)  # Ensure cursor is visible
-        self.mail_content.viewport().setCursor(Qt.IBeamCursor)  # Default cursor
-        
-        # Install event filter to track mouse movement and clicks
-        self.mail_content.viewport().installEventFilter(self)
-
     def highlight_urls_in_plain_text(self):
         """Find and highlight URLs in plain text content."""
         # Comprehensive URL regex pattern
@@ -330,11 +327,12 @@ class MailViewer(QMainWindow):
         # Get the document from the QTextEdit
         document = self.mail_content.document()
         
-        # Create a format for highlighting URLs
-        url_format = QTextCharFormat()
-        url_format.setForeground(QColor("#0000FF"))  # Blue color for links
-        url_format.setUnderlineStyle(QTextCharFormat.SingleUnderline)
-        url_format.setProperty(QTextCharFormat.UserProperty, True)  # Mark as URL
+        # Create a base format for highlighting URLs (no AnchorHref yet)
+        base_url_format = QTextCharFormat()
+        base_url_format.setForeground(QColor("#0000FF"))  # Blue color for links
+        base_url_format.setUnderlineStyle(QTextCharFormat.SingleUnderline)
+        base_url_format.setAnchor(True)
+        base_url_format.setToolTip("Click to open link")
         
         # Start finding all matches in the document
         cursor = QTextCursor(document)
@@ -355,97 +353,15 @@ class MailViewer(QMainWindow):
             cursor.setPosition(start)
             cursor.setPosition(end, QTextCursor.KeepAnchor)
             
-            # Apply URL format
-            cursor.setCharFormat(url_format)
+            match_format = QTextCharFormat(base_url_format)
+            match_format.setAnchorHref(url)
             
-            # Store the URL as user data in the format
-            cursor.setPosition(end)
+            # Apply URL format
+            cursor.setCharFormat(match_format)
             
             # Update the cursor position to search for the next match
             cursor.setPosition(end)
     
-    def eventFilter(self, obj, event):
-        """
-        Filter events to handle mouse movement over and clicking on URLs.
-        """
-        if obj is self.mail_content.viewport():
-            if event.type() == QEvent.MouseMove:
-                # Check if cursor is over a URL
-                pos = event.position().toPoint()
-                cursor = self.mail_content.cursorForPosition(pos)
-                url = self.get_url_at_cursor(cursor)
-                
-                if url:
-                    # Change cursor to pointing hand when over a URL
-                    self.mail_content.viewport().setCursor(Qt.PointingHandCursor)
-                    self.mail_content.setToolTip(url)
-                else:
-                    # Reset cursor when not over a URL
-                    self.mail_content.viewport().setCursor(Qt.IBeamCursor)
-                    self.mail_content.setToolTip("")
-                    
-            elif event.type() == QEvent.MouseButtonPress:
-                # Handle mouse clicks on URLs
-                if event.button() == Qt.LeftButton:
-                    pos = event.position().toPoint()
-                    cursor = self.mail_content.cursorForPosition(pos)
-                    url = self.get_url_at_cursor(cursor)
-                    
-                    if url:
-                        self.handle_link_clicked(url)
-                        return True  # Event handled
-        
-        return super().eventFilter(obj, event)
-        
-    def get_url_at_cursor(self, cursor):
-        """
-        Determine if the cursor is positioned over a URL.
-        
-        Args:
-            cursor: QTextCursor at the position to check
-            
-        Returns:
-            str: The URL if cursor is over one, or None otherwise
-        """
-        # For HTML content, URLs are already detected by Qt
-        if self.is_html_body:
-            # Try to get anchor at this position
-            cursor_pos = self.mail_content.mapFromGlobal(QCursor.pos())
-            anchor = self.mail_content.anchorAt(cursor_pos)
-            if anchor:
-                return anchor
-            return None
-            
-        # For plain text, check if the cursor is within a text span with our URL format
-        format = cursor.charFormat()
-        
-        # Check if this format was marked as a URL
-        if format.hasProperty(QTextCharFormat.UserProperty):
-            # Get the text of the URL
-            # We need to select the entire URL by expanding to word boundaries
-            start_pos = cursor.position()
-            
-            # Move to the start of the word/URL
-            cursor.movePosition(QTextCursor.StartOfWord)
-            start = cursor.position()
-            
-            # Move to the end of the word/URL
-            cursor.movePosition(QTextCursor.EndOfWord)
-            end = cursor.position()
-            
-            # Select the URL text
-            cursor.setPosition(start)
-            cursor.setPosition(end, QTextCursor.KeepAnchor)
-            
-            url = cursor.selectedText()
-            
-            # Restore cursor position
-            cursor.setPosition(start_pos)
-            
-            return url
-            
-        return None
-            
     def handle_link_clicked(self, url):
         """Handle clicking on a URL by opening it in the default browser."""
         if isinstance(url, str):
