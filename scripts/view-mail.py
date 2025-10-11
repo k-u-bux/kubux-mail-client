@@ -188,6 +188,9 @@ class MailViewer(QMainWindow):
         self.view_thread_button = QPushButton("View Thread")
         self.view_thread_button.clicked.connect( lambda: self.view_thread() )
         top_bar_layout.addWidget(self.view_thread_button)
+        self.view_source_button = QPushButton("View Source")
+        self.view_source_button.clicked.connect( lambda: self.view_source() )
+        top_bar_layout.addWidget(self.view_source_button)
 
         self.toggle_header_visibility_button =  QPushButton("Hide Headers")
         self.toggle_header_visibility_button.clicked.connect(self.toggle_header_visibility)
@@ -425,6 +428,38 @@ class MailViewer(QMainWindow):
                     subprocess.Popen([viewer_path, thread_id.replace("thread:","")])
                 except Exception as e:
                     display_error(self, "Error", f"Could not launch mail viewer: {e}")
+
+    def view_source(self):
+        """Opens the raw mail file (self.mail_file_path) in an external text viewer."""
+        
+        # 1. Determine the viewer command
+        # Prioritize the $EDITOR environment variable
+        viewer = os.environ.get('EDITOR')
+        
+        if not viewer:
+            # Fallback to a common, non-GUI pager/viewer
+            # Use 'less' or 'cat' as a reliable fallback for viewing text files
+            # 'less' is preferable as it handles large files and scrolling
+            viewer = 'less'
+            
+        try:
+            # 2. Execute the viewer command in a detached process
+            # Use self.mail_file_path which is already a Path object
+            command = [viewer, str(self.mail_file_path)]
+            
+            # Use Popen to launch the viewer and immediately return, keeping the main app running
+            subprocess.Popen(command)
+            
+            logging.info(f"Opened raw mail source in viewer: {' '.join(command)}")
+            
+        except FileNotFoundError:
+            # Crash hard/fail fast if the determined viewer command doesn't exist
+            # This is a technical failure to execute an external dependency.
+            raise FileNotFoundError(f"External text viewer '{viewer}' not found in PATH.")
+        except Exception as e:
+            # Fail hard on any other unexpected execution error
+            raise RuntimeError(f"Failed to open raw mail source using '{viewer}': {e}")
+
 
     def get_tags(self):
         """Queries the notmuch database for tags of the current mail's message ID."""
