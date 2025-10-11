@@ -11,7 +11,7 @@ from email.utils import getaddresses
 import re
 from pathlib import Path
 from PySide6.QtWidgets import (
-    QApplication, QMainWindow, QWidget, QVBoxLayout, QTextBrowser, QHBoxLayout,
+    QApplication, QMainWindow, QWidget, QVBoxLayout, QTextBrowser, QTextEdit, QHBoxLayout,
     QPushButton, QListWidget, QSplitter, QMessageBox, QMenu, QGroupBox,
     QFormLayout, QLabel, QInputDialog, QScrollArea, QDialog, QDialogButtonBox,
     QFileDialog, QSizePolicy
@@ -36,6 +36,39 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 # NOTE: Replace this with your actual email address.
 # In a future version, this should be loaded from the config file.
 MY_EMAIL_ADDRESS = "your.email@example.com"
+
+
+class MailSourceViewer(QDialog):
+    """A simple dialog to display the raw content of the mail file."""
+    def __init__(self, mail_file_path, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Raw Message Source")
+        self.resize(800, 600)
+
+        main_layout = QVBoxLayout(self)
+
+        # 1. Use QTextEdit for content display and selection
+        self.source_content = QTextEdit()
+        # Set it as read-only, but keep text interaction enabled
+        self.source_content.setReadOnly(True)
+        self.source_content.setTextInteractionFlags(Qt.TextSelectableByMouse | Qt.TextSelectableByKeyboard)
+        self.source_content.setFont(config.get_text_font())
+        
+        main_layout.addWidget(self.source_content)
+
+        # 2. Load the file content
+        try:
+            with open(mail_file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                raw_source = f.read()
+            self.source_content.setPlainText(raw_source)
+        except Exception as e:
+            self.source_content.setPlainText(f"Error loading source file: {e}")
+            self.setWindowTitle("Raw Message Source (Error)")
+            
+        # 3. Add Close Button
+        button_box = QDialogButtonBox(QDialogButtonBox.Ok)
+        button_box.accepted.connect(self.accept)
+        main_layout.addWidget(button_box)
 
 
 # Custom widget for clickable email addresses
@@ -185,10 +218,10 @@ class MailViewer(QMainWindow):
         self.tags_button.setMenu(self.tags_menu)
         top_bar_layout.addWidget(self.tags_button)
 
-        self.view_thread_button = QPushButton("View Thread")
+        self.view_thread_button = QPushButton("Thread")
         self.view_thread_button.clicked.connect( lambda: self.view_thread() )
         top_bar_layout.addWidget(self.view_thread_button)
-        self.view_source_button = QPushButton("View Source")
+        self.view_source_button = QPushButton("Source")
         self.view_source_button.clicked.connect( lambda: self.view_source() )
         top_bar_layout.addWidget(self.view_source_button)
 
@@ -430,36 +463,14 @@ class MailViewer(QMainWindow):
                     display_error(self, "Error", f"Could not launch mail viewer: {e}")
 
     def view_source(self):
-        """Opens the raw mail file (self.mail_file_path) in an external text viewer."""
-        
-        # 1. Determine the viewer command
-        # Prioritize the $EDITOR environment variable
-        viewer = os.environ.get('EDITOR')
-        
-        if not viewer:
-            # Fallback to a common, non-GUI pager/viewer
-            # Use 'less' or 'cat' as a reliable fallback for viewing text files
-            # 'less' is preferable as it handles large files and scrolling
-            viewer = 'less'
-            
         try:
-            # 2. Execute the viewer command in a detached process
-            # Use self.mail_file_path which is already a Path object
-            command = [viewer, str(self.mail_file_path)]
+            viewer_dialog = MailSourceViewer(self.mail_file_path, self)
+            viewer_dialog.exec()
+            logging.info(f"Displayed raw mail source for: {self.mail_file_path.name}")
             
-            # Use Popen to launch the viewer and immediately return, keeping the main app running
-            subprocess.Popen(command)
-            
-            logging.info(f"Opened raw mail source in viewer: {' '.join(command)}")
-            
-        except FileNotFoundError:
-            # Crash hard/fail fast if the determined viewer command doesn't exist
-            # This is a technical failure to execute an external dependency.
-            raise FileNotFoundError(f"External text viewer '{viewer}' not found in PATH.")
         except Exception as e:
-            # Fail hard on any other unexpected execution error
-            raise RuntimeError(f"Failed to open raw mail source using '{viewer}': {e}")
-
+            # Fail hard on unexpected creation error, or rely on the dialog's internal error handling
+            raise RuntimeError(f"Failed to display raw mail source window: {e}")
 
     def get_tags(self):
         """Queries the notmuch database for tags of the current mail's message ID."""
