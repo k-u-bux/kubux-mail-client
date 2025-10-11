@@ -46,17 +46,30 @@ def load_credentials(config_path: str, from_address: str) -> tuple[str, int, str
 
     return host, port, user, password
 
+
 def pause_imap_sync(host: str, port: int, user: str, password: str, timeout: int):
     """
     Connects to IMAP, enters IDLE mode, and waits for a notification or timeout.
     Exits 0 on success (event or timeout), or 1 on critical failure.
+    
+    Supports:
+    - Port 993 (IMAPS/Implicit SSL)
+    - Port 143 (IMAP/STARTTLS)
     """
-    # Assuming SSL=True for the typical secure IMAP port (993)
-    # If using 143, ssl=False would be required, or STARTTLS negotiation.
-    ssl_enabled = (port == 993) 
+    # Determine the initial connection mode based on the port
+    # Port 993 uses implicit SSL/TLS from the start.
+    ssl_enabled = (port == 993)
     
     try:
+        # Initial connection: ssl=True only if port is 993
         with IMAPClient(host, port=port, ssl=ssl_enabled, timeout=10) as server: 
+            
+            # If standard IMAP port 143, negotiate TLS encryption now (STARTTLS)
+            if port == 143:
+                # The imapclient automatically checks capabilities before trying STARTTLS.
+                print("Attempting STARTTLS negotiation...")
+                server.starttls()
+
             server.login(user, password)
             server.select_folder(DEFAULT_MAILBOX) 
             
@@ -77,6 +90,7 @@ def pause_imap_sync(host: str, port: int, user: str, password: str, timeout: int
         # Fail hard on any IMAP error (per your preference)
         print(f"Critical IMAP error (host: {host}, port: {port}, user: {user}): {e}. Exiting.")
         sys.exit(1)
+
 
 def main():
     parser = argparse.ArgumentParser(
