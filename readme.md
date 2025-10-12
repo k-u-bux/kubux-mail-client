@@ -1,6 +1,6 @@
 # Kubux Mail Client
 
-A email client built on top of [Notmuch](https://notmuchmail.org/) using Bayesian classification for tag management.
+A email client built on top of [Notmuch](https://notmuchmail.org/) using Bayesian classification for suggesting tags.
 
 ## Overview
 
