@@ -620,8 +620,8 @@ class MailViewer(QMainWindow):
     def all_involved(self):
         sender = self.message.get("From")
         sender_addr = getaddresses([sender])[0][1] if sender else ""
-        original_to = [ self.message.get("To", "") ]
-        original_cc = [ self.message.get("Cc", "") ]
+        original_to = self.message.get("To", "")
+        original_cc = self.message.get("Cc", "")
         all_recipients = {addr for name, addr in getaddresses([original_to, original_cc])}
         if sender:
             all_recipients.add(sender_addr)
@@ -708,8 +708,8 @@ class MailViewer(QMainWindow):
         if not self.message:
             return
         
-        to_list = self.message.get("To", "")
-        cc_list = self.message.get("Cc", "")
+        to_list = [ self.message.get("To", "") ]
+        cc_list = [ self.message.get("Cc", "") ]
 
         original_subject = self.message.get("Subject", "")
         if not original_subject.lower().startswith("re:"):
