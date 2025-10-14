@@ -708,8 +708,8 @@ class MailViewer(QMainWindow):
         if not self.message:
             return
         
-        to_list = [ self.message.get("To", "") ]
-        cc_list = [ self.message.get("Cc", "") ]
+        to_list = { addr for name, addr in getaddresses( self.message.get("To", "") ) }
+        cc_list = { addr for name, addr in getaddresses( self.message.get("Cc", "") ) }
 
         original_subject = self.message.get("Subject", "")
         if not original_subject.lower().startswith("re:"):
@@ -725,7 +725,7 @@ class MailViewer(QMainWindow):
         
         quoted_body = textwrap.indent(original_body, '> ')
 
-        self._create_draft_and_open_editor(to_list, cc_list, subject, f"\n\n{quoted_body}", self.message.get('Message-ID'))
+        self._create_draft_and_open_editor(list(to_list), list(cc_list), subject, f"\n\n{quoted_body}", self.message.get('Message-ID'))
 
     def reply_to_selected(self):
         """
