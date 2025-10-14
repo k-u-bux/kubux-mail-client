@@ -195,6 +195,7 @@ class MailViewer(QMainWindow):
         self.compose_menu = QMenu(self)
         self.compose_menu.addAction("Reply").triggered.connect(self.reply)
         self.compose_menu.addAction("Reply All").triggered.connect(self.reply_all)
+        self.compose_menu.addAction("Follow Up").triggered.connect(self.follow_up)
         self.compose_menu.addAction("Forward").triggered.connect(self.forward)
         self.compose_menu.addAction("Reply to Selected").triggered.connect(self.reply_to_selected)
         self.compose_menu.addSeparator()
@@ -684,6 +685,32 @@ class MailViewer(QMainWindow):
         all_recipients.discard(sender_addr)
         cc_list = list(all_recipients)
         
+        original_subject = self.message.get("Subject", "")
+        if not original_subject.lower().startswith("re:"):
+            subject = f"Re: {original_subject}"
+        else:
+            subject = original_subject
+
+        original_body = ""
+        for part in self.message.walk():
+            if part.get_content_type() == 'text/plain':
+                original_body = part.get_content()
+                break
+        
+        quoted_body = textwrap.indent(original_body, '> ')
+
+        self._create_draft_and_open_editor(to_list, cc_list, subject, f"\n\n{quoted_body}", self.message.get('Message-ID'))
+
+    def follow_up(self):
+        """
+        Creates a draft with the same to and from as the original.
+        """
+        if not self.message:
+            return
+        
+        to_list = self.message.get("To", "")
+        cc_list = self.message.get("Cc", "")
+
         original_subject = self.message.get("Subject", "")
         if not original_subject.lower().startswith("re:"):
             subject = f"Re: {original_subject}"
