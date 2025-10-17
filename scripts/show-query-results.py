@@ -82,6 +82,11 @@ class QueryResultsViewer(QMainWindow):
         self.edit_drafts_button.clicked.connect(self.edit_drafts_action)
         top_bar_layout.addWidget(self.edit_drafts_button)
 
+        self.edit_config_button = QPushButton("Edit Config")
+        self.edit_config_button.setFont(config.get_interface_font())
+        self.edit_config_button.clicked.connect(self.edit_config_action)
+        top_bar_layout.addWidget(self.edit_config_button)
+
         self.manager_button = QPushButton("Searches")
         self.manager_button.setFont(config.get_interface_font())
         self.manager_button.clicked.connect(self.launch__manager)
@@ -440,6 +445,14 @@ class QueryResultsViewer(QMainWindow):
         row = index.row()
         for tag in tags:
             self.apply_tag_to_row( tag, row )
+
+    def edit_config_action(self):
+        try:
+            subprocess.Popen(["xdg-open", config.config_path])
+            logging.info(f"Launched xdg-open {config.config_path}")
+        except Exception as e:
+            logging.error(f"Failed to launch config editor: {e}")
+            display_error(self, "Launch Error", f"Could not launch config editor:\n\n{e}")
 
 # --- Main Entry Point ---
 def main():
