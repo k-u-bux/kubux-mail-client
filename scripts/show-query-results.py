@@ -139,7 +139,7 @@ class QueryResultsViewer(QMainWindow):
         column = self.results_table.columnAt(position.x())
         
         # Skip if we're outside the table or on the empty input row
-        if row < 0 or column < 0 or row == 0:
+        if row < 0 or column < 0:
             return
         
         # Store the row and column for later use
