@@ -98,11 +98,7 @@ class ThreadViewer(QMainWindow):
         # Skip if we're outside the table or on the empty input row
         if row < 0 or column < 0:
             return
-        
-        # Store the row and column for later use
-        self.context_menu_row = row
-        self.context_menu_column = column
-        
+               
         # Create context menu
         context_menu = QMenu(self)
         context_menu.setFont(config.get_text_font())
@@ -120,10 +116,10 @@ class ThreadViewer(QMainWindow):
             delete_action.triggered.connect( self.delete_selected_items )
             modify_action.triggered.connect( self.modify_selected_items )
         else:
-            open_action.triggered.connect( lambda r=row: self.open_selected_row( r ) )
-            flag_action.triggered.connect( lambda r=row: self.flag_spam_row( r ) )
-            delete_action.triggered.connect( lambda r=row: self.delete_row( r ) )
-            modify_action.triggered.connect( lambda r=row: self.modify_row( r ) )
+            open_action.triggered.connect( lambda r=row: self.open_selected_row( row ) )
+            flag_action.triggered.connect( lambda r=row: self.flag_spam_row( row ) )
+            delete_action.triggered.connect( lambda r=row: self.delete_row( row ) )
+            modify_action.triggered.connect( lambda r=row: self.modify_row( row ) )
         
         # Add actions to menu in the preferred order
         context_menu.addAction(open_action)
