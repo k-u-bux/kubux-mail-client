@@ -69,7 +69,7 @@ def extract_email_text(file_path: Path) -> str:
 
 def main():
     parser = argparse.ArgumentParser(description="Retrain an existing AI classifier with new data.")
-    parser.add_argument("--query", default='tag:$unused and not tag:unread', help="Notmuch query for new training mails.")
+    parser.add_argument("--query", default='tag:$unused and not tag:unread and (tag:spam or not tag:spam)', help="Notmuch query for new training mails.")
     parser.add_argument("--model", default=config.get_model(), help="Path to the model file to update.")
     args = parser.parse_args()
 
@@ -158,7 +158,7 @@ def main():
 
 def old_main():
     parser = argparse.ArgumentParser(description="Retrain an existing AI classifier with new data.")
-    parser.add_argument("--query", default='tag:$unused and not tag:unread', help="Path to the output model file.")
+    parser.add_argument("--query", default='tag:$unused and not tag:unread and (tag:spam or not tag:spam)', help="Path to the output model file.")
     parser.add_argument("--model", default=config.get_model(), help="Path to the model file to update.")
     args = parser.parse_args()
 
