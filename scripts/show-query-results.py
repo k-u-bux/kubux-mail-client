@@ -150,22 +150,26 @@ class QueryResultsViewer(QMainWindow):
 
         # Add actions
         open_action = QAction("Open", self)
+        mark_read_action = QAction("-unread", self)
         flag_action = QAction("+spam", self)
         delete_action = QAction("Delete", self)
         modify_action = QAction("Edit Tags", self)
         if selected_items:
             open_action.triggered.connect( self.open_selected_items )
+            mark_read_action.triggered.connect( self.mark_read_selected_items )
             flag_action.triggered.connect( self.flag_spam_selected_items )
             delete_action.triggered.connect( self.delete_selected_items )
             modify_action.triggered.connect( self.modify_selected_items )
         else:
             open_action.triggered.connect( lambda r=row: self.open_selected_row( row ) )
+            mark_read_action.triggered.connect( lambda r=row: self.mark_read_row( row ) )
             flag_action.triggered.connect( lambda r=row: self.flag_spam_row( row ) )
             delete_action.triggered.connect( lambda r=row: self.delete_row( row ) )
             modify_action.triggered.connect( lambda r=row: self.modify_row( row ) )
         
         # Add actions to menu in the preferred order
         context_menu.addAction(open_action)
+        context_menu.addAction(mark_read_action)
         context_menu.addAction(flag_action)
         context_menu.addAction(delete_action)
         context_menu.addAction(modify_action)
@@ -404,6 +408,19 @@ class QueryResultsViewer(QMainWindow):
         if ok and text:
             return [t.strip() for t in text.split(',')]
         return []
+
+    # mark read
+    def mark_read_row(self, row):
+        self.apply_tag_to_row("-unread", row)
+
+    def mark_read_selected_items(self):
+        for row in list( set( [ item.row() for item in self.results_table.selectedItems() ] ) ):
+            self.mark_read_row( row )
+
+    def mark_read_selected_item(self, index):
+        row = index.row()
+        self.mark_read_row( row )
+
 
     # spam
     def flag_spam_row(self, row):
