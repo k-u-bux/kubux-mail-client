@@ -179,7 +179,7 @@ class QueryResultsViewer(QMainWindow):
             info_string = " ".join( [ s for s in self.get_tags( row ) if not s.startswith("$") ] )
             info_label = QLabel( info_string )
             info_label.setFont(config.get_text_font())
-            info_label.setStyleSheet("QLabel { color: gray; padding-left: 10px; padding-right: 10px; }")
+            info_label.setStyleSheet("QLabel { padding-top: 3px; padding-bottom: 5px;  padding-left: 10px; padding-right: 10px; }")
             info_widget_action.setDefaultWidget(info_label)
             context_menu.addAction( info_widget_action )
         
@@ -470,7 +470,7 @@ class QueryResultsViewer(QMainWindow):
                 self.apply_tag_to_row( tag, row )
 
     def modify_row(self, index):
-        tags = self.tag_button()
+        tags = self.tag_dialog()
         row = index.row()
         for tag in tags:
             self.apply_tag_to_row( tag, row )

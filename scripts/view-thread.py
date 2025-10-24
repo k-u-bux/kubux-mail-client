@@ -14,7 +14,7 @@ from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLineEdit, QPushButton, QTableWidget, QTableWidgetItem, QHeaderView,
     QMessageBox, QDialog, QDialogButtonBox, QLabel, QTextEdit, QInputDialog,
-    QCheckBox, QAbstractItemView, QMenu
+    QCheckBox, QAbstractItemView, QMenu, QWidgetAction
 )
 from PySide6.QtCore import Qt, QSize
 from PySide6.QtGui import QFont, QKeySequence, QAction
@@ -136,7 +136,7 @@ class ThreadViewer(QMainWindow):
             info_string = " ".join( [ s for s in self.get_tags( row ) if not s.startswith("$") ] )
             info_label = QLabel( info_string )
             info_label.setFont(config.get_text_font())
-            info_label.setStyleSheet("QLabel { color: gray; padding-left: 10px; padding-right: 10px; }")
+            info_label.setStyleSheet("QLabel { padding-top: 3px; padding-bottom: 5px; padding-left: 10px; padding-right: 10px; }")
             info_widget_action.setDefaultWidget(info_label)
             context_menu.addAction( info_widget_action )
         
@@ -241,6 +241,13 @@ class ThreadViewer(QMainWindow):
         else:
             return "to: " + message.get("headers", {}).get("To", "unknown <nobody@nowhere.net>")
 
+    # get_tags
+    def get_tags( self, row ):
+        item_data = self.results_table.item(row, 0).data(Qt.ItemDataRole.UserRole)
+        tags = item_data.get("tags")
+        return tags
+    
+    # open
     def open_selected_items(self):
         for row in list( set( [ item.row() for item in self.results_table.selectedItems() ] ) ):
             self.open_selected_row( row )
@@ -329,7 +336,7 @@ class ThreadViewer(QMainWindow):
                 self.apply_tag_to_row( tag, row )
 
     def modify_row(self, index):
-        tags = self.tag_button()
+        tags = self.tag_dialog()
         row = index.row()
         for tag in tags:
             self.apply_tag_to_row( tag, row )
