@@ -130,6 +130,15 @@ class ThreadViewer(QMainWindow):
         context_menu.addAction(flag_action)
         context_menu.addAction(delete_action)
         context_menu.addAction(modify_action)
+        if not selected_items:
+            context_menu.addSeparator()
+            info_widget_action = QWidgetAction(context_menu)           
+            info_string = " ".join( [ s for s in self.get_tags( row ) if not s.startswith("$") ] )
+            info_label = QLabel( info_string )
+            info_label.setFont(config.get_text_font())
+            info_label.setStyleSheet("QLabel { color: gray; padding-left: 10px; padding-right: 10px; }")
+            info_widget_action.setDefaultWidget(info_label)
+            context_menu.addAction( info_widget_action )
         
         # Show context menu at the right position
         context_menu.exec(self.results_table.viewport().mapToGlobal(position))

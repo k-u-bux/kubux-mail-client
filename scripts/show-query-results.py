@@ -14,7 +14,7 @@ from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLineEdit, QPushButton, QTableWidget, QTableWidgetItem, QHeaderView,
     QMessageBox, QDialog, QDialogButtonBox, QLabel, QTextEdit, QInputDialog,
-    QCheckBox, QAbstractItemView, QMenu
+    QCheckBox, QAbstractItemView, QMenu, QWidgetAction
 )
 from PySide6.QtCore import Qt, QSize
 from PySide6.QtGui import QFont, QKeySequence, QAction
@@ -173,6 +173,15 @@ class QueryResultsViewer(QMainWindow):
         context_menu.addAction(flag_action)
         context_menu.addAction(delete_action)
         context_menu.addAction(modify_action)
+        if not selected_items:
+            context_menu.addSeparator()
+            info_widget_action = QWidgetAction(context_menu)           
+            info_string = " ".join( [ s for s in self.get_tags( row ) if not s.startswith("$") ] )
+            info_label = QLabel( info_string )
+            info_label.setFont(config.get_text_font())
+            info_label.setStyleSheet("QLabel { color: gray; padding-left: 10px; padding-right: 10px; }")
+            info_widget_action.setDefaultWidget(info_label)
+            context_menu.addAction( info_widget_action )
         
         # Show context menu at the right position
         context_menu.exec(self.results_table.viewport().mapToGlobal(position))
@@ -349,6 +358,13 @@ class QueryResultsViewer(QMainWindow):
         except Exception as e:
             logging.error(f"Failed to launch mail manager: {e}")
             display_error(self, "Launch Error", f"Could not launch manage-mail.py:\n\n{e}")
+
+    # get_tags
+    def get_tags( self, row ):
+        item_data = self.results_table.item(row, 0).data(Qt.ItemDataRole.UserRole)
+        tags = item_data.get("tags")
+        return tags
+
 
     # open
     def open_selected_items(self):
