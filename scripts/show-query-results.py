@@ -452,7 +452,7 @@ class QueryResultsViewer(QMainWindow):
 
     # delete
     def delete_row(self, row):
-        self.apply_tag_to_row("+delete", row)
+        self.apply_tag_to_row("+deleted", row)
 
     def delete_selected_items(self):
         for row in list( set( [ item.row() for item in self.results_table.selectedItems() ] ) ):
