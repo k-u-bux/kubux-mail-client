@@ -26,7 +26,7 @@ import textwrap
 import base64
 
 from config import config
-from common import display_error
+from common import display_error, html_to_plain_text
 from header_widget import MailHeaderWidget
 
 # Set up basic logging to console
@@ -639,6 +639,25 @@ class MailViewer(QMainWindow):
     def all_other_identities(self):
         return { addr for addr in self.all_involved() if not config.is_me( [addr] ) }
 
+    def get_quoted_body(self):
+        """
+        Extracts and quotes the body of the email.
+        It prioritizes plain text, but falls back to converting HTML to plain text.
+        """
+        original_body = ""
+        html_body = ""
+        for part in self.message.walk():
+            content_type = part.get_content_type()
+            if content_type == 'text/plain' and not original_body:
+                original_body = part.get_payload(decode=True).decode(part.get_content_charset() or 'utf-8', errors='ignore')
+            elif content_type == 'text/html' and not html_body:
+                html_body = part.get_payload(decode=True).decode(part.get_content_charset() or 'utf-8', errors='ignore')
+
+        if not original_body and html_body:
+            original_body = html_to_plain_text(html_body)
+
+        return textwrap.indent(original_body, '> ')
+
     def reply(self):
         """
         Creates a reply draft for the single sender.
@@ -660,13 +679,7 @@ class MailViewer(QMainWindow):
         else:
             subject = original_subject
 
-        original_body = ""
-        for part in self.message.walk():
-            if part.get_content_type() == 'text/plain':
-                original_body = part.get_content()
-                break
-        
-        quoted_body = textwrap.indent(original_body, '> ')
+        quoted_body = self.get_quoted_body()
         
         self._create_draft_and_open_editor(to_list, cc_list, subject, f"\n\n{quoted_body}", self.message.get('Message-ID'))
 
@@ -691,13 +704,7 @@ class MailViewer(QMainWindow):
         else:
             subject = original_subject
 
-        original_body = ""
-        for part in self.message.walk():
-            if part.get_content_type() == 'text/plain':
-                original_body = part.get_content()
-                break
-        
-        quoted_body = textwrap.indent(original_body, '> ')
+        quoted_body = self.get_quoted_body()
 
         self._create_draft_and_open_editor(to_list, cc_list, subject, f"\n\n{quoted_body}", self.message.get('Message-ID'))
 
@@ -717,13 +724,7 @@ class MailViewer(QMainWindow):
         else:
             subject = original_subject
 
-        original_body = ""
-        for part in self.message.walk():
-            if part.get_content_type() == 'text/plain':
-                original_body = part.get_content()
-                break
-        
-        quoted_body = textwrap.indent(original_body, '> ')
+        quoted_body = self.get_quoted_body()
 
         self._create_draft_and_open_editor(to_list, cc_list, subject, f"\n\n{quoted_body}", self.message.get('Message-ID'))
 
@@ -744,13 +745,7 @@ class MailViewer(QMainWindow):
         else:
             subject = original_subject
             
-        original_body = ""
-        for part in self.message.walk():
-            if part.get_content_type() == 'text/plain':
-                original_body = part.get_content()
-                break
-        
-        quoted_body = textwrap.indent(original_body, '> ')
+        quoted_body = self.get_quoted_body()
         
         self._create_draft_and_open_editor(to_list, cc_list, subject, f"\n\n{quoted_body}", self.message.get('Message-ID'))
     

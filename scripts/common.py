@@ -14,6 +14,39 @@ import os
 import subprocess
 import shutil
 from config import config
+import re
+
+def html_to_plain_text(html_content):
+    """
+    Converts a string of HTML content to plain text.
+    
+    This function strips HTML tags and cleans up resulting whitespace.
+    It is designed for simple conversions, like for email quoting, and may
+    not perfectly render complex HTML structures.
+    """
+    if not html_content:
+        return ""
+    
+    # 1. Remove script and style elements
+    text = re.sub(r'<(script|style).*?>.*?</\1>', '', html_content, flags=re.DOTALL | re.IGNORECASE)
+    
+    # 2. Replace <br> and <p> with newlines for better structure
+    text = re.sub(r'<br\s*/?>', '\n', text, flags=re.IGNORECASE)
+    text = re.sub(r'</p>', '\n', text, flags=re.IGNORECASE)
+    
+    # 3. Strip all other HTML tags
+    text = re.sub(r'<[^>]+>', '', text)
+    
+    # 4. Decode HTML entities
+    # Note: A more robust solution might use html.unescape, but for now we handle common ones.
+    text = text.replace('&nbsp;', ' ').replace('&', '&').replace('<', '<').replace('>', '>')
+    
+    # 5. Consolidate whitespace
+    text = re.sub(r'[ \t]+', ' ', text)
+    text = re.sub(r'\n{3,}', '\n\n', text)
+    
+    return text.strip()
+
 
 # Custom dialog for displaying copyable error messages
 class CopyableErrorDialog(QDialog):
