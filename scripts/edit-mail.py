@@ -163,7 +163,7 @@ class MailEditor(QMainWindow):
     def __init__(self, parent=None, mail_file_path=None):
         super().__init__(parent)
         self.setWindowTitle("Kubux Mail Client - Editor")
-        self.resize(QSize(800, 600))
+        self.resize(QSize(1024, 768))
         
         self.attachments = []
         self.mail_file_path = Path(mail_file_path).expanduser() if mail_file_path else None
