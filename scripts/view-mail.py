@@ -795,11 +795,14 @@ class MailViewer(QMainWindow):
 
         self._create_draft_and_open_editor([], cc_list, subject, forwarded_body)
 
+
     def forward(self):
         self.do_forward( false )
 
+
     def forward_cc(self):
         self.do_forward( true )
+
 
     def show_attachment_context_menu(self, pos):
         """Shows a context menu with actions for the clicked attachment."""
