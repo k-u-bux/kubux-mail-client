@@ -797,11 +797,11 @@ class MailViewer(QMainWindow):
 
 
     def forward(self):
-        self.do_forward( false )
+        self.do_forward( False )
 
 
     def forward_cc(self):
-        self.do_forward( true )
+        self.do_forward( True )
 
 
     def show_attachment_context_menu(self, pos):
