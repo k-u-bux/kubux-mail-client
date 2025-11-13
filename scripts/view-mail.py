@@ -197,6 +197,7 @@ class MailViewer(QMainWindow):
         self.compose_menu.addAction("Reply All").triggered.connect(self.reply_all)
         self.compose_menu.addAction("Follow Up").triggered.connect(self.follow_up)
         self.compose_menu.addAction("Forward").triggered.connect(self.forward)
+        self.compose_menu.addAction("Forward (cc all)").triggered.connect(self.forward_cc)
         self.compose_menu.addAction("Reply to Selected").triggered.connect(self.reply_to_selected)
         self.compose_menu.addSeparator()
         self.compose_menu.addAction("Compose New").triggered.connect(self.compose_new)
@@ -756,7 +757,7 @@ class MailViewer(QMainWindow):
         to_list = list(self.selected_addresses)
         self._create_draft_and_open_editor(to_list, [], "", "")
 
-    def forward(self):
+    def do_forward(self, cc_all):
         """
         Creates a draft for forwarding the current mail.
         """
@@ -765,8 +766,12 @@ class MailViewer(QMainWindow):
 
         to_list = []
        
-        all_recipients = self.all_involved()
-        cc_list = list(all_recipients)
+        if cc_all:
+            all_recipients = self.all_involved()
+            cc_list = list(all_recipients)
+        else:
+            cc_list = self.all_my_identities()
+
         # Prepare forwarded body
         headers = ["From", "To", "Cc", "Subject", "Date"]
         forwarded_body = f"---------- Forwarded message ----------\n"
@@ -789,6 +794,12 @@ class MailViewer(QMainWindow):
             subject = original_subject
 
         self._create_draft_and_open_editor([], cc_list, subject, forwarded_body)
+
+    def forward(self):
+        self.do_forward( false )
+
+    def forward_cc(self):
+        self.do_forward( true )
 
     def show_attachment_context_menu(self, pos):
         """Shows a context menu with actions for the clicked attachment."""
