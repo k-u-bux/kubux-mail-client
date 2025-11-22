@@ -45,6 +45,7 @@
             pkgs.makeWrapper
             pythonEnv
             pkgs.notmuch
+            pkgs.muchsync
             pkgs.isync
             pkgs.gnupg
             pkgs.msmtp
@@ -105,6 +106,7 @@
             pkgs.isort
             pkgs.mypy
             pkgs.notmuch
+            pkgs.muchsync
             pkgs.gnupg
             pkgs.msmtp
             pkgs.jq
