@@ -150,18 +150,21 @@ class QueryResultsViewer(QMainWindow):
 
         # Add actions
         open_action = QAction("Open", self)
+        open_thread_action = QAction("Open Thread", self)
         mark_read_action = QAction("-unread", self)
         flag_action = QAction("+spam", self)
         delete_action = QAction("Delete", self)
         modify_action = QAction("Edit Tags", self)
         if selected_items:
             open_action.triggered.connect( self.open_selected_items )
+            open_thread_action.triggered.connect( self.open_thread_selected_items )
             mark_read_action.triggered.connect( self.mark_read_selected_items )
             flag_action.triggered.connect( self.flag_spam_selected_items )
             delete_action.triggered.connect( self.delete_selected_items )
             modify_action.triggered.connect( self.modify_selected_items )
         else:
             open_action.triggered.connect( lambda r=row: self.open_selected_row( row ) )
+            open_thread_action.triggered.connect( lambda r=row: self.open_thread_selected_row( row ) )
             mark_read_action.triggered.connect( lambda r=row: self.mark_read_row( row ) )
             flag_action.triggered.connect( lambda r=row: self.flag_spam_row( row ) )
             delete_action.triggered.connect( lambda r=row: self.delete_row( row ) )
@@ -169,6 +172,8 @@ class QueryResultsViewer(QMainWindow):
         
         # Add actions to menu in the preferred order
         context_menu.addAction(open_action)
+        if not self.view_mode == "thread":
+            context_menu.addAction(open_thread_action)
         context_menu.addAction(mark_read_action)
         context_menu.addAction(flag_action)
         context_menu.addAction(delete_action)
@@ -401,6 +406,43 @@ class QueryResultsViewer(QMainWindow):
                     QMessageBox.critical(self, "Error", f"Could not launch mail viewer: {e}")
             else:
                 logging.warning("Could not find mail file path for selected row.")
+
+
+    # open thread
+    def open_thread_selected_items(self):
+        for row in list( set( [ item.row() for item in self.results_table.selectedItems() ] ) ):
+            self.open_thread_selected_row( row )
+
+    def open_thread_selected_item(self, index):
+        """Launches the appropriate viewer based on the selected item."""
+        row = index.row()
+        self.open_thread_selected_row( row )
+
+    def open_thread_selected_row(self, row):
+        item_data = self.results_table.item(row, 0).data(Qt.ItemDataRole.UserRole)
+        
+        if self.view_mode == "threads":
+            # notmuch search with --output=summary returns a "thread" key
+            thread_id = item_data.get("thread")
+            if thread_id:
+                try:
+                    viewer_path = os.path.join(os.path.dirname(__file__), "view-thread")
+                    subprocess.Popen([viewer_path, thread_id])
+                except Exception as e:
+                    QMessageBox.critical(self, "Error", f"Could not launch mail viewer: {e}")
+            else:
+                logging.warning("Could not find thread ID for selected row.")
+        else: # mails mode
+            message_id = item_data.get("id");
+            command = ['notmuch', 'search', '--output=threads', '--format=text', f'id:{message_id} and (tag:spam or not tag:spam)']
+            result = subprocess.run(command, capture_output=True, text=True, check=True)
+            threads = result.stdout.strip().split('\n')
+            for thread_id in threads:
+                try:
+                    viewer_path = os.path.join(os.path.dirname(__file__), "view-thread")
+                    subprocess.Popen([viewer_path, thread_id.replace("thread:","")])
+                except Exception as e:
+                    display_error(self, "Error", f"Could not launch mail viewer: {e}")
 
 
     # other actions
