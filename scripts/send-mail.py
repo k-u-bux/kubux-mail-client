@@ -35,6 +35,7 @@ class SendMail:
         """Finds the correct account settings based on the sender's email address."""
         if "from" not in self.config:
             logging.error("Configuration file is missing a [[from]] section.")
+            sys.exit(1)
             return None
         
         for key, account in self.config["from"].items():
@@ -42,6 +43,7 @@ class SendMail:
                 return account
         
         logging.error(f"No account found in config for sender address: {from_address}")
+        sys.exit(1)
         return None
 
     def _move_file(self, source_path: Path, dest_dir_path: Path):
@@ -52,12 +54,14 @@ class SendMail:
             logging.info(f"Moved file to: {dest_dir_path / source_path.name}")
         except Exception as e:
             logging.error(f"Failed to move file {source_path}: {e}")
+            sys.exit(1)
 
     def send_file(self, file_path: str):
         """Reads a mail file and sends it using the appropriate SMTP account."""
         file_path = Path(file_path).expanduser()
         if not file_path.exists():
             logging.error(f"File not found: {file_path}")
+            sys.exit(1)
             return
 
         try:
@@ -67,6 +71,7 @@ class SendMail:
             from_address = msg.get("From")
             if not from_address:
                 logging.error(f"Email file has no 'From' header: {file_path}")
+                sys.exit(1)
                 return
 
             from_addr = email.utils.parseaddr(from_address)[1]
@@ -79,12 +84,14 @@ class SendMail:
             account = self._get_account_info(from_addr)
             if not account:
                 logging.error(f"No account configured for {from_addr}");
+                sys.exit(1)
                 return
 
             self._send_via_smtp(account, from_addr, all_recipients, msg, file_path)
 
         except Exception as e:
             logging.error(f"An error occurred while processing {file_path}: {e}")
+            sys.exit(1)
 
 
     def _send_via_smtp(self, account, from_addr, all_recipients, msg, file_path):
@@ -98,6 +105,7 @@ class SendMail:
 
         if not all([smtp_server, smtp_port, username, password, sent_dir, failed_dir]):
             logging.error("Account configuration incomplete for {from_addr}")
+            sys.exit(1)
             return
 
         sent_dir = Path(sent_dir).expanduser()
@@ -126,9 +134,11 @@ class SendMail:
         except smtplib.SMTPException as e:
             logging.error(f"SMTP error: {e}")
             self._move_file(file_path, Path(failed_dir))
+            sys.exit(1)
         except Exception as e:
             logging.error(f"Unexpected error while sending mail: {e}")
             self._move_file(file_path, Path(failed_dir))
+            sys.exit(1)
             
 # --- Main Entry Point ---
 def main():
@@ -144,3 +154,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+    sys.exit(0)
