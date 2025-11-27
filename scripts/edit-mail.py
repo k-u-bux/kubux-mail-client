@@ -582,8 +582,18 @@ class MailEditor(QMainWindow):
                 display_error(self, "Error", f"Could not find send mail script at {send_mail_path}")
                 return
 
-            subprocess.Popen([str(send_mail_path), str(self.mail_file_path)])
-            self.close()
+            result = subprocess.run(
+                [str(send_mail_path), str(self.mail_file_path)],
+                check=False
+            )
+            if result.returncode == 0:
+                self.close()
+            else:
+                display_error(
+                    self,
+                    "Send Error",
+                    f"Mail failed to send (Exit Code: {result.returncode}). Please review the message."
+                )
 
         except Exception as e:
             display_error(self, "Send Error", f"Failed to send mail: {e}")
