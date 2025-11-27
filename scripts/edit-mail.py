@@ -560,10 +560,13 @@ class MailEditor(QMainWindow):
                         os.remove(self.mail_file_path)
                     self.mail_file_path = new_file_path
                     logging.info(f"Draft saved to {self.mail_file_path}")
+            return self.mail_file_path
+        else:
+            return None
 
     def save_message(self):
-        self._save_draft()
-        self.close()
+        if self._save_draft():
+            self.close()
 
     def clone_message(self):
         new_file_path = self._save_draft_in_new_file()
@@ -575,7 +578,8 @@ class MailEditor(QMainWindow):
             subprocess.Popen([editor_path, "--mail-file", str(new_file_path)])
             
     def send_message(self):
-        self._save_draft()
+        if not self._save_draft():
+            return
         try:
             send_mail_path = Path(__file__).parent / "send-mail"
             if not send_mail_path.exists():
