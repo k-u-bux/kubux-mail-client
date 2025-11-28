@@ -6,6 +6,7 @@ from pathlib import Path
 from email.utils import getaddresses
 import re
 from datetime import datetime, timezone
+import logging
 
 def notmuch_show(query, sort, flag_error):
     try:
@@ -151,3 +152,10 @@ def get_tags_from_query(query, flag_error):
         )
         tags = []
     return tags
+
+def update_unseen_from_query( query, flag_error ):
+    tags = get_tags_from_query( query, flag_error )
+    if '$unseen' in tags:
+        logging.info("Found '$unseen' tag. Silently replacing with '$unused'.")
+        apply_tag_to_query( '+$unused', query, flag_error )
+        apply_tag_to_query( '-$unseen', query, flag_error )

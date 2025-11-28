@@ -478,20 +478,21 @@ class MailViewer(QMainWindow):
         """Queries the notmuch database for tags of the current mail's message ID."""
         if not self.message_id:
             return []
+
+        # try:
+        #     command = ['notmuch', 'search', '--output=tags', '--format=text', f'id:{self.message_id} and (tag:spam or not tag:spam)']
+        #     # command = ['notmuch', 'search', '--output=tags', '--format=text', f'id:{self.message_id}']
+        #     result = subprocess.run(command, capture_output=True, text=True, check=True)            
+        #     tags_list = [tag.strip() for tag in result.stdout.strip().split('\n') if tag.strip()]
+        #     self.tags = sorted(tags_list)
+        # except subprocess.CalledProcessError as e:
+        #     display_error(
+        #         "Notmuch Command Failed",
+        #         f"An error occurred while running notmuch:\n\n{e.stderr}\n\nCommand was: {' '.join(command)}"
+        #     )
+        #     self.tags = []
         
-        try:
-            command = ['notmuch', 'search', '--output=tags', '--format=text', f'id:{self.message_id} and (tag:spam or not tag:spam)']
-            # command = ['notmuch', 'search', '--output=tags', '--format=text', f'id:{self.message_id}']
-            result = subprocess.run(command, capture_output=True, text=True, check=True)            
-            tags_list = [tag.strip() for tag in result.stdout.strip().split('\n') if tag.strip()]
-            self.tags = sorted(tags_list)
-        except subprocess.CalledProcessError as e:
-            display_error(
-                "Notmuch Command Failed",
-                f"An error occurred while running notmuch:\n\n{e.stderr}\n\nCommand was: {' '.join(command)}"
-            )
-            self.tags = []
-        
+        self.tags = get_tags_from_query( f'id:{self.message_id}', display_error )
         return self.tags
 
     def update_tags_ui(self):

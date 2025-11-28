@@ -20,7 +20,7 @@ from PySide6.QtCore import Qt, QSize
 from PySide6.QtGui import QFont, QKeySequence, QAction
 import logging
 
-from notmuch import find_matching_messages, find_matching_threads, apply_tag_to_query
+from notmuch import find_matching_messages, find_matching_threads, apply_tag_to_query, get_tags_from_query, update_unseen_from_query
 from config import config
 from common import display_error, create_draft, create_new_mail_menu, launch_drafts_manager
 from query import QueryParser
@@ -460,6 +460,7 @@ class QueryResultsViewer(QMainWindow):
 
     def apply_tag_to_row(self, pm_tag, row):
         apply_tag_to_query( pm_tag, self.row_to_query(row), self.show_error )
+        update_unseen_from_query( self.row_to_query(row), self.show_error )
 
     def tag_dialog(self):
         text, ok = QInputDialog.getText(self, "Tags", "+/-tag(s) (separated by commas):")
