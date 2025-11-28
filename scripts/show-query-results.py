@@ -118,6 +118,7 @@ class QueryResultsViewer(QMainWindow):
         self.results_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Interactive)
         self.results_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
         self.results_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Interactive)
+        self.results_table.horizontalHeader().setStretchLastSection(True)
         self.results_table.verticalHeader().setVisible(False)
         self.results_table.setSortingEnabled(True)
         # Enable context menu
