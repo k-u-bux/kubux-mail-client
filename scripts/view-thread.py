@@ -208,7 +208,7 @@ class ThreadViewer(QMainWindow):
             
             subject_text = mail.get("headers", {}).get("Subject", "No Subject")
             if indent:
-                indent_string = "    " * mail.get('depth', 0)
+                indent_string = ". " * mail.get('depth', 0)
                 subject_text = indent_string + subject_text
             subject_item = QTableWidgetItem(subject_text)
             
