@@ -823,7 +823,20 @@ class MailViewer(QMainWindow):
             
             menu.exec(self.attachments_list.mapToGlobal(pos))
 
-            
+
+    def get_attachment_payload(self, part):
+        if part['binary']:
+            return base64.b64decode(part['payload'])
+        else:
+            # CONVERSION: The payload is a string (str), so we must encode it to bytes.
+            # Assuming 'UTF-8' encoding for non-binary text attachments.
+            text_payload_str = part['payload']
+            if not isinstance(text_payload_str, str):
+                raise TypeError("Expected attachment payload to be a string when 'binary' is false.")
+            encoding = part.get('encoding') or 'utf-8' 
+            return text_payload_str.encode(encoding)
+
+
     def handle_attachment_open(self, item):
         """Saves the attachment to a temporary file and opens it."""
         try:
@@ -832,7 +845,7 @@ class MailViewer(QMainWindow):
             filename = attachment_part['filename']
 
             # Decode the base64 payload
-            payload_bytes = base64.b64decode(attachment_part['payload'])
+            payload_bytes = self.get_attachment_payload( attachment_part )
 
             with tempfile.NamedTemporaryFile(suffix=f"_{filename}", delete=False) as temp_file:
                 temp_file.write(payload_bytes)
@@ -853,10 +866,9 @@ class MailViewer(QMainWindow):
             save_path, _ = QFileDialog.getSaveFileName(self, "Save Attachment", filename)
         
             if save_path:
-                payload_bytes = base64.b64decode(attachment_part['payload'])
+                payload_bytes = self.get_attachment_payload( attachment_part )
                 with open(save_path, 'wb') as f:
                     f.write(payload_bytes)
-                # QMessageBox.information(self, "Success", f"Attachment saved to:\n{save_path}")
             
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Could not save attachment: {e}")
