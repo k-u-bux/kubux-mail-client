@@ -82,17 +82,26 @@ class QueryResultsViewer(QMainWindow):
         self.edit_drafts_button.clicked.connect(self.edit_drafts_action)
         top_bar_layout.addWidget(self.edit_drafts_button)
 
-        self.edit_config_button = QPushButton("Edit Config")
-        self.edit_config_button.setFont(config.get_interface_font())
-        self.edit_config_button.clicked.connect(self.edit_config_action)
-        top_bar_layout.addWidget(self.edit_config_button)
-
-        self.manager_button = QPushButton("Searches")
-        self.manager_button.setFont(config.get_interface_font())
-        self.manager_button.clicked.connect(self.launch__manager)
-        top_bar_layout.addWidget(self.manager_button)
+        # self.edit_config_button = QPushButton("Edit Config")
+        # self.edit_config_button.setFont(config.get_interface_font())
+        # self.edit_config_button.clicked.connect(self.edit_config_action)
+        # top_bar_layout.addWidget(self.edit_config_button)
+        # 
+        # self.manager_button = QPushButton("Searches")
+        # self.manager_button.setFont(config.get_interface_font())
+        # self.manager_button.clicked.connect(self.launch__manager)
+        # top_bar_layout.addWidget(self.manager_button)
 
         top_bar_layout.addStretch()
+
+        self.more_button = QPushButton("More")
+        self.more_menu = QMenu(self)
+        self.more_menu.addAction("New Query").triggered.connect(self.new_search_action)
+        self.more_menu.addAction("Edit Queries").triggered.connect(self.launch__manager)
+        self.more_menu.addAction("Edit Config").triggered.connect(self.edit_config_action)
+        self.more_button.setMenu(self.more_menu)
+        top_bar_layout.addWidget(self.more_button)
+        # top_bar_layout.addStretch()
         
         # Quit button
         self.quit_button = QPushButton("Quit")
@@ -356,6 +365,18 @@ class QueryResultsViewer(QMainWindow):
         button_pos = self.edit_drafts_button.mapToGlobal(self.edit_drafts_button.rect().bottomLeft())
         menu.exec(button_pos)
 
+
+    def new_search_action(self):
+        try:
+            viewer_path = os.path.join(os.path.dirname(__file__), "show-query-results")
+            # subprocess.Popen([viewer_path, "--query", " "])
+            subprocess.Popen([viewer_path])
+            logging.info(f"Launched query viewer without query.")
+        except Exception as e:
+            logging.error(f"Failed to launch query viewer: {e}")
+            display_error(self, "Launch Error", f"Could not launch show-query-results.py:\n\n{e}")
+
+            
     def launch__manager(self):
         try:
             manager_path = os.path.join(os.path.dirname(__file__), "manage-mail")
@@ -364,6 +385,7 @@ class QueryResultsViewer(QMainWindow):
         except Exception as e:
             logging.error(f"Failed to launch mail manager: {e}")
             display_error(self, "Launch Error", f"Could not launch manage-mail.py:\n\n{e}")
+
 
     # get_tags
     def get_tags( self, row ):
