@@ -44,6 +44,7 @@ class QueryResultsViewer(QMainWindow):
         self.execute_query()
 
     def setup_ui(self):
+        query_parser = QueryParser(config_dir=config.config_dir)
         central_widget = QWidget()
         central_widget.setFont(config.get_text_font())
         self.setCentralWidget(central_widget)
@@ -96,9 +97,12 @@ class QueryResultsViewer(QMainWindow):
 
         self.more_button = QPushButton("More")
         self.more_menu = QMenu(self)
-        self.more_menu.addAction("New Query").triggered.connect(self.new_search_action)
-        self.more_menu.addAction("Edit Queries").triggered.connect(self.launch__manager)
         self.more_menu.addAction("Edit Config").triggered.connect(self.edit_config_action)
+        self.more_menu.addAction("Edit Queries").triggered.connect(self.launch__manager)
+        self.more_menu.addSeparator()
+        for named_query in query_parser.names:
+            logging.info(f"add menu entry for query {named_query}.")
+            self.more_menu.addAction(f"${named_query}").triggered.connect( lambda _, dummy=named_query: self.launch_query(dummy))
         self.more_button.setMenu(self.more_menu)
         top_bar_layout.addWidget(self.more_button)
         # top_bar_layout.addStretch()
@@ -385,6 +389,16 @@ class QueryResultsViewer(QMainWindow):
         except Exception as e:
             logging.error(f"Failed to launch mail manager: {e}")
             display_error(self, "Launch Error", f"Could not launch manage-mail.py:\n\n{e}")
+
+    def launch_query(self, name):
+        logging.info(f"name = {name}")
+        try:
+            viewer_path = os.path.join(os.path.dirname(__file__), "show-query-results")
+            subprocess.Popen([viewer_path, "--query", f"${name}"])
+            logging.info(f"Launched query viewer with query: ${name}")
+        except Exception as e:
+            logging.error(f"Failed to launch query viewer: {e}")
+            display_error(self, "Launch Error", f"Could not launch show-query-results.py:\n\n{e}")
 
 
     # get_tags

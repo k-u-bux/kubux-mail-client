@@ -19,6 +19,7 @@ class QueryParser:
         self.queries_path = config_dir / "queries.json"
         self.queries = self._load_queries().get("queries",[])
         self.named_queries = {name:query for name, query in self.queries if not name ==""}
+        self.names  = [name for name, query in self.queries if not name ==""]
 
     def _load_queries(self):
         """
