@@ -282,13 +282,6 @@ Test data is available in the `tests/` directory:
 ./scripts/view-mail tests/tagged/<email-file>
 ```
 
-### Contributing
-
-Contributions are welcome! Please ensure:
-- Code follows the existing architecture
-- New features are documented
-- Privacy-first principles are maintained
-
 ## Troubleshooting
 
 ### Common Issues
