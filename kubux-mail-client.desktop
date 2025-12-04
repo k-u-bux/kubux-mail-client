@@ -1,7 +1,7 @@
 [Desktop Entry]
 Name=Kubux Mail Client
 Comment=mail client based on notmuch
-Exec=manage-mail
+Exec=show-query-results
 Icon=mail-client
 Terminal=false
 Type=Application
