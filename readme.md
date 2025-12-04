@@ -271,16 +271,6 @@ All UI actions support customizable keybindings defined in `config.toml`.
 
 The modular architecture allows easy addition of new components and features following the Unix philosophy.
 
-## Development
-
-### Running Tests
-
-Test data is available in the `tests/` directory:
-
-```bash
-# View test emails
-./scripts/view-mail tests/tagged/<email-file>
-```
 
 ## Troubleshooting
 
