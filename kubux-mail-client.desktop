@@ -9,3 +9,21 @@ Categories=Network;Email;
 Keywords=mail;email;e-mail;inbox;client;
 StartupNotify=true
 StartupWMClass=KubuxMailClient
+
+# ---------------------------------------------
+# 1. Define the Actions available in the menu
+# ---------------------------------------------
+Actions=LaunchMain;LaunchQuery;
+
+# ---------------------------------------------
+# 2. Define the execution details for each Action
+# ---------------------------------------------
+
+[Desktop Action LaunchMain]
+Name=Kubux Mail Client - Edit Queries
+Exec=manage-mail
+
+[Desktop Action LaunchQuery]
+Name=Kubux Mail Client - Search Results
+Exec=show-query-results
+
