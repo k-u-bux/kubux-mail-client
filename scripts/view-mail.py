@@ -194,7 +194,9 @@ class MailViewer(QMainWindow):
 
         # Compose button with menu
         self.compose_button = QPushButton("Compose")
+        self.compose_button.setFont(config.get_interface_font())
         self.compose_menu = QMenu(self)
+        self.compose_menu.setFont(config.get_text_font())
         self.compose_menu.addAction("Reply").triggered.connect(self.reply)
         self.compose_menu.addAction("Reply All").triggered.connect(self.reply_all)
         self.compose_menu.addAction("Follow Up").triggered.connect(self.follow_up)
@@ -209,7 +211,9 @@ class MailViewer(QMainWindow):
         
         # Tags button with menu
         self.tags_button = QPushButton("Tags")
+        self.tags_button.setFont(config.get_interface_font())
         self.tags_menu = QMenu(self)
+        self.tags_menu.setFont(config.get_text_font())
         for tag in config.get_tags():
             l = lambda checked, dummy=f"{tag}": self.really_toggle_tag( dummy )
             action = self.tags_menu.addAction(f"+/- {tag}")
