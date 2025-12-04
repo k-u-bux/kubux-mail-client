@@ -96,7 +96,9 @@ class QueryResultsViewer(QMainWindow):
         top_bar_layout.addStretch()
 
         self.more_button = QPushButton("More")
+        self.more_button.setFont(config.get_interface_font())
         self.more_menu = QMenu(self)
+        self.more_menu.setFont(config.get_text_font())
         self.more_menu.addAction("Edit Config").triggered.connect(self.edit_config_action)
         self.more_menu.addAction("Edit Queries").triggered.connect(self.launch__manager)
         self.more_menu.addSeparator()
