@@ -90,7 +90,7 @@
           
           meta = with pkgs.lib; {
             description = "A Notmuch email client with predictive pre-tagging";
-            homepage = "https://github.com/kubux/kubux-image-manager";
+            homepage = "https://github.com/kubux/kubux-mail-client";
             license = licenses.asl20;
             maintainers = [ ];
             platforms = platforms.linux;
