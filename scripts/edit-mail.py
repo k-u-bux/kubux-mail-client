@@ -160,7 +160,7 @@ class EmailAddressLineEdit(QLineEdit):
 # --- Mail Editor Main Class ---
 
 class MailEditor(QMainWindow):
-    def __init__(self, parent=None, mail_file_path=None):
+    def __init__(self, parent=None, mail_file_path=None, change_id=False):
         super().__init__(parent)
         self.setWindowTitle("Kubux Mail Client - Editor")
         self.resize(QSize(1024, 768))
@@ -189,7 +189,10 @@ class MailEditor(QMainWindow):
         else:
             # Generate a new message ID for new messages
             self.message_id_loc = email.utils.make_msgid().split('@')[0]
-            
+
+        if change_id:
+            self.message_id_loc = email.utils.make_msgid().split('@')[0]
+
         self.setup_ui()
         self.setup_key_bindings()
         self.populate_from_draft()
@@ -575,7 +578,7 @@ class MailEditor(QMainWindow):
             if not (os.path.exists(new_file_path) and os.path.exists(editor_path)):
                 display_error(self, "Error", f"Could not find mail editor at {editor_path}")
                 return
-            subprocess.Popen([editor_path, "--mail-file", str(new_file_path)])
+            subprocess.Popen([editor_path, "--mail-file", str(new_file_path), "--change-id"])
             
     def send_message(self):
         if not self._save_draft():
@@ -615,8 +618,10 @@ class MailEditor(QMainWindow):
 
 # --- Main Entry Point ---
 def main():
+    change_message_id = False;
     parser = argparse.ArgumentParser(description="Edit a pre-drafted email.")
     parser.add_argument("--mail-file", required=True, help="The full path to the mail file containing the pre-drafted email.")
+    parser.add_argument("--change-id", action='store_true')
     args = parser.parse_args()
     
     app = QApplication(sys.argv)
@@ -628,7 +633,7 @@ def main():
     # go on
     # app.setApplicationDisplayName( "Kubux Mail Client" )
     app.setApplicationName( "KubuxMailClient" )
-    editor = MailEditor(mail_file_path=args.mail_file)
+    editor = MailEditor(mail_file_path=args.mail_file, change_id=args.change_id)
     editor.show()
     sys.exit(app.exec())
 
