@@ -196,7 +196,7 @@ class MailViewer(QMainWindow):
         self.compose_button = QPushButton("Compose")
         self.compose_button.setFont(config.get_interface_font())
         self.compose_menu = QMenu(self)
-        self.compose_menu.setFont(config.get_text_font())
+        self.compose_menu.setFont(config.get_menu_font())
         self.compose_menu.addAction("Reply").triggered.connect(self.reply)
         self.compose_menu.addAction("Reply All").triggered.connect(self.reply_all)
         self.compose_menu.addAction("Follow Up").triggered.connect(self.follow_up)
@@ -213,7 +213,7 @@ class MailViewer(QMainWindow):
         self.tags_button = QPushButton("Tags")
         self.tags_button.setFont(config.get_interface_font())
         self.tags_menu = QMenu(self)
-        self.tags_menu.setFont(config.get_text_font())
+        self.tags_menu.setFont(config.get_menu_font())
         for tag in config.get_tags():
             l = lambda checked, dummy=f"{tag}": self.really_toggle_tag( dummy )
             action = self.tags_menu.addAction(f"+/- {tag}")
@@ -816,7 +816,8 @@ class MailViewer(QMainWindow):
         item = self.attachments_list.itemAt(pos)
         if item:
             menu = QMenu(self)
-            
+            menu.setFont(config.get_menu_font())
+
             open_action = QAction("Open", self)
             open_action.triggered.connect(lambda: self.handle_attachment_open(item))
             menu.addAction(open_action)
@@ -881,6 +882,7 @@ class MailViewer(QMainWindow):
     def show_content_context_menu(self, pos):
         """Creates a context menu for the mail content area."""
         menu = QMenu(self)
+        menu.setFont(config.get_menu_font())
         copy_action = QAction("Copy", self)
         copy_action.triggered.connect(self.mail_content.copy)
         menu.addAction(copy_action)

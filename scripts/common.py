@@ -120,7 +120,7 @@ def create_new_mail_menu(parent):
         return
 
     menu = QMenu(parent)
-    menu.setFont(config.get_text_font())
+    menu.setFont(config.get_menu_font())
     for identity in identities:
         action_text = f"From: {identity.get('name', '')} <{identity.get('email', '')}>"
         action = menu.addAction(action_text)

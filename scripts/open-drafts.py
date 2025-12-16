@@ -219,7 +219,7 @@ class DraftsManager(QMainWindow):
         
         # Create context menu
         context_menu = QMenu(self)
-        context_menu.setFont(config.get_text_font())
+        context_menu.setFont(config.get_menu_font())
         
         selected_items = self.drafts_table.selectedItems();
 
@@ -258,7 +258,7 @@ class DraftsManager(QMainWindow):
     def _create_drafts_menu(self):
         """Creates a dropdown menu for selecting an identity's drafts folder."""
         menu = QMenu(self)
-        menu.setFont(config.get_text_font())
+        menu.setFont(config.get_menu_font())
         identities = config.get_identities()
         if not identities:
             action = menu.addAction("No identities found")

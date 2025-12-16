@@ -98,7 +98,7 @@ class QueryResultsViewer(QMainWindow):
         self.more_button = QPushButton("More")
         self.more_button.setFont(config.get_interface_font())
         self.more_menu = QMenu(self)
-        self.more_menu.setFont(config.get_text_font())
+        self.more_menu.setFont(config.get_menu_font())
         self.more_menu.addAction("Edit Config").triggered.connect(self.edit_config_action)
         self.more_menu.addAction("Edit Queries").triggered.connect(self.launch__manager)
         self.more_menu.addSeparator()
@@ -160,7 +160,7 @@ class QueryResultsViewer(QMainWindow):
         
         # Create context menu
         context_menu = QMenu(self)
-        context_menu.setFont(config.get_text_font())
+        context_menu.setFont(config.get_menu_font())
         
         selected_items = self.results_table.selectedItems();
 
@@ -361,7 +361,7 @@ class QueryResultsViewer(QMainWindow):
             return
 
         menu = QMenu(self)
-        menu.setFont(config.get_text_font())
+        menu.setFont(config.get_menu_font())
         for identity in identities:
             action_text = f"From: {identity.get('name', '')} <{identity.get('email', '')}>"
             action = menu.addAction(action_text)

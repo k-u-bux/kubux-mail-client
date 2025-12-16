@@ -388,6 +388,8 @@ class MailEditor(QMainWindow):
         item = self.attachments_list.itemAt(pos)
         if item:
             menu = QMenu(self)
+            menu.setFont(config.get_menu_font())
+
             remove_action = QAction("Remove", self)
             remove_action.triggered.connect(lambda: self.remove_attachment(item))
             menu.addAction(remove_action)

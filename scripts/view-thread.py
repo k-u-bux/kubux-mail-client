@@ -102,7 +102,7 @@ class ThreadViewer(QMainWindow):
                
         # Create context menu
         context_menu = QMenu(self)
-        context_menu.setFont(config.get_text_font())
+        context_menu.setFont(config.get_menu_font())
         
         selected_items = self.results_table.selectedItems();
 

@@ -269,7 +269,7 @@ class QueryEditor(QMainWindow):
         
         # Create context menu
         context_menu = QMenu(self)
-        context_menu.setFont(config.get_text_font())
+        context_menu.setFont(config.get_menu_font())
         
         # Add actions
         execute_action = QAction("Execute", self)
@@ -563,7 +563,7 @@ class QueryEditor(QMainWindow):
             return
 
         menu = QMenu(self)
-        menu.setFont(config.get_text_font())
+        menu.setFont(config.get_menu_font())
         for identity in identities:
             action_text = f"From: {identity.get('name', '')} <{identity.get('email', '')}>"
             action = menu.addAction(action_text)

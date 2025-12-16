@@ -13,6 +13,7 @@ class Config:
 
         # Visual settings
         self.interface_font = self.get_font('interface')
+        self.menu_font = self.get_font('menu')
         self.text_font = self.get_font('text')
         
     def load_config(self):
@@ -21,6 +22,8 @@ class Config:
             "visual": {
                 "interface_font": "monospace",
                 "interface_font_size": 12,
+                "menu_font": "monospace",
+                "menu_font_size": 12,
                 "text_font": "monospace",
                 "text_font_size": 12
             },
@@ -95,6 +98,9 @@ class Config:
 
     def get_interface_font(self):
         return self.get_font("interface")
+
+    def get_menu_font(self):
+        return self.get_font("menu")
 
     def get_text_font(self):
         return self.get_font("text")
