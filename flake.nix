@@ -38,6 +38,7 @@
             pkgs.isort
             pkgs.mypy
             pkgs.notmuch
+            pkgs.muchsync
             pkgs.gnupg
             pkgs.msmtp
             pkgs.jq
