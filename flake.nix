@@ -78,7 +78,7 @@
               makeWrapper ${pythonEnv}/bin/python $out/bin/$file \
                 --add-flags "$out/bin/$file.py" \
                 --set-default TMPDIR "/tmp" \
-                --prefix LD_LIBRARY_PATH : "${pkgs.lib.makeLibraryPath [ pkgs.xorg.libxcbcursor ]}";
+                --prefix LD_LIBRARY_PATH : "${pkgs.lib.makeLibraryPath [ pkgs.xorg.libxcb-cursor ]}";
 	          done
     
             # Copy desktop file
