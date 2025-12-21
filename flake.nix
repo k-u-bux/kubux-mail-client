@@ -30,6 +30,7 @@
           
           buildInputs = [ 
             pythonEnv 
+	    pkgs.qt6.qtbase
             pkgs.isync
             pkgs.poetry
             pkgs.black
