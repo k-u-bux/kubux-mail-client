@@ -31,6 +31,7 @@
           buildInputs = [ 
             pythonEnv 
 	    pkgs.qt6.qtbase
+            pkgs.xorg.xcbutilcursor
             pkgs.isync
             pkgs.poetry
             pkgs.black
@@ -78,7 +79,7 @@
               makeWrapper ${pythonEnv}/bin/python $out/bin/$file \
                 --add-flags "$out/bin/$file.py" \
                 --set-default TMPDIR "/tmp" \
-                --prefix LD_LIBRARY_PATH : "${pkgs.lib.makeLibraryPath [ pkgs.xorg.libxcb-cursor ]}";
+                --prefix LD_LIBRARY_PATH : "${pkgs.lib.makeLibraryPath [ pkgs.xorg.xcbutilcursor ]}";
 	          done
     
             # Copy desktop file
