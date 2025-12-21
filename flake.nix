@@ -77,7 +77,8 @@
             for file in ai-classify ai-train edit-mail view-mail view-thread open-drafts manage-mail show-query-results send-mail get-message-id pause-imap-sync; do
               makeWrapper ${pythonEnv}/bin/python $out/bin/$file \
                 --add-flags "$out/bin/$file.py" \
-                --set-default TMPDIR "/tmp";
+                --set-default TMPDIR "/tmp" \
+                --prefix LD_LIBRARY_PATH : "${pkgs.lib.makeLibraryPath [ pkgs.xorg.libxcbcursor ]}";
 	          done
     
             # Copy desktop file
