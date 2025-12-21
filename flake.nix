@@ -79,7 +79,7 @@
               makeWrapper ${pythonEnv}/bin/python $out/bin/$file \
                 --add-flags "$out/bin/$file.py" \
                 --set-default TMPDIR "/tmp" \
-                --prefix LD_LIBRARY_PATH : "${pkgs.lib.makeLibraryPath [ pkgs.xorg.xcbutilcursor ]}" \
+                --prefix LD_LIBRARY_PATH : "${pkgs.lib.makeLibraryPath [ pkgs.xorg.xcbutilcursor pkgs.xorg.libX11 pkgs.libxkbcommon pkgs.dbus.lib]}" \
                 --set QT_PLUGIN_PATH "${pkgs.qt6.qtbase}/${pkgs.qt6.qtbase.qtPluginPrefix}" \
 		;
 	          done
