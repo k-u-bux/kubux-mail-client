@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+
+# Set paths for S/MIME certificate and private key
+# These must be provided for decryption to succeed.
+SMIME_CERT="/path/to/your/certificate.pem"
+SMIME_KEY="/path/to/your/private_key.pem"
+
+for file in "$@"; do
+    tempfile=$(mktemp)
+    trap 'rm -f "$tempfile"' EXIT
+
+    # Check if the file is an S/MIME message
+    if grep -q 'MIME-Version: 1.0' "$file" && grep -q 'application/pkcs7-mime' "$file"; then
+        if openssl smime -decrypt -in "$file" -recip "$SMIME_CERT" -inkey "$SMIME_KEY" >"$tempfile" 2>/dev/null; then
+            mv "$tempfile" "$file"
+            echo "Successfully decrypted S/MIME file: $file"
+        else
+            rm "$tempfile"
+            echo "S/MIME decryption failed for $file" >&2
+        fi
+    # Check if the file is an OpenPGP message
+    elif grep -q 'BEGIN PGP MESSAGE' "$file"; then
+        if gpg --decrypt "$file" >"$tempfile" 2>/dev/null; then
+            key_temp=$(mktemp)
+            trap 'rm -f "$key_temp"' EXIT
+
+            if sed -n '/-----BEGIN PGP PUBLIC KEY BLOCK-----/,/-----END PGP PUBLIC KEY BLOCK-----/p' "$tempfile" > "$key_temp"; then
+                gpg --import "$key_temp" 2>/dev/null
+            fi
+
+            mv "$tempfile" "$file"
+            echo "Successfully decrypted OpenPGP file: $file"
+        else
+            rm "$tempfile"
+            echo "OpenPGP decryption failed for $file" >&2
+        fi
+    else
+        rm "$tempfile"
+        echo "File $file is not a supported encrypted format." >&2
+    fi
+done
+
+trap - EXIT
