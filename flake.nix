@@ -43,6 +43,7 @@
           ];
           nativeBuildInputs = [ 
             pkgs.makeWrapper
+            pkgs.qt6.wrapQtAppsHook
             pythonEnv
             pkgs.notmuch
             pkgs.muchsync
