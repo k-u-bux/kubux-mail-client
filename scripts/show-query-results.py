@@ -30,7 +30,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 
 class QueryResultsViewer(QMainWindow):
-    def __init__(self, query_string="tag:inbox and tag:unread", parent=None):
+    def __init__(self, query_string=config.get_search(), parent=None):
         super().__init__(parent)
         self.setWindowTitle("Kubux Mail Client - Search Results")
         self.resize(QSize(1024, 768))
@@ -568,7 +568,7 @@ class QueryResultsViewer(QMainWindow):
 # --- Main Entry Point ---
 def main():
     parser = argparse.ArgumentParser(description="View notmuch query results in a list.")
-    parser.add_argument("--query", help="The notmuch query to display.", default="tag:inbox and tag:unread")
+    parser.add_argument("--query", help="The notmuch query to display.", default=config.get_search())
     args = parser.parse_args()
     
     app = QApplication(sys.argv)

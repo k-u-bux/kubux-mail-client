@@ -118,7 +118,10 @@ class Config:
         return self.data.get("email_identities", {}).get("identities", [])
 
     def get_tags(self):
-        return self.data.get("tags", {}).get("tags", [])
+        return self.data.get("searches", {}).get("tags", [])
+
+    def get_search(self):
+        return self.data.get("searches", {}).get("search", "tag:inbox and tag:unread" )
 
     def get_model(self):
         path = self.data.get("predicting", {}).get("model", None)
