@@ -19,6 +19,10 @@
           pyPkgs.watchdog
           pyPkgs.mail-parser
           pyPkgs.pytest
+          pyPkgs.pytest-mock
+          pyPkgs.pytest-cov
+          pyPkgs.pytest-qt
+          pyPkgs.coverage
           pyPkgs.scancode-toolkit
         ]);
       in {
@@ -60,7 +64,7 @@
             mkdir -p $out/share/applications
 	          mkdir -p $out/share/man/man1
 	    
-            # Copy the Python scripts
+            # Copy Python scripts
             cp $src/scripts/*.py $out/bin/
             cp $src/scripts/*.jq $out/bin/
             cp $src/scripts/predict-tags $out/bin/
@@ -72,7 +76,7 @@
             chmod +x $out/bin/decrypt-on-the-fly
             chmod +x $out/bin/mbsync-and-decrypt
 
-	          # Copy the man page
+	          # Copy man page
 	          # cp kubux-mail-client.1 $out/share/man/man1
 
             # Create wrapper using makeWrapper for proper desktop integration
@@ -117,14 +121,19 @@
             pkgs.gnupg
             pkgs.msmtp
             pkgs.jq
+            pkgs.pytest-mock
+            pkgs.pytest-cov
+            pkgs.pytest-qt
+            pkgs.coverage
           ];
     
           shellHook = ''
-            echo "Welcome to the kubux-notmuch-mail-client development shell!"
-            echo "Python environment is ready with PySide6, Notmuch, Scikit-learn, and TOML."
+            echo "Welcome to kubux-notmuch-mail-client development shell!"
+            echo "Python environment is ready with PySide6, Notmuch, Scikit-learn, TOML and testing tools."
             echo "System tools like notmuch, mbsync, gpg, and msmtp are also available."
-            export KUBUIX_NOTMUCH_CONFIG_DIR=$HOME/.config/kubux-notmuch-mail-client
+            echo "Testing tools: pytest, pytest-mock, pytest-cov, pytest-qt, coverage"
+            export KUBUX_NOTMUCH_CONFIG_DIR=$HOME/.config/kubux-notmuch-mail-client
           '';
-        };
+        });
       });   
 }
