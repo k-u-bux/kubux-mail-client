@@ -34,7 +34,7 @@
           
           buildInputs = [ 
             pythonEnv 
-	    pkgs.qt6.qtbase
+	          pkgs.qt6.qtbase
             # pkgs.xorg.xcbutilcursor
             pkgs.isync
             pkgs.poetry
@@ -121,10 +121,6 @@
             pkgs.gnupg
             pkgs.msmtp
             pkgs.jq
-            pkgs.pytest-mock
-            pkgs.pytest-cov
-            pkgs.pytest-qt
-            pkgs.coverage
           ];
     
           shellHook = ''
