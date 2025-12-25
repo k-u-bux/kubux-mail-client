@@ -102,9 +102,9 @@
           meta = with pkgs.lib; {
             description = "A Notmuch email client with predictive pre-tagging";
             homepage = "https://github.com/kubux/kubux-mail-client";
-            license = licenses.asl20;
+            license = pkgs.lib.licenses.asl20;
             maintainers = [ ];
-            platforms = platforms.linux;
+            platforms = pkgs.lib.platforms.linux;
           };
         };
 
@@ -134,6 +134,6 @@
             echo "Testing tools: pytest, pytest-mock, pytest-cov, pytest-qt, coverage"
             export KUBUX_NOTMUCH_CONFIG_DIR=$HOME/.config/kubux-notmuch-mail-client
           '';
-        });
-      });   
+        };
+      });
 }
