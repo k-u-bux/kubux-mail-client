@@ -45,9 +45,6 @@ menu_font_size = 12
 text_font = "monospace"
 text_font_size = 12
 
-[tags]
-tags = ["todo", "done", "read", "important"]
-
 [bindings]
 quit_action = "Ctrl+Q"
 zoom_in = "Ctrl++"
@@ -60,7 +57,7 @@ identities = [
 ]
 
 [searches]
-tags = ["inbox", "unread"]
+tags = ["todo", "done", "read"]
 search = "tag:inbox and tag:unread"
 
 [predicting]

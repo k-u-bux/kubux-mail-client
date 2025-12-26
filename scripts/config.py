@@ -27,9 +27,12 @@ class Config:
                 "text_font": "monospace",
                 "text_font_size": 12
             },
-            "tags": [
-                "todo", "done", "read"
-            ],
+            "searches": {
+                "search": "tag:inbox and tag:unread",
+                "tags": [
+                    "todo", "done", "read"
+                ]
+            },
             "bindings": {
                 "quit_action": "Ctrl+Q",
                 "zoom_in": "Ctrl++",
