@@ -64,7 +64,7 @@ class TestHtmlToPlainText:
         """Test </p> tag conversion to newline."""
         html = "<p>Line1</p><p>Line2</p>"
         result = html_to_plain_text(html)
-        assert result == "Line1\n\nLine2"
+        assert result == "Line1\nLine2"
     
     def test_script_removal(self):
         """Test removing script tags and content."""
