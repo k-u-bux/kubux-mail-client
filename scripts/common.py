@@ -16,8 +16,81 @@ import shutil
 from config import config
 import re
 import html2text
+from bs4 import BeautifulSoup, Comment
+import html
 
 def html_to_plain_text(html_content: str) -> str:
+    if not html_content:
+        return ""
+
+    soup = BeautifulSoup(html_content, "html.parser")
+
+    # 1. Cleanup non-content tags
+    for element in soup(["script", "style", "head", "meta", "title"]):
+        element.decompose()
+
+    # 2. Transform links: <a>label</a> -> <a>label (url)</a>
+    for a in soup.find_all('a', href=True):
+        url = a['href']
+        label = a.get_text(strip=True)
+        if url.startswith('mailto:'):
+            url = url[7:]
+        
+        # Only append URL if it's not identical to the label
+        if label != url:
+            new_content = f"{label} ({url})"
+            a.string = new_content
+
+    # 3. Structural whitespace: Insert newlines before block elements
+    for tag in soup.find_all(['p', 'div', 'br', 'li', 'tr', 'h1', 'h2', 'h3']):
+        tag.insert_before('\n')
+
+    # 4. Extract text with a separator to prevent word-clumping
+    text = soup.get_text(separator=' ')
+
+    # 5. Decode all entities and normalize whitespace
+    text = html.unescape(text)
+    
+    # Procedural cleanup of whitespace and empty lines
+    lines = (line.strip() for line in text.splitlines())
+    return '\n'.join(line for line in lines if line)
+
+def html_to_plain_text_b(html_content: str) -> str:
+    if not html_content:
+        return ""
+
+    # Parse with the built-in parser
+    soup = BeautifulSoup(html_content, "html.parser")
+
+    # 1. Kill all script, style, and font tags
+    # Also kill 'head' and 'meta' if they exist in the blob
+    for element in soup(["script", "style", "font", "head", "meta", "title"]):
+        element.decompose()
+
+    # 2. Remove HTML comments
+    for comment in soup.find_all(string=lambda text: isinstance(text, Comment)):
+        comment.extract()
+
+    # 3. Handle line breaks: 
+    # Insert a literal newline before every block-level tag to prevent words from sticking
+    for tag in soup.find_all(['p', 'div', 'br', 'li', 'tr']):
+        tag.insert_before('\n')
+
+    # 4. Extract text
+    # separator=' ' ensures inline tags don't merge words: <span>A</span><span>B</span> -> A B
+    text = soup.get_text(separator=' ')
+
+    # 5. Final Cleanup
+    # html.unescape handles EVERY entity (&trade;, &#9993;, etc.)
+    text = html.unescape(text)
+
+    # Consolidate whitespace
+    lines = (line.strip() for line in text.splitlines())
+    # Drop empty lines but keep single breaks between paragraphs
+    chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
+    return '\n'.join(chunk for chunk in chunks if chunk)
+
+def html_to_plain_text_stupid(html_content: str) -> str:
     h = html2text.HTML2Text()
     h.ignore_links = False  # Keep URLs in the text
     h.body_width = 0        # Don't wrap lines automatically

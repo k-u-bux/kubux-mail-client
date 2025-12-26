@@ -25,6 +25,7 @@
           pyPkgs.coverage
           pyPkgs.scancode-toolkit
           pyPkgs.html2text
+          pyPkgs.beautifulsoup4
         ]);
       in {
         packages.default = pkgs.stdenv.mkDerivation {
