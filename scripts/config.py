@@ -137,9 +137,9 @@ class Config:
 
     def is_me(self, address_string_list) -> bool:
         from_addresses = getaddresses(address_string_list)
-        from_addrs_only = {addr for name, addr in from_addresses}
+        from_addrs_only = {addr.casefold() for name, addr in from_addresses}
         my_addresses = getaddresses([me["email"] for me in self.get_identities()])
-        my_addrs_only = {addr for name, addr in my_addresses}
+        my_addrs_only = {addr.casefold() for name, addr in my_addresses}
         # print(f"DEBUG:{from_addrs_only} vs {my_addrs_only}")
         return not from_addrs_only.isdisjoint(my_addrs_only)
 
