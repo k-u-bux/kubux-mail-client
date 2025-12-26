@@ -19,7 +19,7 @@ import html2text
 from bs4 import BeautifulSoup, Comment
 import html
 
-def html_to_plain_text_a(html_content: str) -> str:
+def html_to_plain_text(html_content: str) -> str:
     if not html_content:
         return ""
 
@@ -96,7 +96,7 @@ def html_to_plain_text_stupid(html_content: str) -> str:
     h.body_width = 0        # Don't wrap lines automatically
     return h.handle(html_content).strip()
 
-def html_to_plain_text(html_content):
+def html_to_plain_text_hack(html_content):
     """
     Converts a string of HTML content to plain text.
     
