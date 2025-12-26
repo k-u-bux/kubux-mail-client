@@ -15,8 +15,15 @@ import subprocess
 import shutil
 from config import config
 import re
+import html2text
 
-def html_to_plain_text(html_content):
+def html_to_plain_text(html_content: str) -> str:
+    h = html2text.HTML2Text()
+    h.ignore_links = False  # Keep URLs in the text
+    h.body_width = 0        # Don't wrap lines automatically
+    return h.handle(html_content).strip()
+
+def html_to_plain_text_old(html_content):
     """
     Converts a string of HTML content to plain text.
     

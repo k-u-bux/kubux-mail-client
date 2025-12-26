@@ -24,6 +24,7 @@
           pyPkgs.pytest-qt
           pyPkgs.coverage
           pyPkgs.scancode-toolkit
+          pyPkgs.html2text
         ]);
       in {
         packages.default = pkgs.stdenv.mkDerivation {
