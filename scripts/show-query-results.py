@@ -228,7 +228,7 @@ class QueryResultsViewer(QMainWindow):
         
         if total_width > 0:
             self._width_ratio = sender_width / total_width
-            print(f"new ratio = {self._width_ratio} from col1 = {sender_width} and col2 = {subject_width}")
+            # print(f"new ratio = {self._width_ratio} from col1 = {sender_width} and col2 = {subject_width}")
 
     def _fix_column_widths(self,ratio):
         # Ensure the table is not empty to avoid errors
@@ -244,7 +244,7 @@ class QueryResultsViewer(QMainWindow):
         # Calculate the remaining space
         remaining_width = total_width - date_col_width
 
-        # Calculate the target widths for Subject and Sender based on 70:30 ratio
+        # Calculate the target widths for Subject and Sender based on ratio
         subject_col_width = int(remaining_width * ratio)
         sender_col_width = int(remaining_width * (1.0 - ratio))
 
