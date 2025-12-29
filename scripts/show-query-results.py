@@ -345,15 +345,20 @@ class QueryResultsViewer(QMainWindow):
     def _update_row_for_mail(self, row_idx, mail):
         """Helper to populate a row for a mail item from `notmuch show`."""
         date_stamp = mail.get("timestamp")
-        date_item = self._create_date_item(date_stamp)
-        self.results_table.setItem(row_idx, 0, date_item)
-        
         subject_text = mail.get("headers", {}).get("Subject", "No Subject")
-        subject_item = QTableWidgetItem(subject_text)
-        self.results_table.setItem(row_idx, 2, subject_item)
-        
         sender_receiver_text = self._get_sender_receiver(mail)
+        summary_text = f"{sender_receiver_text}: {subject_text}"
+
+        date_item = self._create_date_item(date_stamp)
+        subject_item = QTableWidgetItem(subject_text)
         sender_receiver_item = QTableWidgetItem(sender_receiver_text)
+
+        date_item.setData(Qt.ItemDataRole.ToolTipRole, summary_text)
+        subject_item.setData(Qt.ItemDataRole.ToolTipRole, summary_text)
+        sender_receiver_item.setData(Qt.ItemDataRole.ToolTipRole, summary_text)
+
+        self.results_table.setItem(row_idx, 0, date_item)
+        self.results_table.setItem(row_idx, 2, subject_item)
         self.results_table.setItem(row_idx, 1, sender_receiver_item)
         
         self.results_table.item(row_idx, 0).setData(Qt.ItemDataRole.UserRole, mail)
