@@ -245,13 +245,18 @@ class ThreadViewer(QMainWindow):
             date_item = self._create_date_item(mail.get("timestamp"))
             sender_receiver_text = self._get_sender_receiver(mail)
             sender_receiver_item = QTableWidgetItem(sender_receiver_text)
-            
             subject_text = mail.get("headers", {}).get("Subject", "No Subject")
+            summary_text = f"{sender_receiver_text}: {subject_text}"
+
             if indent:
                 indent_string = ". " * mail.get('depth', 0)
                 subject_text = indent_string + subject_text
             subject_item = QTableWidgetItem(subject_text)
-            
+                        
+            date_item.setData(Qt.ItemDataRole.ToolTipRole, summary_text)
+            subject_item.setData(Qt.ItemDataRole.ToolTipRole, summary_text)
+            sender_receiver_item.setData(Qt.ItemDataRole.ToolTipRole, summary_text)
+
             self.results_table.setItem(row_idx, 0, date_item)
             self.results_table.setItem(row_idx, 1, sender_receiver_item)
             self.results_table.setItem(row_idx, 2, subject_item)
