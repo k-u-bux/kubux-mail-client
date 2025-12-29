@@ -324,18 +324,22 @@ class QueryResultsViewer(QMainWindow):
         """Helper to populate a row for a thread item from `notmuch search --output=summary`."""
         
         date_stamp = thread.get("timestamp")
-        date_item = self._create_date_item(date_stamp)
-        self.results_table.setItem(row_idx, 0, date_item)
-        
         subject_text = f"<{thread.get('total')}> {thread.get('subject')}"
+        authors_text = thread.get("authors", "unknown")
+        summary_text = f"{authors_text}: {subject_text}"
+
+        date_item = self._create_date_item(date_stamp)
         subject_item = QTableWidgetItem(subject_text)
+        authors_item = QTableWidgetItem(authors_text)
+
+        date_item.setData(Qt.ItemDataRole.ToolTipRole, summary_text)
+        subject_item.setData(Qt.ItemDataRole.ToolTipRole, summary_text)
+        authors_item.setData(Qt.ItemDataRole.ToolTipRole, summary_text)
+
+        self.results_table.setItem(row_idx, 0, date_item)        
         self.results_table.setItem(row_idx, 2, subject_item)
-        
-        # Directly use the authors field from the thread summary
-        authors_item = QTableWidgetItem(thread.get("authors", "Unknown"))
         self.results_table.setItem(row_idx, 1, authors_item)
         
-        # Store the entire thread object in the first column's user data
         self.results_table.item(row_idx, 0).setData(Qt.ItemDataRole.UserRole, thread)
 
     def _update_row_for_mail(self, row_idx, mail):
