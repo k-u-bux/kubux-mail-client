@@ -326,7 +326,7 @@ class QueryResultsViewer(QMainWindow):
         date_stamp = thread.get("timestamp")
         subject_text = f"<{thread.get('total')}> {thread.get('subject')}"
         authors_text = thread.get("authors", "unknown")
-        summary_text = f"{authors_text}: {subject_text}"
+        summary_text = f"{authors_text}\n{subject_text}"
 
         date_item = self._create_date_item(date_stamp)
         subject_item = QTableWidgetItem(subject_text)
@@ -347,7 +347,7 @@ class QueryResultsViewer(QMainWindow):
         date_stamp = mail.get("timestamp")
         subject_text = mail.get("headers", {}).get("Subject", "No Subject")
         sender_receiver_text = self._get_sender_receiver(mail)
-        summary_text = f"{sender_receiver_text}: {subject_text}"
+        summary_text = f"{sender_receiver_text}\n{subject_text}"
 
         date_item = self._create_date_item(date_stamp)
         subject_item = QTableWidgetItem(subject_text)

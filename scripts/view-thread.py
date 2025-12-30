@@ -246,7 +246,7 @@ class ThreadViewer(QMainWindow):
             sender_receiver_text = self._get_sender_receiver(mail)
             sender_receiver_item = QTableWidgetItem(sender_receiver_text)
             subject_text = mail.get("headers", {}).get("Subject", "No Subject")
-            summary_text = f"{sender_receiver_text}: {subject_text}"
+            summary_text = f"{sender_receiver_text}\n{subject_text}"
 
             if indent:
                 indent_string = ". " * mail.get('depth', 0)
