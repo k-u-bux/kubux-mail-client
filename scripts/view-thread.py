@@ -22,7 +22,7 @@ import logging
 
 from notmuch import notmuch_show, flatten_message_tree, find_matching_messages, find_matching_threads, apply_tag_to_query
 from config import config
-from common import display_error
+from common import display_error, create_summary_text
 
 # Set up basic logging to console
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -246,7 +246,8 @@ class ThreadViewer(QMainWindow):
             sender_receiver_text = self._get_sender_receiver(mail)
             sender_receiver_item = QTableWidgetItem(sender_receiver_text)
             subject_text = mail.get("headers", {}).get("Subject", "No Subject")
-            summary_text = f"{sender_receiver_text}\n{subject_text}"
+            # summary_text = f"{sender_receiver_text}\n{subject_text}"
+            summary_text = create_summary_text( sender_receiver_text, subject_text, config.get_text_font() )
 
             if indent:
                 indent_string = ". " * mail.get('depth', 0)

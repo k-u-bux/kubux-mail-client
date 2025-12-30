@@ -19,6 +19,24 @@ import html2text
 from bs4 import BeautifulSoup, Comment
 import html
 
+def font_to_html_style(font: QFont) -> str:
+    family = font.family()
+    size = font.pointSize()
+    weight = "bold" if font.bold() else "normal"
+    style = "italic" if font.italic() else "normal"
+    return (f"font-family: '{family}'; "
+            f"font-size: {size}pt; "
+            f"font-weight: {weight}; "
+            f"font-style: {style};")
+
+def create_summary_text( authors, subject, font ) -> str:
+    style_str = font_to_html_style( font )
+    return (
+        f"<div style=\"{style_str} white-space: pre-wrap;\">"
+        f"<p>{html.escape(authors)}</p><p>{html.escape(subject)}</p>"
+        f"</div>"
+    )
+
 def html_to_plain_text(html_content: str) -> str:
     if not html_content:
         return ""

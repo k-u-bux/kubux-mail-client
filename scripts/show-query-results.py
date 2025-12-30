@@ -22,7 +22,7 @@ import logging
 
 from notmuch import find_matching_messages, find_matching_threads, apply_tag_to_query, get_tags_from_query, update_unseen_from_query
 from config import config
-from common import display_error, create_draft, create_new_mail_menu, launch_drafts_manager
+from common import display_error, create_draft, create_new_mail_menu, launch_drafts_manager, create_summary_text
 from query import QueryParser
 
 # Set up basic logging to console
@@ -326,7 +326,8 @@ class QueryResultsViewer(QMainWindow):
         date_stamp = thread.get("timestamp")
         subject_text = f"<{thread.get('total')}> {thread.get('subject')}"
         authors_text = thread.get("authors", "unknown")
-        summary_text = f"{authors_text}\n{subject_text}"
+        summary_text = create_summary_text( authors_text, subject_text, config.get_text_font() )
+        # summary_text = f"{authors_text}\n{subject_text}"
 
         date_item = self._create_date_item(date_stamp)
         subject_item = QTableWidgetItem(subject_text)
@@ -347,7 +348,8 @@ class QueryResultsViewer(QMainWindow):
         date_stamp = mail.get("timestamp")
         subject_text = mail.get("headers", {}).get("Subject", "No Subject")
         sender_receiver_text = self._get_sender_receiver(mail)
-        summary_text = f"{sender_receiver_text}\n{subject_text}"
+        summary_text = create_summary_text( sender_receiver_text, subject_text, config.get_text_font() )
+        # summary_text = f"{sender_receiver_text}\n{subject_text}"
 
         date_item = self._create_date_item(date_stamp)
         subject_item = QTableWidgetItem(subject_text)
