@@ -75,8 +75,6 @@ def pause_imap_sync(host: str, port: int, user: str, password: str, timeout: int
             server.login(user, password)
             server.select_folder(DEFAULT_MAILBOX) 
             
-            print(f"IMAP IDLE: Watching '{DEFAULT_MAILBOX}' on {host}:{port} for up to {timeout} seconds...")
-
             start_time = time.monotonic()
             while True:
                 elapsed = time.monotonic() - start_time
@@ -85,6 +83,7 @@ def pause_imap_sync(host: str, port: int, user: str, password: str, timeout: int
                     print(f"IMAP IDLE: Total timeout reached ({timeout}s).")
                     sys.exit(0)
 
+                print(f"IMAP IDLE: Watching '{DEFAULT_MAILBOX}' on {host}:{port} for up to {timeout} seconds, {remaining} remaining...")
                 server.idle()
                 responses = server.idle_check(timeout=remaining)
                 server.idle_done()
