@@ -83,7 +83,7 @@ def pause_imap_sync(host: str, port: int, user: str, password: str, timeout: int
                     print(f"IMAP IDLE: Total timeout reached ({timeout}s).")
                     sys.exit(0)
 
-                print(f"IMAP IDLE: Watching '{DEFAULT_MAILBOX}' on {host}:{port} for up to {timeout} seconds, {remaining} remaining...")
+                print(f"IMAP IDLE: Watching '{DEFAULT_MAILBOX}' on {host}:{port} for up to {timeout} seconds, {int(0.5+remaining)} remaining...")
                 server.idle()
                 responses = server.idle_check(timeout=remaining)
                 server.idle_done()
