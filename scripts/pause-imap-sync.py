@@ -9,7 +9,7 @@ import toml
 # --- Configuration Constants ---
 DEFAULT_CONFIG = "~/.config/kubux-mail-client/imap-config.toml"
 DEFAULT_MAILBOX = 'INBOX'
-DEFAULT_TIMEOUT = 300 # seconds
+DEFAULT_TIMEOUT = 1800 # seconds
 # -------------------------------
 
 SYNC_WORTHY_EVENTS = {b'EXISTS', b'EXPUNGE', b'FETCH', b'RECENT'}
