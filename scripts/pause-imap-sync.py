@@ -12,6 +12,8 @@ DEFAULT_MAILBOX = 'INBOX'
 DEFAULT_TIMEOUT = 300 # seconds
 # -------------------------------
 
+SYNC_WORTHY_EVENTS = {b'EXISTS', b'EXPUNGE', b'FETCH', b'RECENT'}
+
 def load_credentials(config_path: str, from_address: str) -> tuple[str, int, str, str]:
     """Loads IMAP credentials (host, port, user, pass) for the specified 'from' address."""
     try:
@@ -80,11 +82,19 @@ def pause_imap_sync(host: str, port: int, user: str, password: str, timeout: int
             server.idle_done()
 
             if responses:
-                print(f"IMAP IDLE: Change detected ({len(responses)} server events). Triggering sync.")
+                actionable = any(
+                    any(evt_type == event for event in SYNC_WORTHY_EVENTS)
+                    for _, evt_type in responses if isinstance(evt_type, bytes)
+                )
+                if actionable:
+                    print(f"IMAP IDLE: Data change detected: {responses}. Trigger Sync...")
+                    sys.exit(0)
+                else:
+                    print(f"IMAP IDLE: Heartbeat/Noise detected: {responses}. Continuing...")
+
             else:
                 print(f"IMAP IDLE: Timeout reached ({timeout}s).")
-            
-            sys.exit(0)
+                sys.exit(0)
 
     except Exception as e:
         # Fail hard on any IMAP error (per your preference)
