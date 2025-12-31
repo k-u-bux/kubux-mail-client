@@ -77,24 +77,25 @@ def pause_imap_sync(host: str, port: int, user: str, password: str, timeout: int
             
             print(f"IMAP IDLE: Watching '{DEFAULT_MAILBOX}' on {host}:{port} for up to {timeout} seconds...")
 
-            server.idle()
-            responses = server.idle_check(timeout=timeout)
-            server.idle_done()
-
-            if responses:
-                actionable = any(
-                    any(evt_type == event for event in SYNC_WORTHY_EVENTS)
-                    for _, evt_type in responses if isinstance(evt_type, bytes)
-                )
-                if actionable:
-                    print(f"IMAP IDLE: Data change detected: {responses}. Trigger Sync...")
-                    sys.exit(0)
+            while True:
+                server.idle()
+                responses = server.idle_check(timeout=timeout)
+                server.idle_done()
+    
+                if responses:
+                    actionable = any(
+                        any(evt_type == event for event in SYNC_WORTHY_EVENTS)
+                        for _, evt_type in responses if isinstance(evt_type, bytes)
+                    )
+                    if actionable:
+                        print(f"IMAP IDLE: Data change detected: {responses}. Trigger Sync...")
+                        sys.exit(0)
+                    else:
+                        print(f"IMAP IDLE: Heartbeat/Noise detected: {responses}. Continuing...")
+    
                 else:
-                    print(f"IMAP IDLE: Heartbeat/Noise detected: {responses}. Continuing...")
-
-            else:
-                print(f"IMAP IDLE: Timeout reached ({timeout}s).")
-                sys.exit(0)
+                    print(f"IMAP IDLE: Timeout reached ({timeout}s).")
+                    sys.exit(0)
 
     except Exception as e:
         # Fail hard on any IMAP error (per your preference)
