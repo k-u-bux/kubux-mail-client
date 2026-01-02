@@ -22,7 +22,11 @@ import logging
 
 from notmuch import find_matching_messages, find_matching_threads, apply_tag_to_query, get_tags_from_query, update_unseen_from_query
 from config import config
-from common import display_error, create_draft, create_new_mail_menu, launch_drafts_manager, create_summary_text
+from common import (
+    display_error, 
+    create_draft, create_new_mail_menu, launch_drafts_manager, create_summary_text, 
+    DirectoryEventHandler, get_db_path
+)
 from query import QueryParser
 
 # Set up basic logging to console
@@ -40,10 +44,12 @@ class QueryResultsViewer(QMainWindow):
         self.results = []
         self._width_ratio = 0.3
         self._is_window_resize = True
+        self.dir_watcher = DirectoryEventHandler( self.execute_query )
 
         self.setup_ui()
         self.setup_key_bindings()
         self.execute_query()
+        self.dir_watcher.watch( get_db_path() )
 
     def _flag_resize(self, flag):
         self._is_window_resize = flag
@@ -153,6 +159,8 @@ class QueryResultsViewer(QMainWindow):
         
         # Connect click to action
         self.results_table.doubleClicked.connect(self.open_selected_item)
+
+        # self.dir_watcher.watch( get_db_path() )
 
     def show_context_menu(self, position):
         """Show context menu with options to delete, edit, or execute a query."""

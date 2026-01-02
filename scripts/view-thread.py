@@ -22,7 +22,7 @@ import logging
 
 from notmuch import notmuch_show, flatten_message_tree, find_matching_messages, find_matching_threads, apply_tag_to_query
 from config import config
-from common import display_error, create_summary_text
+from common import display_error, create_summary_text, DirectoryEventHandler, get_db_path
 
 # Set up basic logging to console
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -39,10 +39,12 @@ class ThreadViewer(QMainWindow):
         self.results = []
         self._width_ratio = 0.3
         self._is_window_resize = True
+        self.dir_watcher = DirectoryEventHandler( self.execute_query )
 
         self.setup_ui()
         self.setup_key_bindings()
         self.execute_query()
+        self.dir_watcher.watch( get_db_path() )
 
     def _flag_resize(self, flag):
         self._is_window_resize = flag
