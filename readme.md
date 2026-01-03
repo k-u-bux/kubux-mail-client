@@ -51,49 +51,15 @@ The application follows a modular design with independent components:
 
 ## Installation
 
-### Prerequisites
-
-- Python 3.8+
-- [Notmuch](https://notmuchmail.org/)
-- [mbsync](http://isync.sourceforge.net/) (or OfflineIMAP)
-- Qt6 (PySide6)
-- scikit-learn
-- Additional Python dependencies (see requirements below)
-
-### Python Dependencies
+You need the mix package manager with access to nixpkgs. Then run:
 
 ```bash
-pip install PySide6 toml joblib scikit-learn mail-parser
-```
-
-### Setup
-
-1. Clone the repository:
-```bash
-git clone <repository-url>
-cd kubux-mail-client
-```
-
-2. Create the configuration directory:
-```bash
-mkdir -p ~/.config/kubux-mail-client
-```
-
-3. Copy and edit the configuration files:
-```bash
-cp my_config/config.toml ~/.config/kubux-mail-client/
-cp my_config/smtp-config.toml ~/.config/kubux-mail-client/
-cp my_config/queries.json ~/.config/kubux-mail-client/
-```
-
-4. Set up your email accounts in the configuration files
-
-5. Initialize Notmuch:
-```bash
-notmuch setup
+nix profile install  github:k-u-bux/kubux-mail-client
 ```
 
 ## Configuration
+
+The program expects config files to reside in the directory $HOME/.config/kubux-mail-client.
 
 ### Main Configuration (`config.toml`)
 
@@ -103,11 +69,14 @@ The main configuration file controls visual settings, keybindings, tags, and ema
 [visual]
 interface_font = "monospace"
 interface_font_size = 12
+menu_font = "monospace"
+menu_font_size = 12
 text_font = "monospace"
 text_font_size = 12
 
-[tags]
-tags = ["todo", "done", "read", "important"]
+[searches]
+search = "tag:unread"
+tags = ["private", "professional", "apppointment", "todo", "done", "read", "important"]
 
 [email_identities]
 identities = [
@@ -124,7 +93,17 @@ quit_action = "Ctrl+Q"
 zoom_in = "Ctrl++"
 zoom_out = "Ctrl+-"
 # ... additional keybindings
+
+[predicting]
+model = "~/.config/kubux-mail-client/classify.pkl"
+
+[autocomplete]
+headers = [
+        "someone <someone@somehost.com>"
+        # ...
+]
 ```
+
 
 ### SMTP Configuration (`smtp-config.toml`)
 
@@ -220,45 +199,25 @@ Classify emails:
 
 Train the classifier:
 ```bash
-./scripts/ai-train --model <model-path>
+./scripts/ai-train [--model <model-path>]
 ```
 
 The AI classifier automatically learns from your tagging behavior and improves over time.
 
-## Project Structure
-
-```
-kubux-mail-client/
-├── scripts/               # Main application scripts
-│   ├── manage-mail.py    # Query manager (main UI)
-│   ├── view-mail.py      # Email viewer
-│   ├── view-thread.py    # Thread viewer
-│   ├── edit-mail.py      # Email composer
-│   ├── send-mail.py      # SMTP sender
-│   ├── ai-classify.py    # AI classifier
-│   ├── ai-train.py       # AI trainer
-│   ├── config.py         # Configuration management
-│   ├── common.py         # Shared utilities
-│   └── ...
-├── flake.nix             # the flake
-├── flake.lock            # and its lock
-├── readme.md             # this file
-└── ...
-```
 
 ## Privacy & Security
 
 - **Local Processing**: All email processing, indexing, and AI classification happens on your local machine
 - **No Cloud Dependencies**: No data is sent to external servers
-- **Encryption Support**: Handles PGP/S/MIME encrypted emails with on-the-fly decryption
-- **Disk Encryption**: Relies on full disk encryption for data-at-rest security
+- **Encryption Support**: Handles PGP encrypted emails with on-the-fly decryption
+- **Disk Encryption**: If you want mails to be in encrypted storage, use full disk encryption. This is outside the of this project's scope.
 - **Open Source**: All code is transparent and auditable
 
 ## Advanced Features
 
-### Tag Synchronization (Planned)
+### Tag Synchronization
 
-Multi-device tag synchronization via append-only log files synchronized through tools like Syncthing.
+Multi-device tag synchronization can be achived via muchsync.
 
 ### Custom Keybindings
 
@@ -268,22 +227,6 @@ All UI actions support customizable keybindings defined in `config.toml`.
 
 The modular architecture allows easy addition of new components and features following the Unix philosophy.
 
-
-## Troubleshooting
-
-### Common Issues
-
-1. **Mail not syncing**: Check mbsync configuration and credentials
-2. **Notmuch errors**: Ensure Notmuch database path is correctly configured
-3. **AI classifier not working**: Train the model first with `ai-train.py`
-4. **GUI font issues**: Adjust font settings in `config.toml`
-
-### Logging
-
-Enable detailed logging by setting the logging level in scripts:
-```python
-logging.basicConfig(level=logging.DEBUG)
-```
 
 ## License
 
