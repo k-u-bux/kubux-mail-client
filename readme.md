@@ -8,11 +8,10 @@ Kubux Mail Client is a modular email management system designed to find mails qu
 
 ### Key Features
 
-- **Privacy-First Design**: All processing happens locally; no cloud dependencies
-- **AI-Powered Classification**: Machine learning-based automatic tag prediction using scikit-learn
+- **Predictive Tagging**: Machine learning-based automatic tag prediction using scikit-learn
 - **Notmuch Integration**: Fast, tag-based email management and search
 - **Modular Architecture**: Independent, composable components following Unix philosophy
-- **GUI Mail Management**: Qt-based interfaces for viewing, composing, and organizing mail
+- **GUI Mail Management**: Qt-based interfaces for viewing, composing, and tagging mail
 - **Flexible Configuration**: Plain-text TOML configuration files
 - **Custom Query System**: Powerful search expressions with saved queries
 - **Multi-Identity Support**: Manage multiple email accounts and identities
@@ -25,23 +24,22 @@ The application follows a modular design with independent components:
 
 1. **Mail Synchronization**
    - Uses `mbsync` (or OfflineIMAP) to fetch mail from IMAP servers
+   - Uses `muchsync` to synchronize accross devices
    - Stores mail in standard Maildir format
-   - Optional on-the-fly decryption for PGP/S/MIME encrypted messages
+   - Optional on-the-fly decryption for PGP encrypted messages
 
 2. **Notmuch Indexer**
    - Indexes email content for fast searching
    - Maintains tag-based organization
    - Supports custom database locations
 
-3. **AI Classification System**
+3. **Tag Prediction**
    - `ai-classify.py`: Predicts tags for new emails using trained models
-   - `ai-train.py`: Trains/retrains models based on user feedback
-   - Uses TF-IDF vectorization with LinearSVC for efficient local processing
-   - Continuous learning from user corrections
+   - `ai-train.py`: Trains/retrains models based on user tagged mails
 
 4. **GUI Applications**
-   - `manage-mail.py`: Main interface for query management and mail organization
-   - `view-mail.py`: Single email viewer with rich formatting and attachment handling
+   - `manage-mail.py`: Main interface for query management
+   - `view-mail.py`: Single email viewer/tagger with rich formatting and attachment handling
    - `view-thread.py`: Thread-based conversation view
    - `show-query-results.py`: Display search results
    - `edit-mail.py`: Compose and edit emails
@@ -49,8 +47,7 @@ The application follows a modular design with independent components:
 
 5. **Mail Operations**
    - `send-mail.py`: SMTP-based mail sending with multi-account support
-   - Tag management integrated across all components
-   - Attachment handling (view, save, open)
+   - `pause-imap-sync`: waits idle until the IMAP server's state changes
 
 ## Installation
 
