@@ -854,7 +854,14 @@ class MailViewer(QMainWindow):
 
             with tempfile.NamedTemporaryFile(suffix=f"_{filename}", delete=False) as temp_file:
                 temp_file.write(payload_bytes)
+                temp_file.flush()
+                os.fsync(temp_file.fileno()) # Force write to disk
                 temp_path = temp_file.name
+                stats = os.stat(temp_path)
+                print(f"DEBUG: File size on disk: {stats.st_size} bytes")
+                mime_check = subprocess.run(["xdg-mime", "query", "filetype", temp_path], 
+                                            capture_output=True, text=True)
+                print(f"DEBUG: Detected MIME = {mime_check.stdout.strip()}")
                 subprocess.run(["xdg-open", temp_path])
                 
         except Exception as e:
