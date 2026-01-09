@@ -280,10 +280,11 @@ class AddressDelegate(QStyledItemDelegate):
 
     def editorEvent(self, event, model, option, index):
         if event.type() == QEvent.Type.MouseButtonPress and event.button() == Qt.RightButton:
-            text = index.data()
+            text = index.data(Qt.DisplayRole) if index.data(Qt.DisplayRole) else ""
             row, col = index.row(), index.column()
             
             doc = QTextDocument()
+            doc.setDefaultFont(self.config.get_text_font())  # Must match font used in paint()
             doc.setPlainText(text)
             doc.setTextWidth(option.rect.width())
             
