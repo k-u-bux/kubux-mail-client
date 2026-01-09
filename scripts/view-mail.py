@@ -73,40 +73,6 @@ class MailSourceViewer(QDialog):
         main_layout.addWidget(button_box)
 
 
-# Custom widget for clickable email addresses
-class ClickableLabel(QLabel):
-    clicked = Signal(str, bool)
-    
-    def __init__(self, text, address, parent=None):
-        super().__init__(text, parent)
-        self.address = address
-        self.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.selected = False
-        self.update_style()
-        self.setToolTip(address)
-
-    def mousePressEvent(self, event):
-        if event.button() == Qt.MouseButton.LeftButton:
-            self.selected = not self.selected
-            self.update_style()
-            self.clicked.emit(self.address, self.selected)
-        super().mousePressEvent(event)
-    
-    def enterEvent(self, event):
-        self.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.setStyleSheet("background-color: lightgray;")
-        super().enterEvent(event)
-    
-    def leaveEvent(self, event):
-        self.update_style()
-        super().leaveEvent(event)
-        
-    def update_style(self):
-        if self.selected:
-            self.setStyleSheet("background-color: #aaddff;")
-        else:
-            self.setStyleSheet("background-color: transparent;")
-
 class MailViewer(QMainWindow):
     def __init__(self, mail_file_path, parent=None):
         super().__init__(parent)
@@ -114,7 +80,6 @@ class MailViewer(QMainWindow):
         self.resize(QSize(1024, 768))
 
         self.mail_file_path = Path(mail_file_path).expanduser()
-        self.selected_addresses = set()
         self.tags = []
         self.tags_state = {}
         self.show_headers = True
@@ -586,13 +551,6 @@ class MailViewer(QMainWindow):
             display_error("Failed to Add Tag", f"Failed to add tag '{tag}':\n\n{e.stderr}")
 
 
-    def handle_address_selection(self, address, is_selected):
-        if is_selected:
-            self.selected_addresses.add(address)
-        else:
-            self.selected_addresses.discard(address)
-        print(f"Selected Addresses: {self.selected_addresses}")
-
     def _create_draft_and_open_editor(self, to_addrs, cc_addrs, subject_text, body_text, in_reply_to=None):
         """
         Creates a new mail draft and opens it in the external editor.
@@ -740,12 +698,13 @@ class MailViewer(QMainWindow):
         """
         Creates a reply draft for currently selected addresses.
         """
-        if not self.selected_addresses:
-            QMessageBox.warning(self, "No Addresses Selected", "Please click on at least one address to select it before replying.")
+        selected = self.headers_group_box.get_selected_addresses()
+        if not selected:
+            QMessageBox.warning(self, "No Addresses Selected", "Please right-click on at least one address to select it before replying.")
             return
 
-        to_list = list(self.selected_addresses)
-        cc_list = self.all_my_identities()
+        to_list = list(selected)
+        cc_list = list(self.all_my_identities())
         
         original_subject = self.message.get("Subject", "")
         if not original_subject.lower().startswith("re:"):
@@ -761,7 +720,8 @@ class MailViewer(QMainWindow):
         """
         Creates a new, empty mail draft.
         """
-        to_list = list(self.selected_addresses)
+        selected = self.headers_group_box.get_selected_addresses()
+        to_list = list(selected) if selected else []
         self._create_draft_and_open_editor(to_list, [], "", "")
 
     def do_forward(self, cc_all):

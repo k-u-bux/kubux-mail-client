@@ -169,7 +169,8 @@ class AddressDelegate(QStyledItemDelegate):
         super().__init__(parent)
         self.selected_addresses = {} # Key: (row, col) tuple, Value: list of selected addresses
         # Match full address: "Name <email>", Name <email>, <email>, or just email
-        self.email_regex = r'(?:"([^"]+)"|([^<>]+?))?\s*<([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})>|[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}'
+        # [^<>,]+ excludes commas from unquoted names
+        self.email_regex = r'(?:"([^"]+)"|([^<>,]+))?\s*<([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})>|[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}'
         self.config = config
         self.text_selection = {}  # (row, col) -> (start_char, end_char)
         self.selection_start_cell = None
@@ -366,6 +367,13 @@ class MailHeaderWidget(QWidget):
                 value_item.setFlags(value_item.flags() & ~Qt.ItemIsSelectable)
                 self.table_widget.setItem(row_idx, 1, value_item)
                 row_idx = row_idx + 1
+    
+    def get_selected_addresses(self):
+        """Return list of all selected email addresses"""
+        addresses = []
+        for cell_addresses in self.address_delegate.selected_addresses.values():
+            addresses.extend(cell_addresses)
+        return addresses
 
 class MailClient(QMainWindow):
     def __init__(self):
