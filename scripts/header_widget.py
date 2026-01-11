@@ -124,7 +124,12 @@ class LabelDelegate(QStyledItemDelegate):
         
         hit_point = pos - self.parent().visualRect(index).topLeft()
         char_pos = doc.documentLayout().hitTest(hit_point, Qt.HitTestAccuracy.ExactHit)
-        char_pos = max(0, min(char_pos, len(text)))
+        
+        # hitTest returns -1 when beyond text boundaries
+        if char_pos < 0:
+            char_pos = len(text)
+        else:
+            char_pos = max(0, min(char_pos, len(text)))
         
         self.text_selection.clear()
         self.selection_start_cell = (row, col)
@@ -143,7 +148,12 @@ class LabelDelegate(QStyledItemDelegate):
         
         hit_point = pos - self.parent().visualRect(index).topLeft()
         char_pos = doc.documentLayout().hitTest(hit_point, Qt.HitTestAccuracy.ExactHit)
-        char_pos = max(0, min(char_pos, len(text)))
+        
+        # hitTest returns -1 when beyond text boundaries
+        if char_pos < 0:
+            char_pos = len(text)
+        else:
+            char_pos = max(0, min(char_pos, len(text)))
         
         self.text_selection[(row, col)] = (self.text_selection[(row, col)][0], char_pos)
         self.parent().viewport().update()
@@ -236,7 +246,12 @@ class AddressDelegate(QStyledItemDelegate):
         
         hit_point = pos - self.parent().visualRect(index).topLeft()
         char_pos = doc.documentLayout().hitTest(hit_point, Qt.HitTestAccuracy.ExactHit)
-        char_pos = max(0, min(char_pos, len(text)))
+        
+        # hitTest returns -1 when beyond text boundaries
+        if char_pos < 0:
+            char_pos = len(text)
+        else:
+            char_pos = max(0, min(char_pos, len(text)))
         
         self.text_selection.clear()
         self.selection_start_cell = (row, col)
@@ -256,7 +271,12 @@ class AddressDelegate(QStyledItemDelegate):
         
         hit_point = pos - self.parent().visualRect(index).topLeft()
         char_pos = doc.documentLayout().hitTest(hit_point, Qt.HitTestAccuracy.ExactHit)
-        char_pos = max(0, min(char_pos, len(text)))
+        
+        # hitTest returns -1 when beyond text boundaries
+        if char_pos < 0:
+            char_pos = len(text)
+        else:
+            char_pos = max(0, min(char_pos, len(text)))
         
         self.text_selection[(row, col)] = (self.text_selection[(row, col)][0], char_pos)
         self.parent().viewport().update()
