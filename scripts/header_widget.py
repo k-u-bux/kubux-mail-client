@@ -168,8 +168,7 @@ class AddressDelegate(QStyledItemDelegate):
     def __init__(self, parent, config):
         super().__init__(parent)
         self.selected_addresses = {} # Key: (row, col) tuple, Value: list of selected addresses
-        # Match full address: "Name <email>", Name <email>, <email>, or just email
-        # [^<>,]+ excludes commas from unquoted names
+        # Match full address: "Name <email>", Name <email>, <email>, or just email, explude separating commas
         self.email_regex = r'(?:"([^"]+)"|([^<>,]+))?\s*<([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})>|[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}'
         self.config = config
         self.text_selection = {}  # (row, col) -> (start_char, end_char)
@@ -308,7 +307,6 @@ class AddressDelegate(QStyledItemDelegate):
                     return True # Event handled
         else:
             return False # Allow default behavior for left/middle clicks (text selection)
-        # return super().editorEvent(event, model, option, index) # this would allow editing !
 
 
 class MailHeaderWidget(QWidget):
