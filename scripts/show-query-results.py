@@ -77,10 +77,10 @@ class QueryResultsViewer(QMainWindow):
         top_bar_layout.addWidget(self.view_mode_button)
 
         # Refresh button
-        self.refresh_button = QPushButton("Refresh")
-        self.refresh_button.setFont(config.get_interface_font())
-        self.refresh_button.clicked.connect(self.execute_query)
-        top_bar_layout.addWidget(self.refresh_button)
+        # self.refresh_button = QPushButton("Refresh")
+        # self.refresh_button.setFont(config.get_interface_font())
+        # self.refresh_button.clicked.connect(self.execute_query)
+        # top_bar_layout.addWidget(self.refresh_button)
 
         top_bar_layout.addStretch()
 

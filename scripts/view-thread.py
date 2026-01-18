@@ -65,10 +65,11 @@ class ThreadViewer(QMainWindow):
         self.view_mode_button.clicked.connect(self.toggle_view_mode)
         top_bar_layout.addWidget(self.view_mode_button)
 
-        self.refresh_button = QPushButton("Refresh")
-        self.refresh_button.setFont(config.get_interface_font())
-        self.refresh_button.clicked.connect(self.execute_query)
-        top_bar_layout.addWidget(self.refresh_button)
+        # Refresh button
+        # self.refresh_button = QPushButton("Refresh")
+        # self.refresh_button.setFont(config.get_interface_font())
+        # self.refresh_button.clicked.connect(self.execute_query)
+        # top_bar_layout.addWidget(self.refresh_button)
 
         top_bar_layout.addStretch()
 
