@@ -1,6 +1,6 @@
 import sys
-import email.parser
-import email.policy
+import email
+from email import policy
 
 def get_message_id_from_file(file_path):
     """
@@ -14,15 +14,9 @@ def get_message_id_from_file(file_path):
         str: The Message-ID value, or None if the header is not found.
     """
     try:
-        # Use a context manager to ensure the file is properly closed
-        with open(file_path, 'r', encoding='utf-8') as fp:
-            # Use the email.parser to create a message object from the file
-            msg = email.parser.Parser(policy=email.policy.default).parse(fp)
-            
-            # Get the Message-ID header
+        with open(file_path, 'rb') as f:
+            msg = email.message_from_binary_file(f, policy=policy.default)
             message_id = msg.get('Message-ID')
-
-            # If the header exists, strip the angle brackets and return it
             if message_id:
                 return message_id.strip('<>')
             else:
