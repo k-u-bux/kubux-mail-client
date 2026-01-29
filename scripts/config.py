@@ -13,6 +13,13 @@ def get_dpi():
 
 phys_dpi = get_dpi()
 
+def get_pixel_ratio():
+    helper_path = os.path.join(os.path.dirname(__file__), "config-helper-get-pixel-ratio")
+    pixel_ratio = float( subprocess.check_output([ helper_path ]).decode("utf-8").strip() )
+    return pixel_ratio
+
+pixel_ratio = get_pixel_ratio()
+
 class Config:
     def __init__(self, config_file: str = "~/.config/kubux-mail-client/config.toml"):
         self.config_path = Path(config_file).expanduser()
