@@ -6,7 +6,12 @@ from typing import Dict, Any, Optional
 from email.utils import getaddresses
 import subprocess
 
-phys_dpi = float( subprocess.check_output(["python", "config-helper-get-dpi.py"]).decode("utf-8").strip() )
+def get_dpi():
+    helper_path = os.path.join(os.path.dirname(__file__), "config-helper-get-dpi.py")
+    phys_dpi = float( subprocess.check_output(["python", helper_path]).decode("utf-8").strip() )
+    return phys_dpi
+
+phys_dpi = get_dpi()
 
 class Config:
     def __init__(self, config_file: str = "~/.config/kubux-mail-client/config.toml"):
