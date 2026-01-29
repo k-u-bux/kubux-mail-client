@@ -8,7 +8,7 @@ import subprocess
 
 def get_dpi():
     helper_path = os.path.join(os.path.dirname(__file__), "config-helper-get-dpi.py")
-    phys_dpi = float( subprocess.check_output(["python", helper_path]).decode("utf-8").strip() )
+    phys_dpi = float( subprocess.check_output([ helper_path ]).decode("utf-8").strip() )
     return phys_dpi
 
 phys_dpi = get_dpi()
