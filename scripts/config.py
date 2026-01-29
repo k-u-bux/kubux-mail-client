@@ -122,7 +122,7 @@ class Config:
         return font 
 
     def get_font(self, font_type: str):
-        return self.get_font_physical_size(font_type)
+        return self.get_font_logical_size(font_type)
 
     def get_interface_font(self):
         return self.get_font("interface")
