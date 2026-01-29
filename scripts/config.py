@@ -116,7 +116,7 @@ class Config:
 
     def get_font_physical_size(self, font_type: str):
         pt_size = self.data["visual"][f"{font_type}_font_size"]
-        pixel_size = int( ( pt_size / 72 ) * phys_dpi )
+        pixel_size = pt_size * pixel_ratio
         font = QFont(self.data["visual"][f"{font_type}_font"])
         font.setPixelSize(pixel_size)
         return font 
