@@ -4,7 +4,9 @@ import os
 from PySide6.QtGui import QFont
 from typing import Dict, Any, Optional
 from email.utils import getaddresses
-from PySide6.QtWidgets import QApplication
+import subprocess
+
+phys_dpi = float( subprocess.check_output(["python", "config-helper-get-dpi.py"]).decode("utf-8").strip() )
 
 class Config:
     def __init__(self, config_file: str = "~/.config/kubux-mail-client/config.toml"):
@@ -101,9 +103,6 @@ class Config:
         return font
 
     def get_font_physical_size(self, font_type: str):
-        app = QApplication.instance()
-        screen = app.primaryScreen()
-        phys_dpi = screen.physicalDotsPerInch()
         pt_size = self.data["visual"][f"{font_type}_font_size"]
         pixel_size = int( ( pt_size / 72 ) * phys_dpi )
         font = QFont(self.data["visual"][f"{font_type}_font"])
@@ -111,7 +110,7 @@ class Config:
         return font 
 
     def get_font(self, font_type: str):
-        return self.get_font_logical_size(font_type)
+        return self.get_font_physical_size(font_type)
 
     def get_interface_font(self):
         return self.get_font("interface")
