@@ -119,7 +119,7 @@ class DraftsManager(QMainWindow):
     def __init__(self, drafts_dir_path=None, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Kubux Mail Client - Drafts")
-        self.resize(QSize(900, 700))
+        self.resize(QSize(1024, 768))
 
         self.current_drafts_dir = None
         self.current_identity = None
