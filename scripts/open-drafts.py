@@ -417,7 +417,9 @@ class DraftsManager(QMainWindow):
             self.drafts_table.setRowCount(len(valid_draft_files))
             
             # Only populate with valid files
-            for row, (file_path, msg) in enumerate(valid_draft_files):
+            row = 0
+            for file_path, msg in valid_draft_files:
+                ++ row
                 try:
                     # Extract headers and file info
                     from_header = msg.get('From', 'No From')
@@ -443,7 +445,6 @@ class DraftsManager(QMainWindow):
                         self.drafts_table.setItem(row, 0, QTableWidgetItem(date_str))
                         self.drafts_table.setItem(row, 1, QTableWidgetItem(to_cc_string))
                         self.drafts_table.setItem(row, 2, QTableWidgetItem(subject_header))
-                        self.drafts_table.setItem(row, 3, QTableWidgetItem(from_header))
                         
                         # Store the full file path in the item for retrieval later
                         self.drafts_table.item(row, 0).setData(Qt.ItemDataRole.UserRole, str(file_path))
