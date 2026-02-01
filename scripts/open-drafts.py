@@ -379,6 +379,8 @@ class DraftsManager(QMainWindow):
         """Loads and displays a list of drafts from a given directory."""
         self.current_drafts_dir = directory_path
         self.current_identity = identity
+
+        sender_email = identity.get('email')
         
         # Update the drafts folder button text
         self.update_drafts_folder_button()
@@ -419,7 +421,7 @@ class DraftsManager(QMainWindow):
                 try:
                     # Extract headers and file info
                     from_header = msg.get('From', 'No From')
-                    if match_address( from_header, identity.email ):
+                    if match_address( from_header, sender_email ):
                         to_header = msg.get('To', '')
                         cc_header = msg.get('Cc', '')
                         subject_header = msg.get('Subject', 'No Subject')
