@@ -451,7 +451,7 @@ class DraftsManager(QMainWindow):
                     # The row count should be correct since we're only looping through valid files
 
             # Re-adjust the column widths after loading data
-            self.showEvent()
+            self._fix_column_widths(self._width_ratio)
             
             # Start watching this directory for changes
             self.start_file_system_watcher(self.current_drafts_dir)
