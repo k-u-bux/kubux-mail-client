@@ -168,8 +168,8 @@ class DraftsManager(QMainWindow):
         
         # Set up the table with new column order: Date|To/Cc|Subject|From
         self.drafts_table = QTableWidget()
-        self.drafts_table.setColumnCount(4)
-        self.drafts_table.setHorizontalHeaderLabels(["Date", "To/Cc", "Subject", "From"])
+        self.drafts_table.setColumnCount(3)
+        self.drafts_table.setHorizontalHeaderLabels(["Date", "To/Cc", "Subject"])
         self.drafts_table.setFont(config.get_text_font())
 
         # Configure the table's appearance and make columns user-resizable
@@ -179,14 +179,10 @@ class DraftsManager(QMainWindow):
         # Set initial column widths to use available space more efficiently
         # Date column gets a reasonable fixed width
         self.header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
-        # self.drafts_table.setColumnWidth(0, 120)  # Date column width
         
         # To/Cc and Subject share most of the space
         self.header.setSectionResizeMode(1, QHeaderView.ResizeMode.Interactive)
         self.header.setSectionResizeMode(2, QHeaderView.ResizeMode.Interactive)
-        
-        # From column gets a reasonable width
-        self.header.setSectionResizeMode(3, QHeaderView.ResizeMode.Interactive)
         
         # When the table is first shown, stretch the To/Cc and Subject columns
         # We'll use a timer to adjust column widths after the UI is visible
