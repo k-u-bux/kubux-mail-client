@@ -22,6 +22,7 @@ from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 import subprocess
 import shlex
+from email.utils import parseaddr
 
 def output_of_cmd(cmd_str: str) -> str:
     """
@@ -346,3 +347,10 @@ def launch_drafts_manager(parent, identity_dict):
     except Exception as e:
         logging.error(f"Failed to launch drafts manager: {e}")
         display_error(parent, "Launch Error", f"Could not launch open-drafts.py:\n\n{e}")
+
+def normalize_address (addr_string):
+    _, extracted_addr = parseaddr(addr_string)
+    return extracted_addr.lower()
+
+def match_address (header, address):
+    return ( normalize_address( header ) == normalize_address( address ) )

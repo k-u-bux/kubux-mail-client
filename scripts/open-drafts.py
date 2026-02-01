@@ -28,7 +28,7 @@ from watchdog.events import FileSystemEventHandler
 
 # Import the shared components
 from config import config
-from common import display_error, create_new_mail_menu
+from common import display_error, create_new_mail_menu, match_address
 
 # Set up basic logging to console
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -400,8 +400,8 @@ class DraftsManager(QMainWindow):
             for file_path in draft_files:
                 try:
                     # Basic validation - check if file can be opened
-                    with open(file_path, 'r', encoding='utf-8') as f:
-                        msg = email.message_from_file(f, policy=policy.default)
+                    with open(file_path, 'rb') as f:
+                        msg = email.message_from_binary_file(f, policy=policy.default)
                     # If we get here, the file is a valid email file
                     valid_draft_files.append((file_path, msg))
                 except Exception as e:
@@ -418,31 +418,32 @@ class DraftsManager(QMainWindow):
                 try:
                     # Extract headers and file info
                     from_header = msg.get('From', 'No From')
-                    to_header = msg.get('To', '')
-                    cc_header = msg.get('Cc', '')
-                    subject_header = msg.get('Subject', 'No Subject')
-                    
-                    # Format To/Cc string
-                    to_cc_string = ""
-                    if to_header:
-                        to_cc_string += f"To: {', '.join([addr for name, addr in getaddresses([to_header])])}"
-                    if cc_header:
-                        if to_cc_string:
-                            to_cc_string += "; "
-                        to_cc_string += f"Cc: {', '.join([addr for name, addr in getaddresses([cc_header])])}"
+                    if match_address( from_header, identity.email ):
+                        to_header = msg.get('To', '')
+                        cc_header = msg.get('Cc', '')
+                        subject_header = msg.get('Subject', 'No Subject')
                         
-                    # Use file's modification time as a fallback for date
-                    mod_time = datetime.fromtimestamp(os.path.getmtime(file_path))
-                    date_str = mod_time.strftime("%Y-%m-%d %H:%M")
-                    
-                    # Populate the table row with the new column order: Date|To/Cc|Subject|From
-                    self.drafts_table.setItem(row, 0, QTableWidgetItem(date_str))
-                    self.drafts_table.setItem(row, 1, QTableWidgetItem(to_cc_string))
-                    self.drafts_table.setItem(row, 2, QTableWidgetItem(subject_header))
-                    self.drafts_table.setItem(row, 3, QTableWidgetItem(from_header))
-                    
-                    # Store the full file path in the item for retrieval later
-                    self.drafts_table.item(row, 0).setData(Qt.ItemDataRole.UserRole, str(file_path))
+                        # Format To/Cc string
+                        to_cc_string = ""
+                        if to_header:
+                            to_cc_string += f"To: {', '.join([addr for name, addr in getaddresses([to_header])])}"
+                        if cc_header:
+                            if to_cc_string:
+                                to_cc_string += "; "
+                            to_cc_string += f"Cc: {', '.join([addr for name, addr in getaddresses([cc_header])])}"
+                            
+                        # Use file's modification time as a fallback for date
+                        mod_time = datetime.fromtimestamp(os.path.getmtime(file_path))
+                        date_str = mod_time.strftime("%Y-%m-%d %H:%M")
+                        
+                        # Populate the table row with the new column order: Date|To/Cc|Subject|From
+                        self.drafts_table.setItem(row, 0, QTableWidgetItem(date_str))
+                        self.drafts_table.setItem(row, 1, QTableWidgetItem(to_cc_string))
+                        self.drafts_table.setItem(row, 2, QTableWidgetItem(subject_header))
+                        self.drafts_table.setItem(row, 3, QTableWidgetItem(from_header))
+                        
+                        # Store the full file path in the item for retrieval later
+                        self.drafts_table.item(row, 0).setData(Qt.ItemDataRole.UserRole, str(file_path))
                 except Exception as e:
                     # Log any other errors but don't show in UI
                     logging.error(f"Error processing email data for {file_path}: {e}")
