@@ -175,21 +175,17 @@ class DraftsManager(QMainWindow):
         # Configure the table's appearance and make columns user-resizable
         self.header = self.drafts_table.horizontalHeader()
         self.drafts_table.setStyleSheet( "QTableWidget::item { padding-left: 4px; padding-right: 4px; }")
-
-        # Set initial column widths to use available space more efficiently
-        # Date column gets a reasonable fixed width
         self.header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
-        
-        # To/Cc and Subject share most of the space
         self.header.setSectionResizeMode(1, QHeaderView.ResizeMode.Interactive)
         self.header.setSectionResizeMode(2, QHeaderView.ResizeMode.Interactive)
-        
+        self.header.setStretchLastSection(False)
+        self.header.sectionResized.connect(self._on_column_width_changed)
+
         # When the table is first shown, stretch the To/Cc and Subject columns
         # We'll use a timer to adjust column widths after the UI is visible
-        QTimer.singleShot(0, self.adjust_initial_column_widths)
+        # QTimer.singleShot(0, self.adjust_initial_column_widths)
 
         self.drafts_table.verticalHeader().setVisible(False)
-        self.drafts_table.setFont(config.get_text_font())
         self.drafts_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.drafts_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
 
@@ -253,6 +249,45 @@ class DraftsManager(QMainWindow):
             self.drafts_table.setColumnWidth(2, subject_width)  # Subject
             self.drafts_table.setColumnWidth(3, 200)  # From
         
+    def _on_column_width_changed(self, logical_index, old_size, new_size):
+        """User drags column divider → update stored ratios."""
+        if logical_index in [1, 2]:  # Subject or Sender
+            if not self._is_window_resize:
+                self._update_ratio_from_widths()
+                self._fix_column_widths(self._width_ratio)
+
+    def _update_ratio_from_widths(self):
+        """Calculate and store current Subject/Sender ratio."""
+        sender_width = self.results_table.columnWidth(1)
+        subject_width = self.results_table.columnWidth(2)
+        total_width = subject_width + sender_width
+        
+        if total_width > 0:
+            self._width_ratio = sender_width / total_width
+            # print(f"new ratio = {self._width_ratio} from col1 = {sender_width} and col2 = {subject_width}")
+
+    def _fix_column_widths(self,ratio):
+        # Ensure the table is not empty to avoid errors
+        if self.results_table.rowCount() == 0:
+            return
+
+        # Get the total available width of the table
+        total_width = self.results_table.viewport().width()
+
+        # Get the width of the Date column after it has been sized to its contents
+        date_col_width = self.results_table.columnWidth(0)
+
+        # Calculate the remaining space
+        remaining_width = total_width - date_col_width
+
+        # Calculate the target widths for Subject and Sender based on ratio
+        subject_col_width = int(remaining_width * ratio)
+        sender_col_width = int(remaining_width * (1.0 - ratio))
+
+        # Apply the new widths
+        self.results_table.setColumnWidth(1, subject_col_width)
+        self.results_table.setColumnWidth(2, sender_col_width)
+
     def _create_drafts_menu(self):
         """Creates a dropdown menu for selecting an identity's drafts folder."""
         menu = QMenu(self)
