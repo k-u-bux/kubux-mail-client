@@ -339,10 +339,11 @@ def launch_drafts_manager(parent, identity_dict):
     """Launches the drafts manager script for a given identity's drafts folder."""
     try:
         drafts_path_str = identity_dict.get('drafts', "~/.local/share/kubux-mail-client/mail/drafts")
-        drafts_path = Path(drafts_path_str).expanduser()
+        drafts_path = str( Path(drafts_path_str).expanduser() )
+        drafts_email = identity_dict.get('email', "" )
 
         viewer_path = os.path.join(os.path.dirname(__file__), "open-drafts")
-        subprocess.Popen([viewer_path, "--drafts-dir", str(drafts_path)])
+        subprocess.Popen([viewer_path, "--drafts-dir", drafts_path, "--email", drafts_email])
         logging.info(f"Launched drafts manager for directory: {drafts_path}")
     except Exception as e:
         logging.error(f"Failed to launch drafts manager: {e}")

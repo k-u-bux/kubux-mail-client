@@ -114,15 +114,20 @@ class FileSystemWatcherThread(QThread):
             except Exception as e:
                 logging.error(f"Error stopping observer: {e}")
 
-
 class DraftsManager(QMainWindow):
-    def __init__(self, drafts_dir_path=None, parent=None):
+    def __init__(self, drafts_dir_path=None, sender_email="", parent=None):
         super().__init__(parent)
         self.setWindowTitle("Kubux Mail Client - Drafts")
         self.resize(QSize(1024, 768))
 
+        
+
         self.current_drafts_dir = None
-        self.current_identity = None
+        self.current_identity = find_identity( sender_email )
+        if not self.current_identity:
+            logging.error(f"Sender mail address unknown: {sender_email}")
+            os.exit(1)
+
         self.fs_watcher = None
         
         self._is_window_resize = True
@@ -131,14 +136,10 @@ class DraftsManager(QMainWindow):
         
         # Load the initial drafts directory from the command-line argument
         if drafts_dir_path:
-            self.load_drafts(Path(drafts_dir_path))
+            self.load_drafts(Path(drafts_dir_path).expanduser(), self.current_identity)
         else:
-            # If no argument is provided, default to the first identity's drafts folder
-            identities = config.get_identities()
-            if identities:
-                first_identity = identities[0]
-                drafts_path_str = first_identity.get('drafts', "~/.local/share/kubux-mail-client/mail/drafts")
-                self.load_drafts(Path(drafts_path_str).expanduser(), identity=first_identity)
+            drafts_path_str = self.current_identity.get('drafts', "~/.local/share/kubux-mail-client/mail/drafts")
+            self.load_drafts(Path(drafts_path_str).expanduser(), self.current_identity)
 
     def _flag_resize(self, flag):
         self._is_window_resize = flag
@@ -374,7 +375,7 @@ class DraftsManager(QMainWindow):
             # Fallback if no identity found
             self.drafts_folder_button.setText(f"Drafts: {self.current_drafts_dir.name}")
 
-    def load_drafts(self, directory_path, identity=None):
+    def load_drafts(self, directory_path, identity):
         """Loads and displays a list of drafts from a given directory."""
         self.current_drafts_dir = directory_path
         self.current_identity = identity
@@ -530,12 +531,13 @@ class DraftsManager(QMainWindow):
 def main():
     parser = argparse.ArgumentParser(description="Manage email drafts.")
     parser.add_argument("--drafts-dir", help="The full path to the drafts directory.")
+    parser.add_argument("--email", help="The senders email address.")
     args = parser.parse_args()
     
     app = QApplication(sys.argv)
     # app.setApplicationDisplayName( "Kubux Mail Client" )
     app.setApplicationName( "KubuxMailClient" )
-    manager = DraftsManager(drafts_dir_path=args.drafts_dir)
+    manager = DraftsManager(drafts_dir_path=args.drafts_dir, sender_email=args.email)
     manager.show()
     sys.exit(app.exec())
 
