@@ -416,7 +416,7 @@ class DraftsManager(QMainWindow):
             self.drafts_table.setRowCount(len(valid_draft_files))
 
             row = 0
-            for file_path, msg in valid_draft_files:
+            for (file_path, msg) in valid_draft_files:
                 try:
                     # Extract headers and file info
                     from_header = msg.get('From', 'No From')
