@@ -125,6 +125,7 @@ class DraftsManager(QMainWindow):
         self.current_identity = None
         self.fs_watcher = None
         
+        self._is_window_resize = True
         self.setup_ui()
         
         # Load the initial drafts directory from the command-line argument
@@ -137,6 +138,9 @@ class DraftsManager(QMainWindow):
                 first_identity = identities[0]
                 drafts_path_str = first_identity.get('drafts', "~/.local/share/kubux-mail-client/mail/drafts")
                 self.load_drafts(Path(drafts_path_str).expanduser(), identity=first_identity)
+
+    def _flag_resize(self, flag):
+        self._is_window_resize = flag
 
     def setup_ui(self):
         central_widget = QWidget()
@@ -287,6 +291,18 @@ class DraftsManager(QMainWindow):
         # Apply the new widths
         self.results_table.setColumnWidth(1, subject_col_width)
         self.results_table.setColumnWidth(2, sender_col_width)
+
+    def showEvent(self, event):
+        """Called when the widget is shown."""
+        super().showEvent(event)
+        self._fix_column_widths(self._width_ratio)
+
+    def resizeEvent(self, event):
+        """Called when the widget is resized."""
+        super().resizeEvent(event)
+        self._flag_resize( True )
+        self._fix_column_widths(self._width_ratio)
+        QTimer.singleShot( 250, lambda: self._flag_resize( False ) )
 
     def _create_drafts_menu(self):
         """Creates a dropdown menu for selecting an identity's drafts folder."""
