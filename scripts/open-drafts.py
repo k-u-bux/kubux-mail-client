@@ -170,7 +170,8 @@ class DraftsManager(QMainWindow):
         self.drafts_table = QTableWidget()
         self.drafts_table.setColumnCount(4)
         self.drafts_table.setHorizontalHeaderLabels(["Date", "To/Cc", "Subject", "From"])
-        
+        self.drafts_table.setFont(config.get_text_font())
+
         # Configure the table's appearance and make columns user-resizable
         self.header = self.drafts_table.horizontalHeader()
         self.drafts_table.setStyleSheet( "QTableWidget::item { padding-left: 4px; padding-right: 4px; }")

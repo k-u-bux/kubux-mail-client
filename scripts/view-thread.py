@@ -82,6 +82,7 @@ class ThreadViewer(QMainWindow):
         self.results_table = QTableWidget()
         self.results_table.setColumnCount(3)
         self.results_table.setHorizontalHeaderLabels(["Date", "Sender/Receiver", "Subject"])
+        self.results_table.setFont(config.get_text_font())
         self.results_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
         self.results_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Interactive)
         self.results_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Interactive)
