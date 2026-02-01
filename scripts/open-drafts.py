@@ -413,9 +413,6 @@ class DraftsManager(QMainWindow):
                     logging.debug(traceback.format_exc())
                     # Skip this file - don't add it to the table
             
-            # Set the row count based on valid files only
-            self.drafts_table.setRowCount(len(valid_draft_files))
-            
             # Only populate with valid files
             row = 0
             for file_path, msg in valid_draft_files:
@@ -455,6 +452,9 @@ class DraftsManager(QMainWindow):
                     # Skip this row - we've already allocated it, so just leave it empty
                     # The row count should be correct since we're only looping through valid files
 
+            # Set the row count based on valid files only
+            self.drafts_table.setRowCount(row)
+            
             # Re-adjust the column widths after loading data
             self._fix_column_widths(self._width_ratio)
             
