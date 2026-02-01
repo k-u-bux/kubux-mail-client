@@ -28,7 +28,7 @@ from watchdog.events import FileSystemEventHandler
 
 # Import the shared components
 from config import config
-from common import display_error, create_new_mail_menu, match_address
+from common import display_error, create_new_mail_menu, match_address, find_identity
 
 # Set up basic logging to console
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
