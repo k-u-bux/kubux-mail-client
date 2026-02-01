@@ -135,6 +135,7 @@ class QueryResultsViewer(QMainWindow):
         # c) I like the table below.
         self.results_table = QTableWidget()
         self.results_table.setColumnCount(3)
+        self.results_table.setFont(config.get_text_font())
         # self.results_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
         # self.results_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         self.results_table.setSelectionMode(QAbstractItemView.MultiSelection)
