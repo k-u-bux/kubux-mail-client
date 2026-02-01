@@ -449,7 +449,8 @@ class DraftsManager(QMainWindow):
                         self.drafts_table.item(row, 0).setData(Qt.ItemDataRole.UserRole, str(file_path))
                         row = row + 1
                    else:
-                        # logging.info(f"skipping: {from_header}")
+                       # logging.info(f"skipping: {from_header}")
+                       pass
                 except Exception as e:
                     # Log any other errors but don't show in UI
                     logging.error(f"Error processing email data for {file_path}: {e}")
