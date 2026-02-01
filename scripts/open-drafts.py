@@ -419,8 +419,7 @@ class DraftsManager(QMainWindow):
                 try:
                     # Extract headers and file info
                     from_header = msg.get('From', 'No From')
-                    # if match_address( from_header, identity.email ):
-                    if True:
+                    if match_address( from_header, identity.email ):
                         to_header = msg.get('To', '')
                         cc_header = msg.get('Cc', '')
                         subject_header = msg.get('Subject', 'No Subject')
