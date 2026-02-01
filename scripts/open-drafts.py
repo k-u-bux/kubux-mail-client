@@ -262,8 +262,8 @@ class DraftsManager(QMainWindow):
 
     def _update_ratio_from_widths(self):
         """Calculate and store current Subject/Sender ratio."""
-        sender_width = self.results_table.columnWidth(1)
-        subject_width = self.results_table.columnWidth(2)
+        sender_width = self.drafts_table.columnWidth(1)
+        subject_width = self.drafts_table.columnWidth(2)
         total_width = subject_width + sender_width
         
         if total_width > 0:
@@ -272,14 +272,14 @@ class DraftsManager(QMainWindow):
 
     def _fix_column_widths(self,ratio):
         # Ensure the table is not empty to avoid errors
-        if self.results_table.rowCount() == 0:
+        if self.drafts_table.rowCount() == 0:
             return
 
         # Get the total available width of the table
-        total_width = self.results_table.viewport().width()
+        total_width = self.drafts_table.viewport().width()
 
         # Get the width of the Date column after it has been sized to its contents
-        date_col_width = self.results_table.columnWidth(0)
+        date_col_width = self.drafts_table.columnWidth(0)
 
         # Calculate the remaining space
         remaining_width = total_width - date_col_width
@@ -289,8 +289,8 @@ class DraftsManager(QMainWindow):
         sender_col_width = int(remaining_width * (1.0 - ratio))
 
         # Apply the new widths
-        self.results_table.setColumnWidth(1, subject_col_width)
-        self.results_table.setColumnWidth(2, sender_col_width)
+        self.drafts_table.setColumnWidth(1, subject_col_width)
+        self.drafts_table.setColumnWidth(2, sender_col_width)
 
     def showEvent(self, event):
         """Called when the widget is shown."""
