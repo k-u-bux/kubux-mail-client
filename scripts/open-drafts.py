@@ -413,15 +413,16 @@ class DraftsManager(QMainWindow):
                     logging.debug(traceback.format_exc())
                     # Skip this file - don't add it to the table
             
-            # Only populate with valid files
+            self.drafts_table.setRowCount(len(valid_draft_files))
+
             row = 0
             for file_path, msg in valid_draft_files:
-                ++ row
                 try:
                     # Extract headers and file info
                     from_header = msg.get('From', 'No From')
                     if match_address( from_header, sender_email ):
-                        to_header = msg.get('To', '')
+                        ++ row
+                       to_header = msg.get('To', '')
                         cc_header = msg.get('Cc', '')
                         subject_header = msg.get('Subject', 'No Subject')
                         
@@ -445,6 +446,8 @@ class DraftsManager(QMainWindow):
                         
                         # Store the full file path in the item for retrieval later
                         self.drafts_table.item(row, 0).setData(Qt.ItemDataRole.UserRole, str(file_path))
+                    else:
+                        logging.debug(f"skipping: {from_header}")
                 except Exception as e:
                     # Log any other errors but don't show in UI
                     logging.error(f"Error processing email data for {file_path}: {e}")
