@@ -155,6 +155,8 @@ class QueryResultsViewer(QMainWindow):
         # self.results_table.sortByColumn(1, Qt.SortOrder.DescendingOrder)
         # self.results_table.sortByColumn(0, Qt.SortOrder.DescendingOrder)
 
+        self.result_table.setStyleSheet( "QTableWidget::item { padding: 4px; }")
+        
         main_layout.addWidget(self.results_table)
         
         # Connect click to action

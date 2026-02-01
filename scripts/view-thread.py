@@ -96,6 +96,8 @@ class ThreadViewer(QMainWindow):
         # Enable context menu
         self.results_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.results_table.customContextMenuRequested.connect(self.show_context_menu)
+        
+        self.result_table.setStyleSheet( "QTableWidget::item { padding: 4px; }")
 
         main_layout.addWidget(self.results_table)
 
