@@ -179,26 +179,21 @@ class DraftsManager(QMainWindow):
 
         # Configure the table's appearance and make columns user-resizable
         self.header = self.drafts_table.horizontalHeader()
-        self.drafts_table.setStyleSheet( "QTableWidget::item { padding-left: 4px; padding-right: 4px; }")
         self.header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
         self.header.setSectionResizeMode(1, QHeaderView.ResizeMode.Interactive)
         self.header.setSectionResizeMode(2, QHeaderView.ResizeMode.Interactive)
         self.header.setStretchLastSection(False)
         self.header.sectionResized.connect(self._on_column_width_changed)
-
-        # When the table is first shown, stretch the To/Cc and Subject columns
-        # We'll use a timer to adjust column widths after the UI is visible
-        # QTimer.singleShot(0, self.adjust_initial_column_widths)
-
         self.drafts_table.verticalHeader().setVisible(False)
         self.drafts_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.drafts_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-
+        self.drafts_table.setSortingEnabled(True)
         self.drafts_table.cellDoubleClicked.connect(self.open_selected_draft)
 
         # Enable context menu
         self.drafts_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.drafts_table.customContextMenuRequested.connect(self.show_context_menu)
+        self.drafts_table.setStyleSheet( "QTableWidget::item { padding-left: 4px; padding-right: 4px; }")
 
         main_layout.addWidget(self.drafts_table)
     
@@ -239,21 +234,6 @@ class DraftsManager(QMainWindow):
         # Show context menu at the right position
         context_menu.exec(self.drafts_table.viewport().mapToGlobal(position))
 
-    def adjust_initial_column_widths(self):
-        """Adjust initial column widths once the UI is visible."""
-        total_width = self.drafts_table.width()
-        # Reserve 120px for Date and 200px for From
-        remaining_width = total_width - 120 - 200
-        # Split the remaining width between To/Cc and Subject (40% and 60%)
-        if remaining_width > 0:
-            to_cc_width = int(remaining_width * 0.4)
-            subject_width = remaining_width - to_cc_width
-            
-            self.drafts_table.setColumnWidth(0, 120)  # Date
-            self.drafts_table.setColumnWidth(1, to_cc_width)  # To/Cc
-            self.drafts_table.setColumnWidth(2, subject_width)  # Subject
-            self.drafts_table.setColumnWidth(3, 200)  # From
-        
     def _on_column_width_changed(self, logical_index, old_size, new_size):
         """User drags column divider → update stored ratios."""
         if logical_index in [1, 2]:  # Subject or Sender
@@ -471,7 +451,7 @@ class DraftsManager(QMainWindow):
                     # The row count should be correct since we're only looping through valid files
 
             # Re-adjust the column widths after loading data
-            self.adjust_initial_column_widths()
+            self.showEvent()
             
             # Start watching this directory for changes
             self.start_file_system_watcher(self.current_drafts_dir)
@@ -543,12 +523,6 @@ class DraftsManager(QMainWindow):
     def delete_selected_items(self):
         for row in list( set( [ item.row() for item in self.drafts_table.selectedItems() ] ) ):
             self.delete_row( row )
-
-    def resizeEvent(self, event):
-        """Handle window resize events to adjust column widths."""
-        super().resizeEvent(event)
-        # Re-adjust column widths when window is resized
-        self.adjust_initial_column_widths()
             
 # --- Main Entry Point ---
 def main():

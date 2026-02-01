@@ -94,10 +94,10 @@ class ThreadViewer(QMainWindow):
         self.results_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.results_table.setSortingEnabled(True)
         self.results_table.doubleClicked.connect(self.open_selected_item)
+
         # Enable context menu
         self.results_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
-        self.results_table.customContextMenuRequested.connect(self.show_context_menu)
-        
+        self.results_table.customContextMenuRequested.connect(self.show_context_menu)       
         self.results_table.setStyleSheet( "QTableWidget::item { padding-left: 4px; padding-right: 4px; }")
 
         main_layout.addWidget(self.results_table)
