@@ -446,6 +446,7 @@ class DraftsManager(QMainWindow):
                         self.drafts_table.setItem(row, 2, QTableWidgetItem(subject_header))
                         
                         # Store the full file path in the item for retrieval later
+                        logging.info(f"row: {row}")
                         self.drafts_table.item(row, 0).setData(Qt.ItemDataRole.UserRole, str(file_path))
                     else:
                         logging.info(f"skipping: {from_header}")
