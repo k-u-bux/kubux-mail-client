@@ -173,7 +173,7 @@ class DraftsManager(QMainWindow):
         
         # Configure the table's appearance and make columns user-resizable
         self.header = self.drafts_table.horizontalHeader()
-        self.drafts_table.setStyleSheet( "QTableWidget::item { padding: 4px; }")
+        self.drafts_table.setStyleSheet( "QTableWidget::item { padding-left: 4px; padding-right: 4px; }")
 
         # Set initial column widths to use available space more efficiently
         # Date column gets a reasonable fixed width
