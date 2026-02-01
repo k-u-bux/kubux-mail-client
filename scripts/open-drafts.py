@@ -422,7 +422,7 @@ class DraftsManager(QMainWindow):
                     from_header = msg.get('From', 'No From')
                     if match_address( from_header, sender_email ):
                         ++ row
-                       to_header = msg.get('To', '')
+                        to_header = msg.get('To', '')
                         cc_header = msg.get('Cc', '')
                         subject_header = msg.get('Subject', 'No Subject')
                         
