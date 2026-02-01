@@ -178,8 +178,8 @@ class DraftsManager(QMainWindow):
 
         # Set initial column widths to use available space more efficiently
         # Date column gets a reasonable fixed width
-        self.header.setSectionResizeMode(0, QHeaderView.ResizeMode.Interactive)
-        self.drafts_table.setColumnWidth(0, 120)  # Date column width
+        self.header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+        # self.drafts_table.setColumnWidth(0, 120)  # Date column width
         
         # To/Cc and Subject share most of the space
         self.header.setSectionResizeMode(1, QHeaderView.ResizeMode.Interactive)
