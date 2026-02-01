@@ -126,6 +126,7 @@ class DraftsManager(QMainWindow):
         self.fs_watcher = None
         
         self._is_window_resize = True
+        self._width_ratio = 0.3
         self.setup_ui()
         
         # Load the initial drafts directory from the command-line argument
