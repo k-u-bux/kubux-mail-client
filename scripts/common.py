@@ -355,3 +355,10 @@ def normalize_address (addr_string):
 
 def match_address (header, address):
     return ( normalize_address( header ) == normalize_address( address ) )
+
+def find_identity( sender_email ):
+    for i in config.get_identities():
+        if sender_email == i.get('email'):
+            return i
+    return None
+
