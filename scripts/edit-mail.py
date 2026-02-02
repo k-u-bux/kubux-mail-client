@@ -538,7 +538,14 @@ class MailEditor(QMainWindow):
             
             # Set all headers from the widget
             for header_name, value in headers.items():
-                draft[header_name] = value
+                if header_name.lower() in ['to', 'cc', 'bcc']:
+                    # Parse the comma-separated string into (name, address) tuples
+                    addr_pairs = getaddresses([value])
+                    # Format each pair correctly and join with commas
+                    formatted_addrs = [formataddr(pair) for pair in addr_pairs]
+                    draft[header_name] = ", ".join(formatted_addrs)
+                else:
+                    draft[header_name] = value
                 
             # Get the From address for Message-ID
             from_address = email.utils.parseaddr(headers.get('From', ''))[1]

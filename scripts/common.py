@@ -258,9 +258,9 @@ def create_draft(parent, identity_dict):
         drafts_path.mkdir(parents=True, exist_ok=True)
         
         # Create a unique filename with a timestamp and a random component
-        timestamp_str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        timestamp_str = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
         random_component = secrets.token_hex(16)
-        draft_filename = f"{timestamp_str}__{random_component}.eml"
+        draft_filename = f"{timestamp_str}-{random_component}.eml"
         draft_path = drafts_path / draft_filename
         
         # Create the draft file by copying the template or creating a minimal one
@@ -269,15 +269,15 @@ def create_draft(parent, identity_dict):
             logging.info(f"Created new draft file at {draft_path} from template.")
         else:
             logging.warning(f"Template file not found at {template_path}. Creating a minimal draft instead.")
-            with open(draft_path, "w") as f:
+            with open(draft_path, "w", encoding="utf-8") as f:
                 f.write(f"From: {identity_dict['name']} <{identity_dict['email']}>\n")
                 f.write("To: \n")
                 f.write(f"Cc: {identity_dict['name']} <{identity_dict['email']}>\n")
                 f.write("Subject: \n\n")
 
         # Launch the mail editor on the new draft file
-        viewer_path = os.path.join(os.path.dirname(__file__), "edit-mail")
-        subprocess.Popen([viewer_path, "--mail-file", str(draft_path)])
+        editor_path = os.path.join(os.path.dirname(__file__), "edit-mail")
+        subprocess.Popen([editor_path, "--mail-file", str(draft_path)])
         logging.info(f"Launched mail editor for new draft: {draft_path}")
     except Exception as e:
         logging.error(f"Failed to create draft or launch editor: {e}")
