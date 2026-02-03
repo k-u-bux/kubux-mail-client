@@ -21,6 +21,8 @@ def ignore(title, message):
 def filter(tag):
     if tag.startswith("$"):
         return False
+    if tag.startswith("!"):
+        return False
     if tag == "inbox":
         return False
     if tag == "attachment":
@@ -34,6 +36,8 @@ def filter(tag):
     if tag == "done":
         return False
     if tag == "read":
+        return False
+    if tag == "info":
         return False
     if tag == "mark_for_training":
         return False
