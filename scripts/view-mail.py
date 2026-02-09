@@ -14,7 +14,7 @@ from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QTextBrowser, QTextEdit, QHBoxLayout,
     QPushButton, QListWidget, QSplitter, QMessageBox, QMenu, QGroupBox,
     QFormLayout, QLabel, QInputDialog, QScrollArea, QDialog, QDialogButtonBox,
-    QFileDialog, QSizePolicy
+    QFileDialog, QSizePolicy, QAbstractItemView
 )
 from PySide6.QtCore import Qt, QSize, Signal, QUrl, QRegularExpression, QEvent
 from PySide6.QtGui import QFont, QKeySequence, QAction, QTextCursor, QTextCharFormat, QColor, QDesktopServices, QCursor
