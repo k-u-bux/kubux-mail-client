@@ -256,6 +256,14 @@ class MailViewer(QMainWindow):
             self.attachments_list.setFont(config.get_interface_font())
             self.attachments_list.setMinimumHeight(40)
             self.attachments_list.setMaximumHeight(200)
+            self.attachments_list.setSelectionMode(QAbstractItemView.NoSelection)
+            self.attachments_list.setMouseTracking(True)
+            self.attachments_list.setStyleSheet("""
+                QListWidget::item:hover {
+                    background-color: #3d5afe; /* Your preferred blue */
+                    color: white;
+                }
+            """)
             self.splitter.addWidget(self.attachments_list)
             
             # Set context menu policy for the attachments list
