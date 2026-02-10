@@ -279,6 +279,8 @@ class MailEditor(QMainWindow):
         self.attachments_list.setDragDropMode(QListWidget.DragDropMode.DropOnly)
         self.attachments_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.attachments_list.customContextMenuRequested.connect(self.show_attachment_context_menu)
+        self.attachments_list.setSelectionMode(QAbstractItemView.MultiSelection)
+        self.attachments_list.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         
         attachments_layout.addWidget(self.attachments_list)
         
@@ -387,16 +389,24 @@ class MailEditor(QMainWindow):
     def show_attachment_context_menu(self, pos):
         item = self.attachments_list.itemAt(pos)
         if item:
+            selected_items = self.attachments_list.selectedItems();
+
             menu = QMenu(self)
             menu.setFont(config.get_menu_font())
 
             remove_action = QAction("Remove", self)
-            remove_action.triggered.connect(lambda: self.remove_attachment(item))
-            menu.addAction(remove_action)
             open_action = QAction("Open", self)
-            open_action.triggered.connect(lambda: self.open_attachment(item))
+            if selected_items:
+                remove_action.triggered.connect(lambda: self.remove_attachment_selected)
+                open_action.triggered.connect(lambda: self.open_attachment_selected)
+            else:
+                remove_action.triggered.connect(lambda: self.remove_attachment(item))
+                open_action.triggered.connect(lambda: self.open_attachment(item))
+
+            menu.addAction(remove_action)
             menu.addAction(open_action)
             menu.exec(self.attachments_list.mapToGlobal(pos))
+
 
     def add_attachment(self, file_path=None):
         if not file_path:
@@ -421,11 +431,19 @@ class MailEditor(QMainWindow):
         except Exception as e:
             display_error(self, "Failed to Add Attachment", f"Failed to add attachment:\n{e}")
 
+    def remove_attachment_selected(self):
+        for item in self.attachments_list.selected_items():
+            self.remove_attachment(item)
+
     def remove_attachment(self, item):
         row = self.attachments_list.row(item)
         if 0 <= row < len(self.attachments):
             del self.attachments[row]
             self.attachments_list.takeItem(row)
+
+    def open_attachment_selected(self):
+        for item in self.attachments_list.selected_items():
+            self.open_attachment(item)
 
     def open_attachment(self, item):
         """
