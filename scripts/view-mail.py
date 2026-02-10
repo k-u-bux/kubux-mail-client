@@ -260,7 +260,7 @@ class MailViewer(QMainWindow):
             self.attachments_list.setMouseTracking(True)
             self.attachments_list.setStyleSheet("""
                 QListWidget::item:hover {
-                    background-color: #3d5afe; /* Your preferred blue */
+                    background-color: #418be6; /* Your preferred blue */
                     color: white;
                 }
             """)
