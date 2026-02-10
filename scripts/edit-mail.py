@@ -432,7 +432,7 @@ class MailEditor(QMainWindow):
             display_error(self, "Failed to Add Attachment", f"Failed to add attachment:\n{e}")
 
     def remove_attachment_selected(self):
-        for item in self.attachments_list.selected_items():
+        for item in self.attachments_list.selectedItems():
             self.remove_attachment(item)
 
     def remove_attachment(self, item):
@@ -442,7 +442,7 @@ class MailEditor(QMainWindow):
             self.attachments_list.takeItem(row)
 
     def open_attachment_selected(self):
-        for item in self.attachments_list.selected_items():
+        for item in self.attachments_list.selectedItems():
             self.open_attachment(item)
 
     def open_attachment(self, item):
