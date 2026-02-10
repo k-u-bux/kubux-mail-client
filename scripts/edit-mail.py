@@ -389,7 +389,7 @@ class MailEditor(QMainWindow):
     def show_attachment_context_menu(self, pos):
         item = self.attachments_list.itemAt(pos)
         if item:
-            selected_items = self.attachments_list.selectedItems();
+            selected_items = self.attachments_list.selectedItems()
 
             menu = QMenu(self)
             menu.setFont(config.get_menu_font())
