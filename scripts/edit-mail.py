@@ -397,8 +397,8 @@ class MailEditor(QMainWindow):
             remove_action = QAction("Remove", self)
             open_action = QAction("Open", self)
             if selected_items:
-                remove_action.triggered.connect(lambda: self.remove_attachment_selected)
-                open_action.triggered.connect(lambda: self.open_attachment_selected)
+                remove_action.triggered.connect(self.remove_attachment_selected)
+                open_action.triggered.connect(self.open_attachment_selected)
             else:
                 remove_action.triggered.connect(lambda: self.remove_attachment(item))
                 open_action.triggered.connect(lambda: self.open_attachment(item))
