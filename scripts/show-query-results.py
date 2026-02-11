@@ -185,21 +185,27 @@ class QueryResultsViewer(QMainWindow):
         open_action = QAction("Open", self)
         open_thread_action = QAction("Open Thread", self)
         mark_read_action = QAction("-unread", self)
-        flag_action = QAction("+spam", self)
+        flag_todo_action = QAction("+todo", self)
+        flag_open_action = QAction("+open", self)
+        flag_spam_action = QAction("+spam", self)
         delete_action = QAction("Delete", self)
         modify_action = QAction("Edit Tags", self)
         if selected_items:
             open_action.triggered.connect( self.open_selected_items )
             open_thread_action.triggered.connect( self.open_thread_selected_items )
             mark_read_action.triggered.connect( self.mark_read_selected_items )
-            flag_action.triggered.connect( self.flag_spam_selected_items )
+            flag_todo_action.triggered.connect( self.flag_todo_selected_items )
+            flag_open_action.triggered.connect( self.flag_open_selected_items )
+            flag_spam_action.triggered.connect( self.flag_spam_selected_items )
             delete_action.triggered.connect( self.delete_selected_items )
             modify_action.triggered.connect( self.modify_selected_items )
         else:
             open_action.triggered.connect( lambda r=row: self.open_selected_row( row ) )
             open_thread_action.triggered.connect( lambda r=row: self.open_thread_selected_row( row ) )
             mark_read_action.triggered.connect( lambda r=row: self.mark_read_row( row ) )
-            flag_action.triggered.connect( lambda r=row: self.flag_spam_row( row ) )
+            flag_todo_action.triggered.connect( lambda r=row: self.flag_todo_row( row ) )
+            flag_open_action.triggered.connect( lambda r=row: self.flag_open_row( row ) )
+            flag_spam_action.triggered.connect( lambda r=row: self.flag_spam_row( row ) )
             delete_action.triggered.connect( lambda r=row: self.delete_row( row ) )
             modify_action.triggered.connect( lambda r=row: self.modify_row( row ) )
         
@@ -208,7 +214,9 @@ class QueryResultsViewer(QMainWindow):
         if not self.view_mode == "thread":
             context_menu.addAction(open_thread_action)
         context_menu.addAction(mark_read_action)
-        context_menu.addAction(flag_action)
+        context_menu.addAction(flag_todo_action)
+        context_menu.addAction(flag_open_action)
+        context_menu.addAction(flag_spam_action)
         context_menu.addAction(delete_action)
         context_menu.addAction(modify_action)
         if not selected_items:
@@ -573,6 +581,30 @@ class QueryResultsViewer(QMainWindow):
         row = index.row()
         self.mark_read_row( row )
 
+
+    # todo
+    def flag_todo_row(self, row):
+        self.apply_tag_to_row("+todo", row)
+
+    def flag_todo_selected_items(self):
+        for row in list( set( [ item.row() for item in self.results_table.selectedItems() ] ) ):
+            self.flag_todo_row( row )
+
+    def flag_todo_selected_item(self, index):
+        row = index.row()
+        self.flag_todo_row( row )
+
+    # open
+    def flag_open_row(self, row):
+        self.apply_tag_to_row("+open", row)
+
+    def flag_open_selected_items(self):
+        for row in list( set( [ item.row() for item in self.results_table.selectedItems() ] ) ):
+            self.flag_open_row( row )
+
+    def flag_open_selected_item(self, index):
+        row = index.row()
+        self.flag_open_row( row )
 
     # spam
     def flag_spam_row(self, row):
