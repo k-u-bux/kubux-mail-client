@@ -184,10 +184,10 @@ class QueryResultsViewer(QMainWindow):
         # Add actions
         open_action = QAction("Open", self)
         open_thread_action = QAction("Open Thread", self)
-        mark_read_action = QAction("-unread", self)
-        flag_todo_action = QAction("+todo", self)
-        flag_open_action = QAction("+open", self)
-        flag_spam_action = QAction("+spam", self)
+        mark_read_action = QAction("- unread", self)
+        flag_todo_action = QAction("+/- todo", self)
+        flag_open_action = QAction("+/- open", self)
+        flag_spam_action = QAction("+ spam", self)
         delete_action = QAction("Delete", self)
         modify_action = QAction("Edit Tags", self)
         if selected_items:
@@ -471,6 +471,18 @@ class QueryResultsViewer(QMainWindow):
         tags = item_data.get("tags")
         return tags
 
+    def has_tag( self, row, tag ):
+        if tag in self.get_tags( row ):
+            return True
+        else:
+            return False
+
+    def toggle_tag( self, row, tag ):
+        if self.has_tag( row, tag ):
+            self.apply_tag_to_row(f"-{tag}", row )
+        else:
+            self.apply_tag_to_row(f"+{tag}", row )
+
 
     # open
     def open_selected_items(self):
@@ -584,7 +596,7 @@ class QueryResultsViewer(QMainWindow):
 
     # todo
     def flag_todo_row(self, row):
-        self.apply_tag_to_row("+todo", row)
+        self.toggle_tag( row, "todo" )
 
     def flag_todo_selected_items(self):
         for row in list( set( [ item.row() for item in self.results_table.selectedItems() ] ) ):
@@ -596,7 +608,7 @@ class QueryResultsViewer(QMainWindow):
 
     # open
     def flag_open_row(self, row):
-        self.apply_tag_to_row("+open", row)
+        self.toggle_tag( row, "open" )
 
     def flag_open_selected_items(self):
         for row in list( set( [ item.row() for item in self.results_table.selectedItems() ] ) ):
