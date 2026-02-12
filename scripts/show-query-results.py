@@ -186,8 +186,8 @@ class QueryResultsViewer(QMainWindow):
         open_thread_action = QAction("Open Thread", self)
         mark_read_action = QAction("- unread", self)
         flag_status_action = {}
-#        for tag in config.get_status_tags():
-#            flag_status_action[ tag ] = QAction(f" {tag} {tag}", self)
+        for tag in config.get_status_tags():
+            flag_status_action[ tag ] = QAction(tag, self)
         flag_spam_action = QAction("+ spam", self)
         delete_action = QAction("Delete", self)
         modify_action = QAction("Edit Tags", self)
@@ -205,7 +205,7 @@ class QueryResultsViewer(QMainWindow):
             open_thread_action.triggered.connect( lambda r=row: self.open_thread_selected_row( row ) )
             mark_read_action.triggered.connect( lambda r=row: self.mark_read_row( row ) )
             for tag in config.get_status_tags():
-                flag_status_action[ tag ].triggered.connect( lambda checked, r=row, t=tag: self.flag_status_row( r, t ) )
+                flag_status_action[ tag ].triggered.connect( lambda r=row, t=tag: self.flag_status_row( r, t ) )
             flag_spam_action.triggered.connect( lambda r=row: self.flag_spam_row( row ) )
             delete_action.triggered.connect( lambda r=row: self.delete_row( row ) )
             modify_action.triggered.connect( lambda r=row: self.modify_row( row ) )
