@@ -185,6 +185,7 @@ class QueryResultsViewer(QMainWindow):
         open_action = QAction("Open", self)
         open_thread_action = QAction("Open Thread", self)
         mark_read_action = QAction("- unread", self)
+        flag_status_action = {}
         for status_tag in config.get_status_tags():
             flag_status_action[ status_tag ] = QAction(f"+/- {status_tag}", self)
         flag_spam_action = QAction("+ spam", self)
