@@ -185,9 +185,11 @@ class QueryResultsViewer(QMainWindow):
         open_action = QAction("Open", self)
         open_thread_action = QAction("Open Thread", self)
         mark_read_action = QAction("- unread", self)
+        status_tags = config.get_status_tags()
         flag_status_action = {}
-        for tag in config.get_status_tags():
-            flag_status_action[ tag ] = QAction(tag, self)
+        for tag in status_tags:
+            label = "+/- " + tag
+            flag_status_action[ tag ] = QAction(label, self)
         flag_spam_action = QAction("+ spam", self)
         delete_action = QAction("Delete", self)
         modify_action = QAction("Edit Tags", self)
@@ -195,7 +197,7 @@ class QueryResultsViewer(QMainWindow):
             open_action.triggered.connect( self.open_selected_items )
             open_thread_action.triggered.connect( self.open_thread_selected_items )
             mark_read_action.triggered.connect( self.mark_read_selected_items )
-            for tag in config.get_status_tags():
+            for tag in status_tags:
                 flag_status_action[ tag ].triggered.connect( lambda checked, t=tag: self.flag_status_selected_items( t ) ); 
             flag_spam_action.triggered.connect( self.flag_spam_selected_items )
             delete_action.triggered.connect( self.delete_selected_items )
@@ -204,8 +206,8 @@ class QueryResultsViewer(QMainWindow):
             open_action.triggered.connect( lambda r=row: self.open_selected_row( row ) )
             open_thread_action.triggered.connect( lambda r=row: self.open_thread_selected_row( row ) )
             mark_read_action.triggered.connect( lambda r=row: self.mark_read_row( row ) )
-            for tag in config.get_status_tags():
-                flag_status_action[ tag ].triggered.connect( lambda r=row, t=tag: self.flag_status_row( r, t ) )
+            for tag in status_tags:
+                flag_status_action[ tag ].triggered.connect( lambda checked, r=row, t=tag: self.flag_status_row( r, t ) )
             flag_spam_action.triggered.connect( lambda r=row: self.flag_spam_row( row ) )
             delete_action.triggered.connect( lambda r=row: self.delete_row( row ) )
             modify_action.triggered.connect( lambda r=row: self.modify_row( row ) )
@@ -215,8 +217,8 @@ class QueryResultsViewer(QMainWindow):
         if not self.view_mode == "thread":
             context_menu.addAction(open_thread_action)
         context_menu.addAction(mark_read_action)
-        for action in flag_status_action:
-            context_menu.addAction(action)
+        for tag in status_tags:
+            context_menu.addAction( flag_status_action[ tag ] )
         context_menu.addAction(flag_spam_action)
         context_menu.addAction(delete_action)
         context_menu.addAction(modify_action)
@@ -597,7 +599,6 @@ class QueryResultsViewer(QMainWindow):
 
     # status_tag
     def flag_status_row(self, row, status_tag):
-        print( f"row = {row}, tag = {status_tag}" )
         self.toggle_tag( row, status_tag )
 
     def flag_status_selected_items(self, status_tag):
