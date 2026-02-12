@@ -148,6 +148,9 @@ class Config:
     def get_tags(self):
         return self.data.get("searches", {}).get("tags", [])
 
+    def get_status_tags(self):
+        return self.data.get("searches", {}).get("status_tags", [])
+
     def get_search(self):
         return self.data.get("searches", {}).get("search", "tag:inbox and tag:unread" )
 

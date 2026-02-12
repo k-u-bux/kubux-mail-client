@@ -184,6 +184,11 @@ class MailViewer(QMainWindow):
             action = self.tags_menu.addAction(f"+/- {tag}")
             action.triggered.connect( l )
         self.tags_menu.addSeparator()
+        for tag in config.get_status_tags():
+            l = lambda checked, dummy=f"{tag}": self.really_toggle_tag( dummy )
+            action = self.tags_menu.addAction(f"+/- {tag}")
+            action.triggered.connect( l )
+        self.tags_menu.addSeparator()
         self.tags_menu.addAction("+/- spam").triggered.connect( lambda: self.really_toggle_tag("spam") )
         self.tags_menu.addAction("+/- deleted").triggered.connect( lambda: self.really_toggle_tag("deleted") )
         self.tags_menu.addSeparator()
