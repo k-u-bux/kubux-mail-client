@@ -28,7 +28,7 @@ import textwrap
 import base64
 
 from config import config
-from common import display_error, html_to_plain_text
+from common import display_error, html_to_plain_text, DirectoryEventHandler, get_db_path
 from header_widget import MailHeaderWidget
 
 # Set up basic logging to console
@@ -92,6 +92,9 @@ class MailViewer(QMainWindow):
         self.setup_ui()
         self.setup_key_bindings()
         self.display_message()
+
+        self.dir_watcher = DirectoryEventHandler( self.update_tags_ui )
+        self.dir_watcher.watch( get_db_path() )
 
     def parse_mail_file(self):
         """Parses a real email file from the local filesystem."""
