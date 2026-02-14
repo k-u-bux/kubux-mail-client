@@ -124,15 +124,24 @@ class ThreadViewer(QMainWindow):
         flag_action = QAction("+spam", self)
         delete_action = QAction("Delete", self)
         modify_action = QAction("Edit Tags", self)
+        status_tags = config.get_status_tags()
+        flag_status_action = {}
+        for tag in status_tags:
+            label = "+/- " + tag
+            flag_status_action[ tag ] = QAction(label, self)
         if selected_items:
             open_action.triggered.connect( self.open_selected_items )
             mark_read_action.triggered.connect( self.mark_read_selected_items )
+            for tag in status_tags:
+                flag_status_action[ tag ].triggered.connect( lambda checked, t=tag: self.flag_status_selected_items( t ) ); 
             flag_action.triggered.connect( self.flag_spam_selected_items )
             delete_action.triggered.connect( self.delete_selected_items )
             modify_action.triggered.connect( self.modify_selected_items )
         else:
             open_action.triggered.connect( lambda r=row: self.open_selected_row( row ) )
             mark_read_action.triggered.connect( lambda r=row: self.mark_read_row( row ) )
+            for tag in status_tags:
+                flag_status_action[ tag ].triggered.connect( lambda checked, r=row, t=tag: self.flag_status_row( r, t ) )
             flag_action.triggered.connect( lambda r=row: self.flag_spam_row( row ) )
             delete_action.triggered.connect( lambda r=row: self.delete_row( row ) )
             modify_action.triggered.connect( lambda r=row: self.modify_row( row ) )
@@ -140,6 +149,8 @@ class ThreadViewer(QMainWindow):
         # Add actions to menu in the preferred order
         context_menu.addAction(open_action)
         context_menu.addAction(mark_read_action)
+        for tag in status_tags:
+            context_menu.addAction( flag_status_action[ tag ] )
         context_menu.addAction(flag_action)
         context_menu.addAction(delete_action)
         context_menu.addAction(modify_action)
@@ -300,6 +311,19 @@ class ThreadViewer(QMainWindow):
         tags = item_data.get("tags")
         return tags
     
+    def has_tag( self, row, tag ):
+        if tag in self.get_tags( row ):
+            return True
+        else:
+            return False
+
+    def toggle_tag( self, row, tag ):
+        if self.has_tag( row, tag ):
+            self.apply_tag_to_row(f"-{tag}", row )
+        else:
+            self.apply_tag_to_row(f"+{tag}", row )
+
+
     # open
     def open_selected_items(self):
         for row in list( set( [ item.row() for item in self.results_table.selectedItems() ] ) ):
@@ -356,6 +380,20 @@ class ThreadViewer(QMainWindow):
     def mark_read_selected_item(self, index):
         row = index.row()
         self.mark_read_row( row )
+
+
+    # status_tag
+    def flag_status_row(self, row, status_tag):
+        self.toggle_tag( row, status_tag )
+
+    def flag_status_selected_items(self, status_tag):
+        for row in list( set( [ item.row() for item in self.results_table.selectedItems() ] ) ):
+            self.flag_status_row( row, status_tag )
+
+    def flag_status_selected_item(self, index, status_tag):
+        row = index.row()
+        self.flag_status_row( row, status_tag )
+
 
    # spam
     def flag_spam_row(self, row):
