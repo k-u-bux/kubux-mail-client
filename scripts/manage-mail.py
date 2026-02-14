@@ -281,9 +281,13 @@ class QueryEditor(QMainWindow):
         delete_action = QAction("Delete", self)
         delete_action.triggered.connect(self.delete_row)
         
+        move_up_action = QAction("Move up", self)
+        move_up_action.triggered.connect(lambda checked, r=row: self.move_row_to_top(r))
+        
         # Add actions to menu in the preferred order
         context_menu.addAction(execute_action)
         context_menu.addAction(edit_action)
+        context_menu.addAction(move_up_action)
         context_menu.addAction(delete_action)
         
         # Show context menu at the right position
