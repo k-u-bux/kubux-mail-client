@@ -54,8 +54,19 @@ class QueryResultsViewer(QMainWindow):
     def _flag_resize(self, flag):
         self._is_window_resize = flag
 
-    def setup_ui(self):
+    def refresh_more_menu(self):
+        self.more_menu.clear()        
+        self.more_menu.addAction("Edit Config").triggered.connect(self.edit_config_action)
+        self.more_menu.addAction("Edit Queries").triggered.connect(self.launch__manager)
+        self.more_menu.addSeparator()
         query_parser = QueryParser(config_dir=config.config_dir)
+        for named_query in query_parser.names:
+            logging.info(f"add menu entry for query {named_query}.")
+            self.more_menu.addAction(f"${named_query}").triggered.connect(
+                lambda _, dummy=named_query: self.launch_query(dummy)
+            )
+
+    def setup_ui(self):
         central_widget = QWidget()
         central_widget.setFont(config.get_text_font())
         self.setCentralWidget(central_widget)
@@ -110,12 +121,7 @@ class QueryResultsViewer(QMainWindow):
         self.more_button.setFont(config.get_interface_font())
         self.more_menu = QMenu(self)
         self.more_menu.setFont(config.get_menu_font())
-        self.more_menu.addAction("Edit Config").triggered.connect(self.edit_config_action)
-        self.more_menu.addAction("Edit Queries").triggered.connect(self.launch__manager)
-        self.more_menu.addSeparator()
-        for named_query in query_parser.names:
-            logging.info(f"add menu entry for query {named_query}.")
-            self.more_menu.addAction(f"${named_query}").triggered.connect( lambda _, dummy=named_query: self.launch_query(dummy))
+        self.more_menu.aboutToShow.connect(self.refresh_more_menu)
         self.more_button.setMenu(self.more_menu)
         top_bar_layout.addWidget(self.more_button)
         # top_bar_layout.addStretch()
