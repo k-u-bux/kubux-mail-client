@@ -493,7 +493,8 @@ class MailViewer(QMainWindow):
         # Fetch the latest tags
         current_tags = set(self.get_tags())
         # Filter out special tags starting with '$'
-        all_tags = {tag for tag in set(self.tags_state.keys()).union(current_tags) if not tag.startswith('$')}
+        all_tags = {tag for tag in set(config.get_status_tags()).union( 
+            set(self.tags_state.keys()) ).union(current_tags) if not tag.startswith('$')}
         self.tags_state = {tag: tag in current_tags for tag in sorted(list(all_tags))}
 
         # Add a button for each tag, styled by its state
