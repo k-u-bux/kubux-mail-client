@@ -281,13 +281,17 @@ class QueryEditor(QMainWindow):
         delete_action = QAction("Delete", self)
         delete_action.triggered.connect(self.delete_row)
         
+        move_top_action = QAction("Move top", self)
+        move_top_action.triggered.connect(lambda checked, r=row: self.move_row_to_top(r))
+        
         move_up_action = QAction("Move up", self)
-        move_up_action.triggered.connect(lambda checked, r=row: self.move_row_to_top(r))
+        move_up_action.triggered.connect(lambda checked, r=row: self.move_row_up(r))
         
         # Add actions to menu in the preferred order
         context_menu.addAction(execute_action)
         context_menu.addAction(edit_action)
         context_menu.addAction(move_up_action)
+        context_menu.addAction(move_top_action)
         context_menu.addAction(delete_action)
         
         # Show context menu at the right position
@@ -319,7 +323,7 @@ class QueryEditor(QMainWindow):
         """Execute the query in the row that was right-clicked (same as double-click)."""
         if self.context_menu_row > 0:
             # Move the row to top and open it, just like double-click
-            self.move_row_to_top(self.context_menu_row)
+            # self.move_row_to_top(self.context_menu_row)
             self.open_query_results(1, self.context_menu_column)
     
     def delayed_start_editing(self, row, column):
@@ -436,9 +440,9 @@ class QueryEditor(QMainWindow):
                 
                 # Update the UI to reflect the change
                 self.query_table.update()
-            elif row > 0 and (name or query):
-                # If this is not the empty input row and has content, move it to the top position (row 1)
-                self.move_row_to_top(row)
+            # elif row > 0 and (name or query):
+            #     # If this is not the empty input row and has content, move it to the top position (row 1)
+            #     self.move_row_to_top(row)
             
             # Save all queries
             self.save_queries_from_table()
@@ -452,7 +456,7 @@ class QueryEditor(QMainWindow):
             return
             
         # Move the row to the top of the list (just below the empty input row)
-        self.move_row_to_top(row)
+        # self.move_row_to_top(row)
         
         # Now open the query results
         self.open_query_results(1, column)  # Use row 1 since the item is now there
@@ -494,6 +498,41 @@ class QueryEditor(QMainWindow):
             
             # Select the moved row
             self.query_table.setCurrentCell(1, 0)
+        finally:
+            self.is_moving_row = False
+
+    def move_row_up(self, row):
+        """Moves up a row"""
+        # Don't move if it's already at the top or it's the empty input row
+        if row <= 1:
+            return
+            
+        # Set the flag to prevent triggering cell change events
+        self.is_moving_row = True
+        
+        try:
+            # Extract the data from the row to be moved
+            name_item = self.query_table.item(row, 0)
+            query_item = self.query_table.item(row, 1)
+            
+            name = name_item.text() if name_item else ""
+            query = query_item.text() if query_item else ""
+            
+            # Remove the row
+            self.query_table.removeRow(row)
+            
+            row = row - 1
+
+            self.query_table.insertRow(row)
+            new_name_item = QTableWidgetItem(name)
+            new_name_item.setFont(config.get_text_font())
+            self.query_table.setItem(row, 0, new_name_item)
+            
+            new_query_item = QTableWidgetItem(query)
+            new_query_item.setFont(config.get_text_font())
+            self.query_table.setItem(row, 1, new_query_item)
+            self.save_queries_from_table()
+            self.query_table.setCurrentCell(row, 0)
         finally:
             self.is_moving_row = False
 
