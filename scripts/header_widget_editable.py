@@ -145,9 +145,10 @@ class AddressAwareTextEdit(QTextEdit):
         else:
             # If no current word, show all completions
             self.completer.setCompletionPrefix("")
+            pass
             
         # Show popup if there are completions
-        if self.completer.completionCount() > 0:
+        if self.completer.completionCount() > 0 and self.completer.completionCount() < 20:
             self.completer.complete(rect)
             self.completer_active = True
     
@@ -240,7 +241,7 @@ class AddressAwareTextEdit(QTextEdit):
             self.completer.setCompletionPrefix(current_word)
             
             # Show popup if there are completions
-            if self.completer.completionCount() > 0:
+            if self.completer.completionCount() > 0 and self.completer.completionCount() < 20:
                 self.completer.complete(rect)
                 self.completer_active = True
             else:
