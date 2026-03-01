@@ -102,6 +102,7 @@ class AddressAwareTextEdit(QTextEdit):
         
         # Flag to track if completer is visible
         self.completer_active = False
+        self.completer_supress_count = 0;
         
         # Connect signals
         self.textChanged.connect(self.handle_text_changed)
@@ -209,8 +210,11 @@ class AddressAwareTextEdit(QTextEdit):
     def handle_text_changed(self):
         """Called when the text content changes."""
         # Update autocomplete suggestions
-        if hasattr(self, 'completer'):
-            self.update_completer()
+        if self.completer_supress_count > 0:
+            self.completer_supress_count = self.completer_supress_count - 1
+        else:
+            if hasattr(self, 'completer'):
+                self.update_completer()
         
         # Adjust the height based on content
         self.adjustHeight()
@@ -477,6 +481,8 @@ class AddressAwareTextEdit(QTextEdit):
                 
                 event.accept()
                 event.setDropAction(Qt.MoveAction)
+
+                self.completer_supress_count = self.completer_supress_count + 2
                 return
                 
         super().dropEvent(event)
