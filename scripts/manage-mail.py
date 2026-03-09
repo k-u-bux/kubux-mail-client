@@ -14,8 +14,8 @@ from PySide6.QtWidgets import (
     QPushButton, QTableWidget, QTableWidgetItem, QHeaderView,
     QAbstractItemView, QMenu, QStyledItemDelegate, QLineEdit, QInputDialog
 )
-from PySide6.QtCore import Qt, QSize, QEvent, QTimer, QRect, QPoint
-from PySide6.QtGui import QMouseEvent, QFontMetrics, QAction
+from PySide6.QtCore import Qt, QSize, QEvent, QTimer, QRect, QPoint, QMimeData, QByteArray, QDataStream, QIODevice
+from PySide6.QtGui import QMouseEvent, QFontMetrics, QAction, QDrag, QColor
 import logging
 
 # Set up basic logging to console
@@ -93,6 +93,29 @@ class NoSelectTextDelegate(QStyledItemDelegate):
         self.click_pos = pos
 
 
+class DragHandleDelegate(QStyledItemDelegate):
+    """A delegate that paints a drag handle icon in the handle column."""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.handle_column = 2
+    
+    def paint(self, painter, option, index):
+        if index.column() == self.handle_column:
+            rect = option.rect
+            handle_height = 10
+            handle_width = 15
+            x = rect.x() + (rect.width() - handle_width) // 2
+            y = rect.y() + (rect.height() - handle_height) // 2
+            
+            painter.setPen(QColor("gray"))
+            # Drawing a simple 3-bar handle
+            for i in range(3):
+                offset = i * 4
+                painter.drawLine(x, y + offset, x + handle_width, y + offset)
+        else:
+            super().paint(painter, option, index)
+
+
 class QueryEditor(QMainWindow):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -101,8 +124,14 @@ class QueryEditor(QMainWindow):
         
         self.query_parser = QueryParser(config.config_path.parent)
         
-        # Create our custom delegate
+        # Create our custom delegates
         self.text_delegate = NoSelectTextDelegate()
+        self.drag_handle_delegate = DragHandleDelegate()
+        
+        # Drag-and-drop related variables
+        self.dragging_row = -1
+        self.drag_start_pos = None
+        self.handle_column = 2
         
         # Track double-click detection
         self.last_click_time = 0
@@ -157,12 +186,14 @@ class QueryEditor(QMainWindow):
         self.quit_button.clicked.connect(self.close)
         top_bar_layout.addWidget(self.quit_button)
         
-        # Set up the table
+        # Set up the table with 3 columns now
         self.query_table = QTableWidget()
-        self.query_table.setColumnCount(2)
-        self.query_table.setHorizontalHeaderLabels(["Name", "Query Expression"])
+        self.query_table.setColumnCount(3)
+        self.query_table.setHorizontalHeaderLabels(["Name", "Query Expression", "Move"])
         self.query_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
         self.query_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        self.query_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
+        self.query_table.setColumnWidth(2, 40)  # Narrow handle column
         self.query_table.horizontalHeader().setVisible(False)
         self.query_table.verticalHeader().setVisible(False)
         self.query_table.setFont(config.get_text_font())
@@ -173,12 +204,20 @@ class QueryEditor(QMainWindow):
             QAbstractItemView.EditTrigger.AnyKeyPressed
         )
         
+        # Enable drag and drop
+        self.query_table.setAcceptDrops(True)
+        self.query_table.viewport().setAcceptDrops(True)
+        self.query_table.setDropIndicatorShown(True)
+        self.query_table.setDefaultDropAction(Qt.DropAction.MoveAction)
+        
         # Enable context menu
         self.query_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.query_table.customContextMenuRequested.connect(self.show_context_menu)
         
-        # Use our custom delegate
-        self.query_table.setItemDelegate(self.text_delegate)
+        # Set delegates for different columns
+        for col in range(2):  # Columns 0 and 1
+            self.query_table.setItemDelegateForColumn(col, self.text_delegate)
+        self.query_table.setItemDelegateForColumn(2, self.drag_handle_delegate)
         
         # Connect signals
         self.query_table.cellChanged.connect(self.handle_cell_changed)
@@ -206,6 +245,102 @@ class QueryEditor(QMainWindow):
 
         main_layout.addWidget(self.query_table)
 
+    def dragEnterEvent(self, event):
+        """Accept drag enter events."""
+        if event.mimeData().hasFormat("application/x-query-row"):
+            event.acceptProposedAction()
+        else:
+            event.ignore()
+
+    def dragMoveEvent(self, event):
+        """Handle drag move with real-time preview."""
+        if not event.mimeData().hasFormat("application/x-query-row"):
+            event.ignore()
+            return
+        
+        pos = event.position().toPoint()
+        viewport_pos = self.query_table.viewport().mapFrom(self, pos)
+        target_row = self.query_table.rowAt(viewport_pos.y())
+        
+        # Don't allow dropping on row 0
+        if target_row > 0:
+            event.acceptProposedAction()
+            self.previewRowMove(target_row)
+        else:
+            event.ignore()
+
+    def dropEvent(self, event):
+        """Handle drop event."""
+        if not event.mimeData().hasFormat("application/x-query-row"):
+            event.ignore()
+            return
+        
+        pos = event.position().toPoint()
+        viewport_pos = self.query_table.viewport().mapFrom(self, pos)
+        target_row = self.query_table.rowAt(viewport_pos.y())
+        
+        # Protect row 0
+        if target_row <= 0:
+            event.ignore()
+            return
+        
+        # Row already moved by preview, just finalize
+        event.acceptProposedAction()
+        self.dragging_row = -1
+        self.save_queries_from_table()
+
+    def previewRowMove(self, target_row):
+        """Show real-time preview of row movement (adapted for QTableWidget)."""
+        if self.dragging_row <= 0 or target_row <= 0 or self.dragging_row == target_row:
+            return
+        
+        # Set flag to prevent save during preview
+        self.is_moving_row = True
+        
+        try:
+            # Save row data using takeItem()
+            row_data = []
+            for col in range(3):  # Now 3 columns
+                item = self.query_table.takeItem(self.dragging_row, col)
+                row_data.append(item)
+            
+            # Also save any cell widgets
+            widgets = []
+            for col in range(3):
+                widget = self.query_table.cellWidget(self.dragging_row, col)
+                if widget:
+                    self.query_table.removeCellWidget(self.dragging_row, col)
+                    widgets.append(widget)
+                else:
+                    widgets.append(None)
+            
+            # Remove old row
+            self.query_table.removeRow(self.dragging_row)
+            
+            # Adjust target if needed
+            if target_row > self.dragging_row:
+                target_row -= 1
+            
+            # Insert at new position
+            self.query_table.insertRow(target_row)
+            for col, item in enumerate(row_data):
+                if item:
+                    self.query_table.setItem(target_row, col, item)
+                else:
+                    # Create empty item for handle column
+                    self.query_table.setItem(target_row, col, QTableWidgetItem(""))
+            
+            for col, widget in enumerate(widgets):
+                if widget:
+                    self.query_table.setCellWidget(target_row, col, widget)
+            
+            # Update tracking
+            self.dragging_row = target_row
+            self.query_table.selectRow(target_row)
+        
+        finally:
+            self.is_moving_row = False
+
     def eventFilter(self, obj, event):
         """Track mouse position and force immediate edit mode on click."""
         if obj is self.query_table.viewport():
@@ -216,6 +351,13 @@ class QueryEditor(QMainWindow):
                     pos = event.position().toPoint()
                     row = self.query_table.rowAt(pos.y())
                     column = self.query_table.columnAt(pos.x())
+                    
+                    # Handle drag column clicks - initiate drag
+                    if column == self.handle_column and row > 0:
+                        self.drag_start_pos = pos
+                        self.dragging_row = row
+                        self.query_table.selectRow(row)
+                        return True  # Consume the event
                     
                     if row >= 0 and column >= 0:
                         # Check for potential double click by looking at time since last click
@@ -246,6 +388,39 @@ class QueryEditor(QMainWindow):
                         QTimer.singleShot(self.double_click_interval + 10, 
                                          lambda: self.delayed_start_editing(row, column))
                     
+            elif event.type() == QEvent.Type.MouseMove:
+                # Handle mouse move for dragging
+                if self.drag_start_pos is not None and self.dragging_row > 0:
+                    pos = event.position().toPoint()
+                    
+                    # Check if we've moved far enough to start dragging
+                    if (pos - self.drag_start_pos).manhattanLength() >= QApplication.startDragDistance():
+                        # Create and execute drag
+                        drag = QDrag(self.query_table)
+                        mime_data = QMimeData()
+                        
+                        # Encode row index
+                        byte_array = QByteArray()
+                        stream = QDataStream(byte_array, QIODevice.OpenModeFlag.WriteOnly)
+                        stream.writeInt32(self.dragging_row)
+                        
+                        mime_data.setData("application/x-query-row", byte_array)
+                        drag.setMimeData(mime_data)
+                        
+                        # Execute drag
+                        drag.exec(Qt.DropAction.MoveAction)
+                        
+                        # Reset drag state
+                        self.dragging_row = -1
+                        self.drag_start_pos = None
+                        return True
+            
+            elif event.type() == QEvent.Type.MouseButtonRelease:
+                # Reset drag state if mouse released without dragging
+                if event.button() == Qt.MouseButton.LeftButton:
+                    self.dragging_row = -1
+                    self.drag_start_pos = None
+            
             elif event.type() == QEvent.Type.MouseButtonDblClick:
                 # Handle double click - we'll let the table's built-in handler call the double-click handler
                 self.is_double_click_pending = False
@@ -271,7 +446,7 @@ class QueryEditor(QMainWindow):
         context_menu = QMenu(self)
         context_menu.setFont(config.get_menu_font())
         
-        # Add actions
+        # Add actions (removed move actions)
         execute_action = QAction("Execute", self)
         execute_action.triggered.connect(self.execute_row)
         
@@ -281,17 +456,9 @@ class QueryEditor(QMainWindow):
         delete_action = QAction("Delete", self)
         delete_action.triggered.connect(self.delete_row)
         
-        move_top_action = QAction("Move top", self)
-        move_top_action.triggered.connect(lambda checked, r=row: self.move_row_to_top(r))
-        
-        move_up_action = QAction("Move up", self)
-        move_up_action.triggered.connect(lambda checked, r=row: self.move_row_up(r))
-        
         # Add actions to menu in the preferred order
         context_menu.addAction(execute_action)
         context_menu.addAction(edit_action)
-        context_menu.addAction(move_up_action)
-        context_menu.addAction(move_top_action)
         context_menu.addAction(delete_action)
         
         # Show context menu at the right position
@@ -322,9 +489,7 @@ class QueryEditor(QMainWindow):
     def execute_row(self):
         """Execute the query in the row that was right-clicked (same as double-click)."""
         if self.context_menu_row > 0:
-            # Move the row to top and open it, just like double-click
-            # self.move_row_to_top(self.context_menu_row)
-            self.open_query_results(1, self.context_menu_column)
+            self.open_query_results(self.context_menu_row, self.context_menu_column)
     
     def delayed_start_editing(self, row, column):
         """Start editing after a delay to allow for double-click detection."""
@@ -376,6 +541,10 @@ class QueryEditor(QMainWindow):
             query_item.setFont(config.get_text_font())
             self.query_table.setItem(row, 1, query_item)
             
+            # Add empty item for handle column
+            handle_item = QTableWidgetItem("")
+            self.query_table.setItem(row, 2, handle_item)
+            
         # Reconnect the signal
         self.query_table.cellChanged.connect(self.handle_cell_changed)
 
@@ -388,6 +557,9 @@ class QueryEditor(QMainWindow):
         query_item = QTableWidgetItem(query)
         query_item.setFont(config.get_text_font())
         self.query_table.setItem(1, 1, query_item)
+        # Add empty item for handle column
+        handle_item = QTableWidgetItem("")
+        self.query_table.setItem(1, 2, handle_item)
 
     def handle_new_label(self,editor):
         new_label = editor.text().strip()
@@ -413,6 +585,9 @@ class QueryEditor(QMainWindow):
         query_editor.setPlaceholderText("new search expression")
         self.query_table.setCellWidget(0, 1, query_editor)
         query_editor.returnPressed.connect(lambda: self.handle_new_query(query_editor))
+        
+        # Handle column: empty (will show drag handle via delegate for other rows)
+        self.query_table.setItem(0, 2, QTableWidgetItem(""))
 
     def handle_cell_changed(self, row, column):
         """Handles cell changes and creates a new row if needed."""
@@ -423,7 +598,7 @@ class QueryEditor(QMainWindow):
         self.is_processing_cell_change = True
         
         try:
-            # Get the items from the changed row
+            # Get the items from the changed row (only first two columns matter)
             name_item = self.query_table.item(row, 0)
             query_item = self.query_table.item(row, 1)
             
@@ -440,9 +615,6 @@ class QueryEditor(QMainWindow):
                 
                 # Update the UI to reflect the change
                 self.query_table.update()
-            # elif row > 0 and (name or query):
-            #     # If this is not the empty input row and has content, move it to the top position (row 1)
-            #     self.move_row_to_top(row)
             
             # Save all queries
             self.save_queries_from_table()
@@ -450,91 +622,13 @@ class QueryEditor(QMainWindow):
             self.is_processing_cell_change = False
 
     def handle_cell_double_clicked(self, row, column):
-        """Handles double click event - opens query results and moves row to top."""
-        # Skip the top empty row
-        if row == 0:
+        """Handles double click event - opens query results."""
+        # Skip the top empty row and handle column
+        if row == 0 or column == self.handle_column:
             return
-            
-        # Move the row to the top of the list (just below the empty input row)
-        # self.move_row_to_top(row)
         
-        # Now open the query results
-        self.open_query_results(1, column)  # Use row 1 since the item is now there
-
-    def move_row_to_top(self, row):
-        """Moves a row to the top of the list (just below the empty input row at row 0)."""
-        # Don't move if it's already at the top or it's the empty input row
-        if row <= 1:
-            return
-            
-        # Set the flag to prevent triggering cell change events
-        self.is_moving_row = True
-        
-        try:
-            # Extract the data from the row to be moved
-            name_item = self.query_table.item(row, 0)
-            query_item = self.query_table.item(row, 1)
-            
-            name = name_item.text() if name_item else ""
-            query = query_item.text() if query_item else ""
-            
-            # Remove the row
-            self.query_table.removeRow(row)
-            
-            # Insert a new row at position 1 (just below the empty input row)
-            self.query_table.insertRow(1)
-            
-            # Add the items to the new row
-            new_name_item = QTableWidgetItem(name)
-            new_name_item.setFont(config.get_text_font())
-            self.query_table.setItem(1, 0, new_name_item)
-            
-            new_query_item = QTableWidgetItem(query)
-            new_query_item.setFont(config.get_text_font())
-            self.query_table.setItem(1, 1, new_query_item)
-            
-            # Save the changes
-            self.save_queries_from_table()
-            
-            # Select the moved row
-            self.query_table.setCurrentCell(1, 0)
-        finally:
-            self.is_moving_row = False
-
-    def move_row_up(self, row):
-        """Moves up a row"""
-        # Don't move if it's already at the top or it's the empty input row
-        if row <= 1:
-            return
-            
-        # Set the flag to prevent triggering cell change events
-        self.is_moving_row = True
-        
-        try:
-            # Extract the data from the row to be moved
-            name_item = self.query_table.item(row, 0)
-            query_item = self.query_table.item(row, 1)
-            
-            name = name_item.text() if name_item else ""
-            query = query_item.text() if query_item else ""
-            
-            # Remove the row
-            self.query_table.removeRow(row)
-            
-            row = row - 1
-
-            self.query_table.insertRow(row)
-            new_name_item = QTableWidgetItem(name)
-            new_name_item.setFont(config.get_text_font())
-            self.query_table.setItem(row, 0, new_name_item)
-            
-            new_query_item = QTableWidgetItem(query)
-            new_query_item.setFont(config.get_text_font())
-            self.query_table.setItem(row, 1, new_query_item)
-            self.save_queries_from_table()
-            self.query_table.setCurrentCell(row, 0)
-        finally:
-            self.is_moving_row = False
+        # Open the query results
+        self.open_query_results(row, column)
 
     def save_queries_from_table(self):
         """Saves the contents of the table back to the queries file, skipping the empty top row."""
