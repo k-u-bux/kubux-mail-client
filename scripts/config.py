@@ -44,6 +44,7 @@ class Config:
             },
             "searches": {
                 "search": "tag:inbox and tag:unread",
+                "max_named_searches": 20,
                 "tags": [
                     "todo", "done", "read"
                 ]
@@ -144,6 +145,9 @@ class Config:
 
     def get_identities(self):
         return self.data.get("email_identities", {}).get("identities", [])
+
+    def get_max_named_searches(self):
+        return self.data.get("searches", {}).get("max_named_searches", 20)
 
     def get_tags(self):
         return self.data.get("searches", {}).get("tags", [])
