@@ -118,6 +118,7 @@ class ThreadViewer(QMainWindow):
 #        self.results_table.setStyleSheet( "QTableWidget::item { padding-left: 4px; padding-right: 4px; }")
 
         # Install event filter for row-level hover highlighting
+        self.results_table.setMouseTracking(True)
         self.results_table.viewport().installEventFilter(self)
 
         main_layout.addWidget(self.results_table)
