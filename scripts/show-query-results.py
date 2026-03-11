@@ -16,8 +16,8 @@ from PySide6.QtWidgets import (
     QMessageBox, QDialog, QDialogButtonBox, QLabel, QTextEdit, QInputDialog,
     QCheckBox, QAbstractItemView, QMenu, QWidgetAction, QProxyStyle, QStyle
 )
-from PySide6.QtCore import Qt, QSize, QTimer,QItemSelectionModel
-from PySide6.QtGui import QFont, QKeySequence, QAction
+from PySide6.QtCore import Qt, QSize, QTimer, QItemSelectionModel, QEvent
+from PySide6.QtGui import QFont, QKeySequence, QAction, QColor
 import logging
 
 from notmuch import find_matching_messages, find_matching_threads, apply_tag_to_query, get_tags_from_query, update_unseen_from_query
@@ -45,6 +45,7 @@ class QueryResultsViewer(QMainWindow):
         self.results = []
         self._width_ratio = 0.3
         self._is_window_resize = True
+        self._hovered_row = -1  # Track which row is currently hovered
         self.dir_watcher = DirectoryEventHandler( self.execute_query )
 
         self.setup_ui()
@@ -179,6 +180,9 @@ class QueryResultsViewer(QMainWindow):
 #            QTableWidget::item:focus { background-color: transparent; }
 #            QTableWidget::item:hover { background-color: rgba(100, 149, 237, 50); }
         """)
+        
+        # Install event filter for row-level hover highlighting
+        self.results_table.viewport().installEventFilter(self)
         
         main_layout.addWidget(self.results_table)
         
@@ -322,6 +326,49 @@ class QueryResultsViewer(QMainWindow):
                 action.triggered.connect(func)
                 self.addAction(action)
 
+    def eventFilter(self, obj, event):
+        """Event filter to track mouse hover over table rows."""
+        if obj == self.results_table.viewport():
+            if event.type() == QEvent.Type.MouseMove:
+                # Get the row under the cursor
+                pos = event.pos()
+                row = self.results_table.rowAt(pos.y())
+                
+                # If we've moved to a different row, update highlighting
+                if row != self._hovered_row:
+                    self._clear_hover_highlight(self._hovered_row)
+                    self._hovered_row = row
+                    self._apply_hover_highlight(row)
+                    
+            elif event.type() == QEvent.Type.Leave:
+                # Mouse left the table entirely
+                self._clear_hover_highlight(self._hovered_row)
+                self._hovered_row = -1
+                
+        return super().eventFilter(obj, event)
+
+    def _apply_hover_highlight(self, row):
+        """Apply light blue background to all cells in the row."""
+        if row < 0 or row >= self.results_table.rowCount():
+            return
+            
+        hover_color = QColor(100, 149, 237, 50)  # Light blue with transparency
+        
+        for col in range(self.results_table.columnCount()):
+            item = self.results_table.item(row, col)
+            if item:
+                item.setBackground(hover_color)
+
+    def _clear_hover_highlight(self, row):
+        """Clear background color from all cells in the row."""
+        if row < 0 or row >= self.results_table.rowCount():
+            return
+            
+        for col in range(self.results_table.columnCount()):
+            item = self.results_table.item(row, col)
+            if item:
+                item.setBackground(QColor(0, 0, 0, 0))  # Transparent
+
     def toggle_view_mode(self):
         if self.view_mode == "threads":
             self.view_mode = "mails"
@@ -335,6 +382,9 @@ class QueryResultsViewer(QMainWindow):
         parser = QueryParser(config_dir=config.config_dir)
         self.current_query = parser.parse( self.query_edit.text() )
         logging.info(f"Executing query: '{self.current_query}' in '{self.view_mode}' mode.")
+        
+        # Clear hover state when refreshing
+        self._hovered_row = -1
         
         self.results_table.setRowCount(0)
         self.results_table.clearContents()
