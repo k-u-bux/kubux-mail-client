@@ -164,12 +164,13 @@ class QueryResultsViewer(QMainWindow):
         # self.results_table.sortByColumn(0, Qt.SortOrder.DescendingOrder)
 
         self.results_table.setMouseTracking(True)
+        self.results_table.horizontalHeader().setHighlightSections(False)
         self.results_table.setStyleSheet( """
-            QTableWidget { selection-background-color: transparent; outline: none; }
+            QTableWidget { selection-background-color: rgb(100, 149, 237); color: palette(text); outline: none; }
             QTableWidget::item { padding-left: 4px; padding-right: 4px; }
-            QTableWidget::item:selected { background-color: transparent; }
-            QTableWidget::item:focus { background-color: transparent; }
-#            QTableWidget::item:hover { background-color: rgba(100, 149, 237, 50); border: none; }
+#            QTableWidget::item:selected { background-color: rgba(100, 149, 237, 50); color: palette(text); }
+#            QTableWidget::item:focus { background-color: transparent; }
+            QTableWidget::item:hover { background-color: rgba(100, 149, 237, 50); }
         """)
         
         main_layout.addWidget(self.results_table)

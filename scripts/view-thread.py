@@ -99,7 +99,15 @@ class ThreadViewer(QMainWindow):
         # Enable context menu
         self.results_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.results_table.customContextMenuRequested.connect(self.show_context_menu)       
-        self.results_table.setStyleSheet( "QTableWidget::item { padding-left: 4px; padding-right: 4px; }")
+        self.results_table.horizontalHeader().setHighlightSections(False)
+        self.results_table.setStyleSheet( """
+            QTableWidget { selection-background-color: rgb(100, 149, 237); color: palette(text); outline: none; }
+            QTableWidget::item { padding-left: 4px; padding-right: 4px; }
+#            QTableWidget::item:selected { background-color: rgba(100, 149, 237, 50); color: palette(text); }
+#            QTableWidget::item:focus { background-color: transparent; }
+#            QTableWidget::item:hover { background-color: rgba(100, 149, 237, 50); }
+        """)
+#        self.results_table.setStyleSheet( "QTableWidget::item { padding-left: 4px; padding-right: 4px; }")
 
         main_layout.addWidget(self.results_table)
 
