@@ -145,9 +145,8 @@ class QueryResultsViewer(QMainWindow):
         self.results_table.setFont(config.get_text_font())
         # self.results_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
         # self.results_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
-        self.results_table.setSelectionMode(QAbstractItemView.NoSelection)
-        # self.results_table.setSelectionMode(QAbstractItemView.MultiSelection)
-        # self.results_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.results_table.setSelectionMode(QAbstractItemView.MultiSelection)
+        self.results_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.results_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         # self.results_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         self.results_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Interactive)
@@ -178,7 +177,6 @@ class QueryResultsViewer(QMainWindow):
         
         # Connect click to action
         self.results_table.doubleClicked.connect(self.open_selected_item)
-        self.results_table.clicked.connect(self._toggle_row_selection)
 
         # self.dir_watcher.watch( get_db_path() )
 
