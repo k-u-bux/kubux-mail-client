@@ -14,7 +14,7 @@ from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLineEdit, QPushButton, QTableWidget, QTableWidgetItem, QHeaderView,
     QMessageBox, QDialog, QDialogButtonBox, QLabel, QTextEdit, QInputDialog,
-    QCheckBox, QAbstractItemView, QMenu, QWidgetAction
+    QCheckBox, QAbstractItemView, QMenu, QWidgetAction, QProxyStyle, QStyle
 )
 from PySide6.QtCore import Qt, QSize, QTimer, QItemSelectionModel
 from PySide6.QtGui import QFont, QKeySequence, QAction
@@ -57,6 +57,12 @@ class ThreadViewer(QMainWindow):
         main_layout = QVBoxLayout(central_widget)
         main_layout.setContentsMargins(8, 8, 8, 8)
 
+        style = QProxyStyle()
+        style.styleHint = lambda hint, opt, widget, data: \
+            0 if hint == QStyle.SH_ToolTip_WakeUpDelay else \
+            QApplication.style().styleHint(hint, opt, widget, data)
+
+
         # Top bar with buttons
         top_bar_layout = QHBoxLayout()
         main_layout.addLayout(top_bar_layout)
@@ -81,6 +87,7 @@ class ThreadViewer(QMainWindow):
         
         # Table view to serve as both list and tree view
         self.results_table = QTableWidget()
+        self.results_table.setStyle( style )
         self.results_table.setColumnCount(3)
         self.results_table.setHorizontalHeaderLabels(["Date", "Sender/Receiver", "Subject"])
         self.results_table.setFont(config.get_text_font())
