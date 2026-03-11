@@ -22,7 +22,8 @@ import logging
 
 from notmuch import notmuch_show, flatten_message_tree, find_matching_messages, find_matching_threads, apply_tag_to_query
 from config import config
-from common import display_error, create_summary_text, DirectoryEventHandler, get_db_path
+from common import display_error, create_summary_text, get_db_path
+from watcher import DirectoryEventHandler
 
 # Set up basic logging to console
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')

@@ -5,6 +5,7 @@ from PySide6.QtGui import QFont
 from typing import Dict, Any, Optional
 from email.utils import getaddresses
 import subprocess
+from watcher import DirectoryEventHandler
 
 def get_dpi():
     helper_path = os.path.join(os.path.dirname(__file__), "config-helper-get-dpi")
@@ -30,7 +31,13 @@ class Config:
         self.interface_font = self.get_font('interface')
         self.menu_font = self.get_font('menu')
         self.text_font = self.get_font('text')
+
+        self.dir_watcher = DirectoryEventHandler( self.reload_config )
+        self.dir_watcher.watch( self.config_dir )
         
+    def reload_config(self):
+        self.data = self.load_config()
+
     def load_config(self):
         # Default configuration
         default_config = {

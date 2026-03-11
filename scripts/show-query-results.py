@@ -25,8 +25,9 @@ from config import config
 from common import (
     display_error, 
     create_draft, create_new_mail_menu, launch_drafts_manager, create_summary_text, 
-    DirectoryEventHandler, get_db_path
+    get_db_path
 )
+from watcher import DirectoryEventHandler
 from query import QueryParser
 
 # Set up basic logging to console

@@ -28,7 +28,8 @@ import textwrap
 import base64
 
 from config import config
-from common import display_error, html_to_plain_text, DirectoryEventHandler, get_db_path
+from common import display_error, html_to_plain_text, get_db_path
+from watcher import DirectoryEventHandler
 from header_widget import MailHeaderWidget
 
 # Set up basic logging to console
