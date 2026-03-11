@@ -16,7 +16,7 @@ from PySide6.QtWidgets import (
     QMessageBox, QDialog, QDialogButtonBox, QLabel, QTextEdit, QInputDialog,
     QCheckBox, QAbstractItemView, QMenu, QWidgetAction
 )
-from PySide6.QtCore import Qt, QSize, QTimer
+from PySide6.QtCore import Qt, QSize, QTimer,QItemSelectionModel
 from PySide6.QtGui import QFont, QKeySequence, QAction
 import logging
 
@@ -145,8 +145,9 @@ class QueryResultsViewer(QMainWindow):
         self.results_table.setFont(config.get_text_font())
         # self.results_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
         # self.results_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
-        self.results_table.setSelectionMode(QAbstractItemView.MultiSelection)
-        self.results_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.results_table.setSelectionMode(QAbstractItemView.NoSelection)
+        # self.results_table.setSelectionMode(QAbstractItemView.MultiSelection)
+        # self.results_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.results_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         # self.results_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         self.results_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Interactive)
@@ -177,6 +178,7 @@ class QueryResultsViewer(QMainWindow):
         
         # Connect click to action
         self.results_table.doubleClicked.connect(self.open_selected_item)
+        self.results_table.clicked.connect(self._toggle_row_selection)
 
         # self.dir_watcher.watch( get_db_path() )
 
@@ -503,11 +505,17 @@ class QueryResultsViewer(QMainWindow):
 
 
     # open
+    def _toggle_row_selection(self, index):
+        """Toggle selection for single-clicked row."""
+        self.results_table.selectionModel().select(index, 
+            QItemSelectionModel.SelectionFlag.Toggle | QItemSelectionModel.SelectionFlag.Rows)
+
     def open_selected_items(self):
         for row in list( set( [ item.row() for item in self.results_table.selectedItems() ] ) ):
             self.open_selected_row( row )
 
     def open_selected_item(self, index):
+        self._toggle_row_selection( index )
         """Launches the appropriate viewer based on the selected item."""
         row = index.row()
         self.open_selected_row( row )

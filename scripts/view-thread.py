@@ -16,7 +16,7 @@ from PySide6.QtWidgets import (
     QMessageBox, QDialog, QDialogButtonBox, QLabel, QTextEdit, QInputDialog,
     QCheckBox, QAbstractItemView, QMenu, QWidgetAction
 )
-from PySide6.QtCore import Qt, QSize, QTimer
+from PySide6.QtCore import Qt, QSize, QTimer, QItemSelectionModel
 from PySide6.QtGui import QFont, QKeySequence, QAction
 import logging
 
@@ -175,6 +175,11 @@ class ThreadViewer(QMainWindow):
         
         # Show context menu at the right position
         context_menu.exec(self.results_table.viewport().mapToGlobal(position))
+
+    def _toggle_row_selection(self, index):
+        """Toggle selection for single-clicked row."""
+        self.results_table.selectionModel().select(index, 
+            QItemSelectionModel.SelectionFlag.Toggle | QItemSelectionModel.SelectionFlag.Rows)
 
     def _on_column_width_changed(self, logical_index, old_size, new_size):
         """User drags column divider → update stored ratios."""
@@ -339,6 +344,7 @@ class ThreadViewer(QMainWindow):
             self.open_selected_row( row )
 
     def open_selected_item(self, index):
+        self._toggle_row_selection( index )
         self.open_selected_row( index.row() )
         
     def open_selected_row(self, row):
