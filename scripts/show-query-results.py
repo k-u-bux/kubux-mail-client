@@ -170,7 +170,7 @@ class QueryResultsViewer(QMainWindow):
             QTableWidget::item { padding-left: 4px; padding-right: 4px; }
 #            QTableWidget::item:selected { background-color: rgba(100, 149, 237, 50); color: palette(text); }
 #            QTableWidget::item:focus { background-color: transparent; }
-            QTableWidget::item:hover { background-color: rgba(100, 149, 237, 50); }
+#            QTableWidget::item:hover { background-color: rgba(100, 149, 237, 50); }
         """)
         
         main_layout.addWidget(self.results_table)
