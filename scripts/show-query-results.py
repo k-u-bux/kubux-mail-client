@@ -163,7 +163,14 @@ class QueryResultsViewer(QMainWindow):
         # self.results_table.sortByColumn(1, Qt.SortOrder.DescendingOrder)
         # self.results_table.sortByColumn(0, Qt.SortOrder.DescendingOrder)
 
-        self.results_table.setStyleSheet( "QTableWidget::item { padding-left: 4px; padding-right: 4px; }")
+        self.results_table.setMouseTracking(True)
+        self.results_table.setStyleSheet( """
+            QTableWidget { selection-background-color: transparent; outline: none; }
+            QTableWidget::item { padding-left: 4px; padding-right: 4px; }
+            QTableWidget::item:selected { background-color: transparent; }
+            QTableWidget::item:focus { background-color: transparent; }
+#            QTableWidget::item:hover { background-color: rgba(100, 149, 237, 50); border: none; }
+        """)
         
         main_layout.addWidget(self.results_table)
         
