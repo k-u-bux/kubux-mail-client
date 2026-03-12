@@ -93,6 +93,7 @@ class MailViewer(QMainWindow):
         self.has_html_body = False
         self.parse_mail_file()
         self.force_html = False
+        self.shows_html = False
 
         self.process_initial_tags()
         self.setup_ui()
@@ -102,8 +103,25 @@ class MailViewer(QMainWindow):
         self.dir_watcher = DirectoryEventHandler( self.update_tags_ui )
         self.dir_watcher.watch( get_db_path() )
 
+    def render_html_button ( self ):
+        self.toggle_html_button.setFont(config.get_interface_font())
+        if self.shows_html:
+            self.toggle_html_button.setText("Text")
+            if not self.has_text_body:
+                self.toggle_html_button.setStyleSheet("QPushButton { color: gray; }")
+            else:
+                self.toggle_html_button.setStyleSheet("QPushButton { color: black; }")
+        else:
+            self.toggle_html_button.setText("Html")
+            if not self.has_html_body:
+                self.toggle_html_button.setStyleSheet("QPushButton { color: gray; }")
+            else:
+                self.toggle_html_button.setStyleSheet("QPushButton { color: black; }")
+
     def toggle_force_html ( self ):
         self.force_html = not self.force_html
+        self.shows_html = ( self.force_html and self.has_html_body ) or not self.has_text_body
+        self.render_html_button()
         self.display_message()
 
     def parse_mail_file(self):
@@ -221,6 +239,7 @@ class MailViewer(QMainWindow):
         self.toggle_html_button =  QPushButton("Html")
         self.toggle_html_button.clicked.connect(self.toggle_force_html)
         top_bar_layout.addWidget(self.toggle_html_button)
+        self.render_html_button()
 
         top_bar_layout.addStretch()
 
@@ -347,7 +366,7 @@ class MailViewer(QMainWindow):
         self.mail_content.anchorClicked.connect(self.handle_link_clicked)
         self.mail_content.setTextInteractionFlags(Qt.TextBrowserInteraction)
 
-        if ( self.force_html and self.has_html_body ) or not self.has_text_body:
+        if self.shows_html:
             self.mail_content.setHtml(self.mail_html)
         else:
             self.mail_content.setPlainText(self.mail_body)
