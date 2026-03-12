@@ -87,8 +87,13 @@ class MailViewer(QMainWindow):
         self.attachments = []
         self.message_id = None
         self.message = None
+        self.mail_body = ""
+        self.mail_html = ""
+        self.has_text_body = False
+        self.has_html_body = False
         self.parse_mail_file()
-        
+        self.force_html = False
+
         self.process_initial_tags()
         self.setup_ui()
         self.setup_key_bindings()
@@ -96,6 +101,10 @@ class MailViewer(QMainWindow):
 
         self.dir_watcher = DirectoryEventHandler( self.update_tags_ui )
         self.dir_watcher.watch( get_db_path() )
+
+    def toggle_force_html ( self ):
+        self.force_html = not self.force_html
+        self.display_message()
 
     def parse_mail_file(self):
         """Parses a real email file from the local filesystem."""
@@ -110,19 +119,17 @@ class MailViewer(QMainWindow):
             logging.error(f"Failed to parse mail file: {e}")
             os.exit(1)
         # print("parsing message")
-        body_text = ""
         for part in self.message.walk():
             # Prioritize plain text over HTML
-            if part.get_content_type() == 'text/plain':
+            if part.get_content_type() == 'text/plain' and not self.has_text_body:
                 body_text = part.get_content()
                 self.mail_body = body_text
-                self.is_html_body = False
-                break
-            if part.get_content_type() == 'text/html' and not body_text:
-                body_text = part.get_content()
-                sanitized_html = self.sanitize_html_fonts(body_text)
-                self.mail_body = sanitized_html
-                self.is_html_body = True
+                self.has_text_body = True
+            if part.get_content_type() == 'text/html' and not self.has_html_body:
+                body_html = part.get_content()
+                sanitized_html = self.sanitize_html_fonts(body_html)
+                self.mail_html = sanitized_html
+                self.has_html_body = True
         self.attachments = mail.attachments 
         # unfortunately not all mail have only one id
         if isinstance(mail.message_id, list):
@@ -211,6 +218,10 @@ class MailViewer(QMainWindow):
         self.toggle_header_visibility_button.clicked.connect(self.toggle_header_visibility)
         top_bar_layout.addWidget(self.toggle_header_visibility_button)
         
+        self.toggle_html_button =  QPushButton("Html")
+        self.toggle_html_button.clicked.connect(self.toggle_force_html)
+        top_bar_layout.addWidget(self.toggle_html_button)
+
         top_bar_layout.addStretch()
 
         self.delete_button = QPushButton("Delete")
@@ -336,8 +347,8 @@ class MailViewer(QMainWindow):
         self.mail_content.anchorClicked.connect(self.handle_link_clicked)
         self.mail_content.setTextInteractionFlags(Qt.TextBrowserInteraction)
 
-        if self.is_html_body:
-            self.mail_content.setHtml(self.mail_body)
+        if ( self.force_html and self.has_html_body ) or not self.has_text_body:
+            self.mail_content.setHtml(self.mail_html)
         else:
             self.mail_content.setPlainText(self.mail_body)
             # For plain text, we need to detect URLs manually
