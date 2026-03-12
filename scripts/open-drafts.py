@@ -19,8 +19,8 @@ from PySide6.QtWidgets import (
     QPushButton, QTableWidget, QTableWidgetItem, QHeaderView,
     QAbstractItemView, QMenu
 )
-from PySide6.QtCore import Qt, QSize, QTimer, QObject, Signal, QThread
-from PySide6.QtGui import QFont, QAction
+from PySide6.QtCore import Qt, QSize, QTimer, QObject, Signal, QThread, QEvent
+from PySide6.QtGui import QFont, QAction, QColor
 
 # Import watchdog for directory monitoring
 from watchdog.observers import Observer
@@ -132,6 +132,7 @@ class DraftsManager(QMainWindow):
         
         self._is_window_resize = True
         self._width_ratio = 0.3
+        self._hovered_row = -1  # Track which row is currently hovered
         self.setup_ui()
         
         # Load the initial drafts directory from the command-line argument
@@ -195,11 +196,15 @@ class DraftsManager(QMainWindow):
         # Enable context menu
         self.drafts_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.drafts_table.customContextMenuRequested.connect(self.show_context_menu)
+        self.drafts_table.setMouseTracking(True)
         self.drafts_table.horizontalHeader().setHighlightSections(False)
         self.drafts_table.setStyleSheet( """
             QTableWidget { selection-background-color: rgb(100, 149, 237); color: palette(text); outline: none; }
             QTableWidget::item { padding-left: 4px; padding-right: 4px; }
         """)
+
+        # Install event filter for row-level hover highlighting
+        self.drafts_table.viewport().installEventFilter(self)
 
         main_layout.addWidget(self.drafts_table)
     
@@ -290,6 +295,49 @@ class DraftsManager(QMainWindow):
         self._flag_resize( True )
         self._fix_column_widths(self._width_ratio)
         QTimer.singleShot( 250, lambda: self._flag_resize( False ) )
+
+    def eventFilter(self, obj, event):
+        """Event filter to track mouse hover over table rows."""
+        if obj == self.drafts_table.viewport():
+            if event.type() == QEvent.Type.MouseMove:
+                # Get the row under the cursor
+                pos = event.pos()
+                row = self.drafts_table.rowAt(pos.y())
+                
+                # If we've moved to a different row, update highlighting
+                if row != self._hovered_row:
+                    self._clear_hover_highlight(self._hovered_row)
+                    self._hovered_row = row
+                    self._apply_hover_highlight(row)
+                    
+            elif event.type() == QEvent.Type.Leave:
+                # Mouse left the table entirely
+                self._clear_hover_highlight(self._hovered_row)
+                self._hovered_row = -1
+                
+        return super().eventFilter(obj, event)
+
+    def _apply_hover_highlight(self, row):
+        """Apply light blue background to all cells in the row."""
+        if row < 0 or row >= self.drafts_table.rowCount():
+            return
+            
+        hover_color = QColor(100, 149, 237, 50)  # Light blue with transparency
+        
+        for col in range(self.drafts_table.columnCount()):
+            item = self.drafts_table.item(row, col)
+            if item:
+                item.setBackground(hover_color)
+
+    def _clear_hover_highlight(self, row):
+        """Clear background color from all cells in the row."""
+        if row < 0 or row >= self.drafts_table.rowCount():
+            return
+            
+        for col in range(self.drafts_table.columnCount()):
+            item = self.drafts_table.item(row, col)
+            if item:
+                item.setBackground(QColor(0, 0, 0, 0))  # Transparent
 
     def _create_drafts_menu(self):
         """Creates a dropdown menu for selecting an identity's drafts folder."""
@@ -389,6 +437,9 @@ class DraftsManager(QMainWindow):
         
         # Update the drafts folder button text
         self.update_drafts_folder_button()
+        
+        # Clear hover state when refreshing
+        self._hovered_row = -1
         
         # Clear the table and update the window title
         self.drafts_table.setRowCount(0)

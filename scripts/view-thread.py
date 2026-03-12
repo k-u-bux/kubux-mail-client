@@ -106,7 +106,8 @@ class ThreadViewer(QMainWindow):
 
         # Enable context menu
         self.results_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
-        self.results_table.customContextMenuRequested.connect(self.show_context_menu)       
+        self.results_table.customContextMenuRequested.connect(self.show_context_menu)
+        self.results_table.setMouseTracking(True)
         self.results_table.horizontalHeader().setHighlightSections(False)
         self.results_table.setStyleSheet( """
             QTableWidget { selection-background-color: rgb(100, 149, 237); color: palette(text); outline: none; }
