@@ -186,6 +186,7 @@ class DraftsManager(QMainWindow):
         self.header.setStretchLastSection(False)
         self.header.sectionResized.connect(self._on_column_width_changed)
         self.drafts_table.verticalHeader().setVisible(False)
+        self.drafts_table.setSelectionMode(QAbstractItemView.MultiSelection)
         self.drafts_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.drafts_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.drafts_table.setSortingEnabled(True)
@@ -194,7 +195,11 @@ class DraftsManager(QMainWindow):
         # Enable context menu
         self.drafts_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.drafts_table.customContextMenuRequested.connect(self.show_context_menu)
-        self.drafts_table.setStyleSheet( "QTableWidget::item { padding-left: 4px; padding-right: 4px; }")
+        self.drafts_table.horizontalHeader().setHighlightSections(False)
+        self.drafts_table.setStyleSheet( """
+            QTableWidget { selection-background-color: rgb(100, 149, 237); color: palette(text); outline: none; }
+            QTableWidget::item { padding-left: 4px; padding-right: 4px; }
+        """)
 
         main_layout.addWidget(self.drafts_table)
     
