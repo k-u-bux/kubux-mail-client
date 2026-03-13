@@ -22,9 +22,8 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, QSize, QTimer, QObject, Signal, QThread, QEvent
 from PySide6.QtGui import QFont, QAction, QColor
 
-# Import watchdog for directory monitoring
-from watchdog.observers import Observer
-from watchdog.events import FileSystemEventHandler
+# directory monitoring
+from watcher import DirectoryEventHandler
 
 # Import the shared components
 from config import config
@@ -33,94 +32,11 @@ from common import display_error, create_new_mail_menu, match_address, find_iden
 # Set up basic logging to console
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-
-class DraftsFileSystemEventHandler(FileSystemEventHandler):
-    """Handles file system events for the drafts directory."""
-    def __init__(self, callback):
-        self.callback = callback
-        # Track the timer for debouncing
-        self.timer = None
-        self.debounce_interval = 0.5  # seconds
-        
-    def on_any_event(self, event):
-        """Called for any file system event."""
-        try:
-            # Don't filter by file extension - we want to catch all events
-            # including temp files that might be part of the edit-save cycle
-            
-            # Cancel any existing timer
-            if self.timer and self.timer.is_alive():
-                self.timer.cancel()
-            
-            # Create a new standard Python timer (works in any thread)
-            self.timer = Timer(self.debounce_interval, self.callback)
-            self.timer.daemon = True  # Allow the timer to be killed when the program exits
-            self.timer.start()
-            
-            logging.debug(f"File system event: {event.event_type} - {event.src_path}")
-            
-        except Exception as e:
-            # Log the error but don't propagate it to avoid affecting the UI
-            logging.error(f"Error in file system event handler: {e}")
-            logging.debug(traceback.format_exc())
-
-
-class FSWatcherSignals(QObject):
-    """Signals for the file system watcher thread."""
-    reload_needed = Signal()
-
-
-class FileSystemWatcherThread(QThread):
-    """Thread for watching file system changes."""
-    def __init__(self, directory_path):
-        super().__init__()
-        self.directory_path = directory_path
-        self.signals = FSWatcherSignals()
-        self.observer = None
-        self.running = True
-        
-    def run(self):
-        """Start monitoring the directory."""
-        try:
-            self.observer = Observer()
-            event_handler = DraftsFileSystemEventHandler(self.signals.reload_needed.emit)
-            # Monitor the entire directory, not just .eml files
-            self.observer.schedule(event_handler, str(self.directory_path), recursive=False)
-            self.observer.start()
-            
-            # Keep the thread running
-            while self.running:
-                time.sleep(0.5)
-        except Exception as e:
-            # Log the error but don't propagate it to avoid affecting the UI
-            logging.error(f"Error in file system watcher thread: {e}")
-            logging.debug(traceback.format_exc())
-        finally:
-            # Make sure to stop the observer if it was started
-            if hasattr(self, 'observer') and self.observer:
-                try:
-                    self.observer.stop()
-                    self.observer.join()
-                except Exception as e:
-                    logging.error(f"Error stopping observer: {e}")
-            
-    def stop(self):
-        """Stop monitoring the directory."""
-        self.running = False
-        if self.observer:
-            try:
-                self.observer.stop()
-                self.observer.join()
-            except Exception as e:
-                logging.error(f"Error stopping observer: {e}")
-
 class DraftsManager(QMainWindow):
     def __init__(self, drafts_dir_path=None, sender_email="", parent=None):
         super().__init__(parent)
         self.setWindowTitle("Kubux Mail Client - Drafts")
         self.resize(QSize(1024, 768))
-
-        
 
         self.current_drafts_dir = None
         self.current_identity = find_identity( sender_email )
@@ -128,7 +44,7 @@ class DraftsManager(QMainWindow):
             logging.error(f"Sender mail address unknown: {sender_email}")
             os.exit(1)
 
-        self.fs_watcher = None
+        self.dir_watcher = DirectoryEventHandler( self.reload_drafts )
         
         self._is_window_resize = True
         self._width_ratio = 0.3
@@ -358,37 +274,10 @@ class DraftsManager(QMainWindow):
         return menu
 
     def start_file_system_watcher(self, directory_path):
-        """Start watching the drafts directory for changes."""
-        try:
-            # Stop any existing watcher
-            self.stop_file_system_watcher()
-            
-            # Create a new watcher thread
-            self.fs_watcher = FileSystemWatcherThread(directory_path)
-            self.fs_watcher.signals.reload_needed.connect(self.reload_drafts)
-            self.fs_watcher.start()
-            logging.info(f"Started file system watcher for {directory_path}")
-        except Exception as e:
-            # Log the error but don't affect the UI
-            logging.error(f"Failed to start file system watcher: {e}")
-            logging.debug(traceback.format_exc())
-            # Nullify the watcher if it failed to start
-            self.fs_watcher = None
+        self.dir_watcher.watch( directory_path )
         
     def stop_file_system_watcher(self):
-        """Stop the file system watcher."""
-        if self.fs_watcher:
-            try:
-                self.fs_watcher.stop()
-                self.fs_watcher.wait()  # Wait for the thread to finish
-                self.fs_watcher = None
-                logging.info("Stopped file system watcher")
-            except Exception as e:
-                # Log the error but don't affect the UI
-                logging.error(f"Error stopping file system watcher: {e}")
-                logging.debug(traceback.format_exc())
-                # Ensure we clear the reference even if there was an error
-                self.fs_watcher = None
+        self.dir_watcher.stop()
 
     def closeEvent(self, event):
         """Handle the window close event."""
