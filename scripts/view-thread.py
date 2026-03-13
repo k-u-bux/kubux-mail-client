@@ -20,7 +20,7 @@ from PySide6.QtCore import Qt, QSize, QTimer, QItemSelectionModel, QEvent
 from PySide6.QtGui import QFont, QKeySequence, QAction, QColor
 import logging
 
-from notmuch import notmuch_show, flatten_message_tree, find_matching_messages, find_matching_threads, apply_tag_to_query
+from notmuch import find_matching_messages, apply_tag_to_query
 from config import config
 from common import display_error, create_summary_text, get_db_path
 from watcher import DirectoryEventHandler

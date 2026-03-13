@@ -16,8 +16,8 @@ from PySide6.QtWidgets import (
     QFormLayout, QLabel, QInputDialog, QScrollArea, QDialog, QDialogButtonBox,
     QFileDialog, QSizePolicy, QAbstractItemView
 )
-from PySide6.QtCore import Qt, QSize, Signal, QUrl, QRegularExpression, QEvent
-from PySide6.QtGui import QFont, QKeySequence, QAction, QTextCursor, QTextCharFormat, QColor, QDesktopServices, QCursor
+from PySide6.QtCore import Qt, QSize, QUrl, QRegularExpression
+from PySide6.QtGui import QFont, QKeySequence, QAction, QTextCursor, QTextCharFormat, QColor, QDesktopServices
 
 from notmuch import find_matching_messages, find_matching_threads, apply_tag_to_query, get_tags_from_query, update_unseen_from_query
 

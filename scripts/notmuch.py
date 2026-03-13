@@ -1,11 +1,6 @@
-import sys
 import subprocess
 import json
 import os
-from pathlib import Path
-from email.utils import getaddresses
-import re
-from datetime import datetime, timezone
 import logging
 
 def notmuch_show(query, sort, flag_error):

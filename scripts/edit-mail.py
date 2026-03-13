@@ -18,7 +18,7 @@ from PySide6.QtWidgets import (
     QFormLayout, QLabel, QFileDialog, QSizePolicy, QMenu, QComboBox,
     QDialogButtonBox, QGroupBox, QAbstractItemView
 )
-from PySide6.QtCore import Qt, QSize, QUrl, QMimeData, QObject, QEvent
+from PySide6.QtCore import Qt, QSize, QObject, QEvent
 from PySide6.QtGui import QFont, QAction, QKeySequence, QDrag
 import logging
 import mimetypes

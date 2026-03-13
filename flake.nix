@@ -28,6 +28,7 @@
           pyPkgs.beautifulsoup4
           pyPkgs.nuitka
           pyPkgs.cython
+          pyPkgs.pylint
         ]);
       in {
         packages.default = pkgs.stdenv.mkDerivation {
@@ -130,7 +131,9 @@
             pkgs.msmtp
             pkgs.jq
           ];
-    
+
+          LD_LIBRARY_PATH = "${pkgs.zlib}/lib";
+
           shellHook = ''
             echo "Welcome to kubux-notmuch-mail-client development shell!"
             echo "Python environment is ready with PySide6, Notmuch, Scikit-learn, TOML and testing tools."

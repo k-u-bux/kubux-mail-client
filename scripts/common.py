@@ -18,7 +18,6 @@ import re
 import html2text
 from bs4 import BeautifulSoup, Comment
 import html
-import subprocess
 import shlex
 from email.utils import parseaddr
 
