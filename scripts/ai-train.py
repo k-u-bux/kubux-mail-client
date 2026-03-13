@@ -1,24 +1,28 @@
 #!/usr/bin/env python3
 
-import argparse
-import joblib
-import subprocess
-import json
 from pathlib import Path
+import email
+from email import policy
+import argparse
+
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.svm import LinearSVC
 from sklearn.multiclass import OneVsRestClassifier
-import email
-from email import policy
-from typing import List, Dict
-from notmuch import notmuch_show, flatten_message_tree, find_matching_messages
+
+import joblib
+
+from notmuch import find_matching_messages
 from config import config 
 
 
 def ignore(title, message):
     pass
 
-def filter(tag):
+def training_on(tag):
+    if tag in config.get_status_tags():
+        return False
+    if tag in config.get_suppressed_tags():
+        return False
     if tag.startswith("$"):
         return False
     if tag.startswith("!"):
@@ -28,16 +32,6 @@ def filter(tag):
     if tag == "attachment":
         return False
     if tag == "unread":
-        return False
-    if tag == "todo":
-        return False
-    if tag == "open":
-        return False
-    if tag == "done":
-        return False
-    if tag == "read":
-        return False
-    if tag == "info":
         return False
     if tag == "mark_for_training":
         return False
@@ -99,9 +93,9 @@ def main():
         new_tagged_data = {}
         messages = find_matching_messages(args.query, ignore)
         for msg in messages:
-             tags = [f"{tag}" for tag in msg["tags"] if filter(tag)]
-             file = f"{msg["filename"][0]}"
-             new_tagged_data[file] = tags
+            tags = [f"{tag}" for tag in msg["tags"] if training_on(tag)]
+            file = f"{msg["filename"][0]}"
+            new_tagged_data[file] = tags
         
     except FileNotFoundError:
         # --- Full Training Logic (no model found) ---
@@ -111,7 +105,7 @@ def main():
         new_tagged_data = {}
         messages = find_matching_messages(args.query, ignore)
         for msg in messages:
-            tags = [f"{tag}" for tag in msg["tags"] if filter(tag)]
+            tags = [f"{tag}" for tag in msg["tags"] if training_on(tag)]
             file = f"{msg["filename"][0]}"
             new_tagged_data[file] = tags
         
@@ -159,75 +153,6 @@ def main():
     print("Training complete.")
 
     print( f"tags = {tag_list}" )
-
-def old_main():
-    parser = argparse.ArgumentParser(description="Retrain an existing AI classifier with new data.")
-    parser.add_argument("--query", default='tag:$unused and not tag:unread and (tag:spam or not tag:spam)', help="Path to the output model file.")
-    parser.add_argument("--model", default=config.get_model(), help="Path to the model file to update.")
-    args = parser.parse_args()
-
-    try:
-        existing_model_data = joblib.load(args.model)
-        existing_vectorizer = existing_model_data['vectorizer']
-        existing_classifier = existing_model_data['classifier']
-        existing_tags = set(existing_model_data['tags'])
-    except FileNotFoundError:
-        print(f"Model file not found at {args.model}. Starting a full training run instead.")
-        return
-
-    new_tagged_data = {}
-    try:
-        messages = find_matching_messages(args.query, ignore)
-        for msg in messages:
-            tags = [f"{tag}" for tag in msg["tags"] if filter(tag)]
-            file = f"{msg["filename"][0]}"
-            print( f"{file} --> {tags}" )
-            new_tagged_data[ file ] = tags
-    except Exception as e:
-        print(f"{e}")
-        pass
-
-    # print( f"pre-existing tags = {existing_tags}" )
-    # print( f"{ " or ".join( [ f"tag:{tag}" for tag in existing_tags] ) }" )
-
-    # return
-
-    X_data = []
-    y_data_map = {}
-
-    combined_data = {**new_tagged_data}
-    all_tags = set(existing_tags)
-    for filename, tags in combined_data.items():
-        all_tags.update(tags)
-        mail_path = Path( filename )
-        if mail_path.exists():
-            text = extract_email_text(mail_path)
-            if text:
-                X_data.append(text)
-                y_data_map[filename] = tags
-
-    tag_list = sorted(list(all_tags))
-
-    print(f"Found {len(X_data)} emails and {len(tag_list)} unique tags for retraining.")
-
-    X_vectorized = existing_vectorizer.transform(X_data)
-
-    y_data = []
-    for filename in combined_data.keys():
-        row = [1 if tag in y_data_map.get(filename, []) else 0 for tag in tag_list]
-        y_data.append(row)
-
-    print("Re-training model...")
-    existing_classifier.fit(X_vectorized, y_data)
-
-    print(f"Saving updated model to {args.model}...")
-    model_data = {
-        'vectorizer': existing_vectorizer,
-        'classifier': existing_classifier,
-        'tags': tag_list
-    }
-    joblib.dump(model_data, args.model)
-    print("Retraining complete.")
 
 if __name__ == "__main__":
     main()
