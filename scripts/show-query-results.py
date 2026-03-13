@@ -8,7 +8,6 @@ import os
 from pathlib import Path
 from email.utils import getaddresses
 import re
-from datetime import datetime, timezone
 from mail_table_widget import MailTableWidget
 
 from PySide6.QtWidgets import (
