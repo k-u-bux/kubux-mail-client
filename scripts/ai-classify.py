@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 
-import argparse
-import joblib
 import sys
 from pathlib import Path
 import email
 from email import policy
-from typing import List
+import argparse
+import joblib
+
 from config import config
 
 def extract_email_text(file_path: Path) -> str:
@@ -65,10 +65,9 @@ def main():
         if not text:
             continue
 
-        X_test = [text]
-        X_test_vectorized = vectorizer.transform(X_test)
+        test_vectorized = vectorizer.transform( [text] )
 
-        predictions = classifier.predict(X_test_vectorized)
+        predictions = classifier.predict( test_vectorized )
         predicted_tags = [tag_list[i] for i, pred in enumerate(predictions[0]) if pred == 1]
 
         classified_mail = f"{mail_file.name} {' '.join(predicted_tags)}"
