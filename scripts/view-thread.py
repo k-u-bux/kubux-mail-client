@@ -8,7 +8,6 @@ import os
 from pathlib import Path
 from email.utils import getaddresses
 import re
-from datetime import datetime, timezone
 
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
@@ -24,7 +23,7 @@ from mail_table_widget import MailTableWidget
 import logging
 from notmuch import find_matching_messages, apply_tag_to_query
 from config import config
-from common import display_error, create_summary_text, get_db_path
+from common import display_error, create_summary_text, create_date_item, get_db_path
 from watcher import DirectoryEventHandler
 
 # Set up basic logging to console
@@ -195,7 +194,7 @@ class ThreadViewer(QMainWindow):
         """Populates the QTableWidget from a flattened list of messages."""
         self.results_table.setRowCount(len(messages))
         for row_idx, mail in enumerate(messages):
-            date_item = self._create_date_item(mail.get("timestamp"))
+            date_item = create_date_item(mail.get("timestamp"))
             sender_receiver_text = self._get_sender_receiver(mail)
             sender_receiver_item = QTableWidgetItem(sender_receiver_text)
             subject_text = mail.get("headers", {}).get("Subject", "No Subject")
@@ -217,18 +216,6 @@ class ThreadViewer(QMainWindow):
             
             self.results_table.item(row_idx, 0).setData(Qt.ItemDataRole.UserRole, mail)
             
-    def _create_date_item(self, timestamp):
-        """Creates a sortable QTableWidgetItem for the date."""
-        if not isinstance(timestamp, (int, float)):
-            timestamp = 0
-            
-        dt = datetime.fromtimestamp(timestamp, tz=timezone.utc).astimezone()
-        date_string = dt.strftime("%Y-%m-%d %H:%M")
-        
-        item = QTableWidgetItem(date_string)
-        item.setData(Qt.ItemDataRole.UserRole, timestamp)
-        return item
-        
     def _get_sender_receiver(self, message):
         """Extracts the sender/receiver based on my email address."""
         from_field = message.get("headers", {}).get("From", "unknown <nobody@nowhere.net>")

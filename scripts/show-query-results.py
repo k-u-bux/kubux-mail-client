@@ -25,7 +25,7 @@ from notmuch import find_matching_messages, find_matching_threads, apply_tag_to_
 from config import config
 from common import (
     display_error, 
-    create_draft, create_new_mail_menu, launch_drafts_manager, create_summary_text, 
+    create_draft, create_new_mail_menu, launch_drafts_manager, create_summary_text, create_date_item,
     get_db_path
 )
 from watcher import DirectoryEventHandler
@@ -281,7 +281,7 @@ class QueryResultsViewer(QMainWindow):
         summary_text = create_summary_text( authors_text, subject_text, config.get_text_font() )
         # summary_text = f"{authors_text}\n{subject_text}"
 
-        date_item = self._create_date_item(date_stamp)
+        date_item = create_date_item(date_stamp)
         subject_item = QTableWidgetItem(subject_text)
         authors_item = QTableWidgetItem(authors_text)
 
@@ -303,7 +303,7 @@ class QueryResultsViewer(QMainWindow):
         summary_text = create_summary_text( sender_receiver_text, subject_text, config.get_text_font() )
         # summary_text = f"{sender_receiver_text}\n{subject_text}"
 
-        date_item = self._create_date_item(date_stamp)
+        date_item = create_date_item(date_stamp)
         subject_item = QTableWidgetItem(subject_text)
         sender_receiver_item = QTableWidgetItem(sender_receiver_text)
 
@@ -316,18 +316,6 @@ class QueryResultsViewer(QMainWindow):
         self.results_table.setItem(row_idx, 1, sender_receiver_item)
         
         self.results_table.item(row_idx, 0).setData(Qt.ItemDataRole.UserRole, mail)
-        
-    def _create_date_item(self, timestamp):
-        """Creates a sortable QTableWidgetItem for the date."""
-        if not isinstance(timestamp, (int, float)):
-            timestamp = 0
-            
-        dt = datetime.fromtimestamp(timestamp, tz=timezone.utc).astimezone()
-        date_string = dt.strftime("%Y-%m-%d %H:%M")
-        
-        item = QTableWidgetItem(date_string)
-        item.setData(Qt.ItemDataRole.UserRole, timestamp)
-        return item
         
     def _get_sender_receiver(self, message):
         """Extracts the sender/receiver based on my email address."""

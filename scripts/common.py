@@ -20,6 +20,7 @@ from bs4 import BeautifulSoup, Comment
 import html
 import shlex
 from email.utils import parseaddr
+from datetime import datetime, timezone
 
 def output_of_cmd(cmd_str: str) -> str:
     """
@@ -159,6 +160,17 @@ def html_to_plain_text_hack(html_content):
     
     return text.strip()
 
+def create_date_item ( timestamp ):
+    """Creates a sortable QTableWidgetItem for the date."""
+    if not isinstance(timestamp, (int, float)):
+        timestamp = 0
+        
+    dt = datetime.fromtimestamp(timestamp, tz=timezone.utc).astimezone()
+    date_string = dt.strftime("%Y-%m-%d %H:%M")
+    
+    item = QTableWidgetItem(date_string)
+    item.setData(Qt.ItemDataRole.UserRole, timestamp)
+    return item
 
 # Custom dialog for displaying copyable error messages
 class CopyableErrorDialog(QDialog):
