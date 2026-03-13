@@ -26,6 +26,8 @@
           pyPkgs.scancode-toolkit
           pyPkgs.html2text
           pyPkgs.beautifulsoup4
+          pyPkgs.nuitka
+          pyPkgs.cython
         ]);
       in {
         packages.default = pkgs.stdenv.mkDerivation {
@@ -49,6 +51,7 @@
             pkgs.msmtp
             pkgs.jq
             pkgs.imagemagick 
+            pkgs.zlib
           ];
           nativeBuildInputs = [ 
             pkgs.makeWrapper
@@ -59,6 +62,9 @@
             pkgs.isync
             pkgs.gnupg
             pkgs.msmtp
+            pkgs.clang
+            pkgs.gcc
+            pkgs.binutils
           ];
 
           installPhase = ''
