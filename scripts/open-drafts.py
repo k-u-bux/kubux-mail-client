@@ -22,6 +22,8 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, QSize, QTimer, QObject, Signal, QThread, QEvent
 from PySide6.QtGui import QFont, QAction, QColor
 
+from mail_table_widget import MailTableWidget
+
 # directory monitoring
 from watcher import DirectoryEventHandler
 
@@ -46,9 +48,6 @@ class DraftsManager(QMainWindow):
 
         self.dir_watcher = DirectoryEventHandler( self.reload_drafts )
         
-        self._is_window_resize = True
-        self._width_ratio = 0.3
-        self._hovered_row = -1  # Track which row is currently hovered
         self.setup_ui()
         
         # Load the initial drafts directory from the command-line argument
@@ -57,9 +56,6 @@ class DraftsManager(QMainWindow):
         else:
             drafts_path_str = self.current_identity.get('drafts', "~/.local/share/kubux-mail-client/mail/drafts")
             self.load_drafts(Path(drafts_path_str).expanduser(), self.current_identity)
-
-    def _flag_resize(self, flag):
-        self._is_window_resize = flag
 
     def setup_ui(self):
         central_widget = QWidget()
@@ -90,37 +86,12 @@ class DraftsManager(QMainWindow):
         top_bar_layout.addWidget(self.quit_button)
         
         # Set up the table with new column order: Date|To/Cc|Subject|From
-        self.drafts_table = QTableWidget()
-        self.drafts_table.setColumnCount(3)
-        self.drafts_table.setHorizontalHeaderLabels(["Date", "To/Cc", "Subject"])
-        self.drafts_table.setFont(config.get_text_font())
-
-        # Configure the table's appearance and make columns user-resizable
-        self.header = self.drafts_table.horizontalHeader()
-        self.header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
-        self.header.setSectionResizeMode(1, QHeaderView.ResizeMode.Interactive)
-        self.header.setSectionResizeMode(2, QHeaderView.ResizeMode.Interactive)
-        self.header.setStretchLastSection(False)
-        self.header.sectionResized.connect(self._on_column_width_changed)
-        self.drafts_table.verticalHeader().setVisible(False)
-        self.drafts_table.setSelectionMode(QAbstractItemView.MultiSelection)
-        self.drafts_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.drafts_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        self.drafts_table.setSortingEnabled(True)
+        self.drafts_table = MailTableWidget()
         self.drafts_table.cellDoubleClicked.connect(self.open_selected_draft)
 
         # Enable context menu
         self.drafts_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.drafts_table.customContextMenuRequested.connect(self.show_context_menu)
-        self.drafts_table.setMouseTracking(True)
-        self.drafts_table.horizontalHeader().setHighlightSections(False)
-        self.drafts_table.setStyleSheet( """
-            QTableWidget { selection-background-color: rgb(100, 149, 237); color: palette(text); outline: none; }
-            QTableWidget::item { padding-left: 4px; padding-right: 4px; }
-        """)
-
-        # Install event filter for row-level hover highlighting
-        self.drafts_table.viewport().installEventFilter(self)
 
         main_layout.addWidget(self.drafts_table)
     
@@ -160,100 +131,6 @@ class DraftsManager(QMainWindow):
         
         # Show context menu at the right position
         context_menu.exec(self.drafts_table.viewport().mapToGlobal(position))
-
-    def _on_column_width_changed(self, logical_index, old_size, new_size):
-        """User drags column divider → update stored ratios."""
-        if logical_index in [1, 2]:  # Subject or Sender
-            if not self._is_window_resize:
-                self._update_ratio_from_widths()
-                self._fix_column_widths(self._width_ratio)
-
-    def _update_ratio_from_widths(self):
-        """Calculate and store current Subject/Sender ratio."""
-        sender_width = self.drafts_table.columnWidth(1)
-        subject_width = self.drafts_table.columnWidth(2)
-        total_width = subject_width + sender_width
-        
-        if total_width > 0:
-            self._width_ratio = sender_width / total_width
-            # print(f"new ratio = {self._width_ratio} from col1 = {sender_width} and col2 = {subject_width}")
-
-    def _fix_column_widths(self,ratio):
-        # Ensure the table is not empty to avoid errors
-        if self.drafts_table.rowCount() == 0:
-            return
-
-        # Get the total available width of the table
-        total_width = self.drafts_table.viewport().width()
-
-        # Get the width of the Date column after it has been sized to its contents
-        date_col_width = self.drafts_table.columnWidth(0)
-
-        # Calculate the remaining space
-        remaining_width = total_width - date_col_width
-
-        # Calculate the target widths for Subject and Sender based on ratio
-        subject_col_width = int(remaining_width * ratio)
-        sender_col_width = int(remaining_width * (1.0 - ratio))
-
-        # Apply the new widths
-        self.drafts_table.setColumnWidth(1, subject_col_width)
-        self.drafts_table.setColumnWidth(2, sender_col_width)
-
-    def showEvent(self, event):
-        """Called when the widget is shown."""
-        super().showEvent(event)
-        self._fix_column_widths(self._width_ratio)
-
-    def resizeEvent(self, event):
-        """Called when the widget is resized."""
-        super().resizeEvent(event)
-        self._flag_resize( True )
-        self._fix_column_widths(self._width_ratio)
-        QTimer.singleShot( 250, lambda: self._flag_resize( False ) )
-
-    def eventFilter(self, obj, event):
-        """Event filter to track mouse hover over table rows."""
-        if obj == self.drafts_table.viewport():
-            if event.type() == QEvent.Type.MouseMove:
-                # Get the row under the cursor
-                pos = event.pos()
-                row = self.drafts_table.rowAt(pos.y())
-                
-                # If we've moved to a different row, update highlighting
-                if row != self._hovered_row:
-                    self._clear_hover_highlight(self._hovered_row)
-                    self._hovered_row = row
-                    self._apply_hover_highlight(row)
-                    
-            elif event.type() == QEvent.Type.Leave:
-                # Mouse left the table entirely
-                self._clear_hover_highlight(self._hovered_row)
-                self._hovered_row = -1
-                
-        return super().eventFilter(obj, event)
-
-    def _apply_hover_highlight(self, row):
-        """Apply light blue background to all cells in the row."""
-        if row < 0 or row >= self.drafts_table.rowCount():
-            return
-            
-        hover_color = QColor(100, 149, 237, 50)  # Light blue with transparency
-        
-        for col in range(self.drafts_table.columnCount()):
-            item = self.drafts_table.item(row, col)
-            if item:
-                item.setBackground(hover_color)
-
-    def _clear_hover_highlight(self, row):
-        """Clear background color from all cells in the row."""
-        if row < 0 or row >= self.drafts_table.rowCount():
-            return
-            
-        for col in range(self.drafts_table.columnCount()):
-            item = self.drafts_table.item(row, col)
-            if item:
-                item.setBackground(QColor(0, 0, 0, 0))  # Transparent
 
     def _create_drafts_menu(self):
         """Creates a dropdown menu for selecting an identity's drafts folder."""
@@ -328,12 +205,13 @@ class DraftsManager(QMainWindow):
         self.update_drafts_folder_button()
         
         # Clear hover state when refreshing
-        self._hovered_row = -1
+        self.drafts_table.clear_and_reset_hover()
         
         # Clear the table and update the window title
         self.drafts_table.setRowCount(0)
         self.setWindowTitle(f"Kubux Mail Client - Drafts ({self.current_identity['email']})")
-        
+        self.drafts_table.setHorizontalHeaderLabels(["Date", "To/Cc", "Subject"])
+
         if not self.current_drafts_dir.is_dir():
             display_error(self, "Directory not found", f"The drafts directory does not exist:\n\n{self.current_drafts_dir}")
             return
@@ -407,7 +285,7 @@ class DraftsManager(QMainWindow):
             self.drafts_table.setRowCount(row)
             
             # Re-adjust the column widths after loading data
-            self._fix_column_widths(self._width_ratio)
+            # self._fix_column_widths(self._width_ratio)
             
             # Start watching this directory for changes
             self.start_file_system_watcher(self.current_drafts_dir)

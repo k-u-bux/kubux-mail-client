@@ -9,12 +9,13 @@ from pathlib import Path
 from email.utils import getaddresses
 import re
 from datetime import datetime, timezone
+from mail_table_widget import MailTableWidget
 
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLineEdit, QPushButton, QTableWidget, QTableWidgetItem, QHeaderView,
     QMessageBox, QDialog, QDialogButtonBox, QLabel, QTextEdit, QInputDialog,
-    QCheckBox, QAbstractItemView, QMenu, QWidgetAction, QProxyStyle, QStyle
+    QCheckBox, QAbstractItemView, QMenu, QWidgetAction
 )
 from PySide6.QtCore import Qt, QSize, QTimer, QItemSelectionModel, QEvent
 from PySide6.QtGui import QFont, QKeySequence, QAction, QColor
@@ -43,18 +44,13 @@ class QueryResultsViewer(QMainWindow):
         self.view_mode = "mails" # either "threads" or "mails"
         self.current_query = query_string
         self.results = []
-        self._width_ratio = 0.3
-        self._is_window_resize = True
-        self._hovered_row = -1  # Track which row is currently hovered
-        self.dir_watcher = DirectoryEventHandler( self.execute_query )
 
         self.setup_ui()
         self.setup_key_bindings()
         self.execute_query()
-        self.dir_watcher.watch( get_db_path() )
 
-    def _flag_resize(self, flag):
-        self._is_window_resize = flag
+        self.dir_watcher = DirectoryEventHandler( self.execute_query )
+        self.dir_watcher.watch( get_db_path() )
 
     def refresh_more_menu(self):
         self.more_menu.clear()        
@@ -74,12 +70,6 @@ class QueryResultsViewer(QMainWindow):
         self.setCentralWidget(central_widget)
         main_layout = QVBoxLayout(central_widget)
         main_layout.setContentsMargins(8, 8, 8, 8)
-
-        style = QProxyStyle()
-        style.styleHint = lambda hint, opt, widget, data: \
-            0 if hint == QStyle.SH_ToolTip_WakeUpDelay else \
-            QApplication.style().styleHint(hint, opt, widget, data)
-
 
         # a) Top row: quit button right, on the left two buttons "refresh" and a button that changes
         top_bar_layout = QHBoxLayout()
@@ -147,49 +137,11 @@ class QueryResultsViewer(QMainWindow):
         main_layout.addWidget(self.query_edit)
 
         # c) I like the table below.
-        self.results_table = QTableWidget()
-        self.results_table.setStyle( style )
-        self.results_table.setColumnCount(3)
-        self.results_table.setFont(config.get_text_font())
-        # self.results_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
-        # self.results_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
-        self.results_table.setSelectionMode(QAbstractItemView.MultiSelection)
-        self.results_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.results_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        # self.results_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
-        self.results_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Interactive)
-        self.results_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
-        self.results_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Interactive)
-        self.results_table.horizontalHeader().setStretchLastSection(False)
-        self.results_table.horizontalHeader().sectionResized.connect(self._on_column_width_changed)
-        self.results_table.verticalHeader().setVisible(False)
-        self.results_table.setSortingEnabled(True)
-        # Enable context menu
+        self.results_table = MailTableWidget()
         self.results_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
-        self.results_table.customContextMenuRequested.connect(self.show_context_menu)
-        # self.results_table.sortByColumn(2, Qt.SortOrder.DescendingOrder)
-        # self.results_table.sortByColumn(1, Qt.SortOrder.DescendingOrder)
-        # self.results_table.sortByColumn(0, Qt.SortOrder.DescendingOrder)
-
-        self.results_table.setMouseTracking(True)
-        self.results_table.horizontalHeader().setHighlightSections(False)
-        self.results_table.setStyleSheet( """
-            QTableWidget { selection-background-color: rgb(100, 149, 237); color: palette(text); outline: none; }
-            QTableWidget::item { padding-left: 4px; padding-right: 4px; }
-#            QTableWidget::item:selected { background-color: rgba(100, 149, 237, 50); color: palette(text); }
-#            QTableWidget::item:focus { background-color: transparent; }
-#            QTableWidget::item:hover { background-color: rgba(100, 149, 237, 50); }
-        """)
-        
-        # Install event filter for row-level hover highlighting
-        self.results_table.viewport().installEventFilter(self)
-        
-        main_layout.addWidget(self.results_table)
-        
-        # Connect click to action
+        self.results_table.customContextMenuRequested.connect(self.show_context_menu)        
         self.results_table.doubleClicked.connect(self.open_selected_item)
-
-        # self.dir_watcher.watch( get_db_path() )
+        main_layout.addWidget(self.results_table)
 
     def show_context_menu(self, position):
         """Show context menu with options to delete, edit, or execute a query."""
@@ -261,57 +213,6 @@ class QueryResultsViewer(QMainWindow):
         # Show context menu at the right position
         context_menu.exec(self.results_table.viewport().mapToGlobal(position))
 
-    def _on_column_width_changed(self, logical_index, old_size, new_size):
-        """User drags column divider → update stored ratios."""
-        if logical_index in [1, 2]:  # Subject or Sender
-            if not self._is_window_resize:
-                self._update_ratio_from_widths()
-                self._fix_column_widths(self._width_ratio)
-
-    def _update_ratio_from_widths(self):
-        """Calculate and store current Subject/Sender ratio."""
-        sender_width = self.results_table.columnWidth(1)
-        subject_width = self.results_table.columnWidth(2)
-        total_width = subject_width + sender_width
-        
-        if total_width > 0:
-            self._width_ratio = sender_width / total_width
-            # print(f"new ratio = {self._width_ratio} from col1 = {sender_width} and col2 = {subject_width}")
-
-    def _fix_column_widths(self,ratio):
-        # Ensure the table is not empty to avoid errors
-        if self.results_table.rowCount() == 0:
-            return
-
-        # Get the total available width of the table
-        total_width = self.results_table.viewport().width()
-
-        # Get the width of the Date column after it has been sized to its contents
-        date_col_width = self.results_table.columnWidth(0)
-
-        # Calculate the remaining space
-        remaining_width = total_width - date_col_width
-
-        # Calculate the target widths for Subject and Sender based on ratio
-        subject_col_width = int(remaining_width * ratio)
-        sender_col_width = int(remaining_width * (1.0 - ratio))
-
-        # Apply the new widths
-        self.results_table.setColumnWidth(1, subject_col_width)
-        self.results_table.setColumnWidth(2, sender_col_width)
-
-    def showEvent(self, event):
-        """Called when the widget is shown."""
-        super().showEvent(event)
-        self._fix_column_widths(self._width_ratio)
-
-    def resizeEvent(self, event):
-        """Called when the widget is resized."""
-        super().resizeEvent(event)
-        self._flag_resize( True )
-        self._fix_column_widths(self._width_ratio)
-        QTimer.singleShot( 250, lambda: self._flag_resize( False ) )
-
     def setup_key_bindings(self):
         """Sets up key bindings based on the config file."""
         actions = {
@@ -325,49 +226,6 @@ class QueryResultsViewer(QMainWindow):
                 action.setShortcut(QKeySequence(key_seq))
                 action.triggered.connect(func)
                 self.addAction(action)
-
-    def eventFilter(self, obj, event):
-        """Event filter to track mouse hover over table rows."""
-        if obj == self.results_table.viewport():
-            if event.type() == QEvent.Type.MouseMove:
-                # Get the row under the cursor
-                pos = event.pos()
-                row = self.results_table.rowAt(pos.y())
-                
-                # If we've moved to a different row, update highlighting
-                if row != self._hovered_row:
-                    self._clear_hover_highlight(self._hovered_row)
-                    self._hovered_row = row
-                    self._apply_hover_highlight(row)
-                    
-            elif event.type() == QEvent.Type.Leave:
-                # Mouse left the table entirely
-                self._clear_hover_highlight(self._hovered_row)
-                self._hovered_row = -1
-                
-        return super().eventFilter(obj, event)
-
-    def _apply_hover_highlight(self, row):
-        """Apply light blue background to all cells in the row."""
-        if row < 0 or row >= self.results_table.rowCount():
-            return
-            
-        hover_color = QColor(100, 149, 237, 50)  # Light blue with transparency
-        
-        for col in range(self.results_table.columnCount()):
-            item = self.results_table.item(row, col)
-            if item:
-                item.setBackground(hover_color)
-
-    def _clear_hover_highlight(self, row):
-        """Clear background color from all cells in the row."""
-        if row < 0 or row >= self.results_table.rowCount():
-            return
-            
-        for col in range(self.results_table.columnCount()):
-            item = self.results_table.item(row, col)
-            if item:
-                item.setBackground(QColor(0, 0, 0, 0))  # Transparent
 
     def toggle_view_mode(self):
         if self.view_mode == "threads":
@@ -384,7 +242,7 @@ class QueryResultsViewer(QMainWindow):
         logging.info(f"Executing query: '{self.current_query}' in '{self.view_mode}' mode.")
         
         # Clear hover state when refreshing
-        self._hovered_row = -1
+        self.results_table.clear_and_reset_hover()
         
         self.results_table.setRowCount(0)
         self.results_table.clearContents()
