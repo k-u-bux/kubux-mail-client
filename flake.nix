@@ -1,1 +1,1 @@
-flake.nix-nuitka
+flake.nix-script
