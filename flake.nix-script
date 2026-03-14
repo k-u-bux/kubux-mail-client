@@ -23,7 +23,7 @@
           pyPkgs.pytest-cov
           pyPkgs.pytest-qt
           pyPkgs.coverage
-          pyPkgs.scancode-toolkit
+          # pyPkgs.scancode-toolkit
           pyPkgs.html2text
           pyPkgs.beautifulsoup4
         ]);
@@ -42,7 +42,7 @@
             pkgs.poetry
             pkgs.black
             pkgs.isort
-            pkgs.mypy
+            # pkgs.mypy
             pkgs.notmuch
             pkgs.muchsync
             pkgs.gnupg
@@ -117,7 +117,7 @@
             pkgs.poetry
             pkgs.black
             pkgs.isort
-            pkgs.mypy
+            # pkgs.mypy
             pkgs.notmuch
             pkgs.muchsync
             pkgs.gnupg
