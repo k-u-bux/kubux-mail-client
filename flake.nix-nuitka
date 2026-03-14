@@ -27,6 +27,7 @@
           pyPkgs.html2text
           pyPkgs.beautifulsoup4
           pyPkgs.nuitka
+          pyPkgs.shiboken6
         ]);
       in {
         packages.default = pkgs.stdenv.mkDerivation {
@@ -50,9 +51,14 @@
             pkgs.msmtp
             pkgs.jq
             pkgs.imagemagick 
+            pkgs.blas
+            pkgs.gtk3
+            pkgs.gdk-pixbuf
+            pkgs.atk
           ];
           nativeBuildInputs = [ 
             pkgs.makeWrapper
+            pkgs.autoPatchelfHook
             pkgs.qt6.wrapQtAppsHook
             pythonEnv
             pkgs.notmuch
@@ -64,44 +70,56 @@
 
           installPhase = ''
             mkdir -p $out/bin
+            mkdir -p $out/libexec
             mkdir -p $out/share/applications
 	          mkdir -p $out/share/man/man1
 	    
             # Copy Python scripts
-            cp $src/scripts/*.py $out/bin/
-            cp $src/scripts/*.jq $out/bin/
-            cp $src/scripts/predict-tags $out/bin/
-            cp $src/scripts/decrypt-on-the-fly $out/bin/
-            cp $src/scripts/mbsync-and-decrypt $out/bin/
-            chmod +x $out/bin/*.py
-            # chmod +x $out/bin/*.sh
-            chmod +x $out/bin/predict-tags
-            chmod +x $out/bin/decrypt-on-the-fly
-            chmod +x $out/bin/mbsync-and-decrypt
+            cp $src/scripts/*.py $out/libexec/
+            cp $src/scripts/*.jq $out/libexec/
+            cp $src/scripts/predict-tags $out/libexec/
+            cp $src/scripts/decrypt-on-the-fly $out/libexec/
+            cp $src/scripts/mbsync-and-decrypt $out/libexec/
+            chmod +x $out/libexec/*.py
+            # chmod +x $out/libexec/*.sh
+            chmod +x $out/libexec/predict-tags
+            chmod +x $out/libexec/decrypt-on-the-fly
+            chmod +x $out/libexec/mbsync-and-decrypt
 
 	          # Copy man page
 	          # cp kubux-mail-client.1 $out/share/man/man1
 
-             # Create wrapper using makeWrapper for proper desktop integration
-            for file in ai-classify ai-train edit-mail view-mail view-thread open-drafts manage-mail send-mail get-message-id pause-imap-sync config-helper-get-pixel-ratio config-helper-get-dpi; do
-              makeWrapper ${pythonEnv}/bin/python $out/bin/$file \
-                --add-flags "$out/bin/$file.py" \
-                --set-default TMPDIR "/tmp" \
-		;
-	          done
-    
-           # Create wrapper using makeWrapper for proper desktop integration
-            for file in show-query-results; do
+            # Nuitka compilation
+            for file in show-query-results edit-mail view-mail view-thread open-drafts manage-mail; do
                 nuitka \
+                       --standalone \
+                       --output-filename=$file \
                        --enable-plugin=pyside6 \
                        --lto=no \
                        --follow-imports \
                        --file-reference-choice=runtime \
                        scripts/$file.py \
                        ;
-                mv $file.bin $out/bin/$file
-                mv $file.* $out/bin/
+                ls -l
+                cp -pvr $file.dist/* $out/libexec/
+                ln -s $out/libexec/$file $out/bin/$file
 	          done
+
+            # Create wrapper using makeWrapper for proper desktop integration
+            for file in ai-classify ai-train send-mail get-message-id pause-imap-sync config-helper-get-pixel-ratio config-helper-get-dpi; do
+              makeWrapper ${pythonEnv}/bin/python $out/libexec/$file \
+                --add-flags "$out/libexec/$file.py" \
+                --set-default TMPDIR "/tmp" \
+		            ;
+                ln -s $out/libexec/$file $out/bin/$file              
+	          done
+     
+            # Create forwarding scripts
+            # for file in ai-classify ai-train show-query-results edit-mail view-mail view-thread open-drafts manage-mail send-mail get-message-id pause-imap-sync config-helper-get-pixel-ratio config-helper-get-dpi predict-tags decrypt-on-the-fly mbsync-and-decrypt; do
+            #     makeWrapper $out/libexec/$file $out/bin/$file \
+            #                 --set-default TMPDIR "/tmp" \
+            #                ;
+            # done
 
             # Copy desktop file
             cp $src/kubux-mail-client.desktop $out/share/applications/
@@ -113,6 +131,14 @@
             done
           '';
           
+          prePatchMkspecs = ''
+            find $out -ls
+          '';
+
+          postPatchMkspecs = ''
+            find $out -ls
+          '';
+
           meta = with pkgs.lib; {
             description = "A Notmuch email client with predictive pre-tagging";
             homepage = "https://github.com/kubux/kubux-mail-client";
