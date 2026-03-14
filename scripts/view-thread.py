@@ -253,7 +253,6 @@ class ThreadViewer(QMainWindow):
             self.open_selected_row( row )
 
     def open_selected_item(self, index):
-        self._toggle_row_selection( index )
         self.open_selected_row( index.row() )
         
     def open_selected_row(self, row):
