@@ -12,7 +12,6 @@
         pkgs = nixpkgs.legacyPackages.${system};
         pythonEnv = pkgs.python3.withPackages (pyPkgs: [
           pyPkgs.pyside6
-          pyPkgs.notmuch
           pyPkgs.notmuch2
           pyPkgs.scikit-learn
           pyPkgs.toml
@@ -62,7 +61,6 @@
             pkgs.autoPatchelfHook
             pkgs.qt6.wrapQtAppsHook
             pythonEnv
-            pkgs.notmuch
             pkgs.muchsync
             pkgs.isync
             pkgs.gnupg
@@ -76,11 +74,11 @@
 	          mkdir -p $out/share/man/man1
 	    
             # Copy Python scripts
-            cp $src/scripts/*.py $out/libexec/
-            cp $src/scripts/*.jq $out/libexec/
-            cp $src/scripts/predict-tags $out/libexec/
-            cp $src/scripts/decrypt-on-the-fly $out/libexec/
-            cp $src/scripts/mbsync-and-decrypt $out/libexec/
+            cp -P $src/scripts/*.py $out/libexec/
+            cp -P $src/scripts/*.jq $out/libexec/
+            cp -P $src/scripts/predict-tags $out/libexec/
+            cp -P $src/scripts/decrypt-on-the-fly $out/libexec/
+            cp -P $src/scripts/mbsync-and-decrypt $out/libexec/
             chmod +x $out/libexec/*.py
             # chmod +x $out/libexec/*.sh
             chmod +x $out/libexec/predict-tags

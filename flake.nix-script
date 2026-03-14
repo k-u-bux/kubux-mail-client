@@ -68,11 +68,11 @@
 	          mkdir -p $out/share/man/man1
 	    
             # Copy Python scripts
-            cp $src/scripts/*.py $out/bin/
-            cp $src/scripts/*.jq $out/bin/
-            cp $src/scripts/predict-tags $out/bin/
-            cp $src/scripts/decrypt-on-the-fly $out/bin/
-            cp $src/scripts/mbsync-and-decrypt $out/bin/
+            cp -P $src/scripts/*.py $out/bin/
+            cp -P $src/scripts/*.jq $out/bin/
+            cp -P $src/scripts/predict-tags $out/bin/
+            cp -P $src/scripts/decrypt-on-the-fly $out/bin/
+            cp -P $src/scripts/mbsync-and-decrypt $out/bin/
             chmod +x $out/bin/*.py
             # chmod +x $out/bin/*.sh
             chmod +x $out/bin/predict-tags
