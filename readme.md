@@ -240,5 +240,3 @@ This mail client was concieved long ago when my distro decided to ditch exmh. Th
 - Uses [PySide6](https://www.qt.io/qt-for-python) for GUI components
 
 ---
-
-For more detailed architectural information, see [outline.md](outline.md).
