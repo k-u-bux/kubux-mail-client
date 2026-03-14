@@ -13,6 +13,7 @@
         pythonEnv = pkgs.python3.withPackages (pyPkgs: [
           pyPkgs.pyside6
           pyPkgs.notmuch
+          pyPkgs.notmuch2
           pyPkgs.scikit-learn
           pyPkgs.toml
           pyPkgs.imapclient

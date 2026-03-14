@@ -12,7 +12,8 @@
         pkgs = nixpkgs.legacyPackages.${system};
         pythonEnv = pkgs.python3.withPackages (pyPkgs: [
           pyPkgs.pyside6
-          pyPkgs.notmuch
+          # pyPkgs.notmuch
+          pyPkgs.notmuch2
           pyPkgs.scikit-learn
           pyPkgs.toml
           pyPkgs.imapclient
@@ -54,7 +55,7 @@
             pkgs.makeWrapper
             pkgs.qt6.wrapQtAppsHook
             pythonEnv
-            pkgs.notmuch
+            # pkgs.notmuch
             pkgs.muchsync
             pkgs.isync
             pkgs.gnupg
