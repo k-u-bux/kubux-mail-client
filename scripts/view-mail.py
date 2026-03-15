@@ -93,7 +93,7 @@ class MailViewer(QMainWindow):
         self.has_html_body = False
         self.parse_mail_file()
         self.force_html = False
-        self.shows_html = False
+        self.shows_html = not self.has_text_body
 
         self.process_initial_tags()
         self.setup_ui()
