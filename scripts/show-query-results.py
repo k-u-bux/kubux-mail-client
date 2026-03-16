@@ -180,6 +180,7 @@ class QueryResultsViewer(QMainWindow):
         # Actions
         open_action = QAction("Open", self)
         open_newest_action = QAction("Open newest in thread", self)
+        open_oldest_action = QAction("Open oldest in thread", self)
         open_thread_action = QAction("Open Thread", self)
         mark_read_action = QAction("- unread", self)
         status_tags = config.get_status_tags()
@@ -193,6 +194,7 @@ class QueryResultsViewer(QMainWindow):
         if selected_items:
             open_action.triggered.connect( self.open_selected_items )
             open_newest_action.triggered.connect( lambda r=row: self.open_thread_newest_selected_items )
+            open_oldest_action.triggered.connect( lambda r=row: self.open_thread_oldest_selected_items )
             open_thread_action.triggered.connect( self.open_thread_selected_items )
             mark_read_action.triggered.connect( self.mark_read_selected_items )
             for tag in status_tags:
@@ -203,6 +205,7 @@ class QueryResultsViewer(QMainWindow):
         else:
             open_action.triggered.connect( lambda r=row: self.open_selected_row( row ) )
             open_newest_action.triggered.connect( lambda r=row: self.open_thread_newest_selected_row( row ) )
+            open_oldest_action.triggered.connect( lambda r=row: self.open_thread_oldest_selected_row( row ) )
             open_thread_action.triggered.connect( lambda r=row: self.open_thread_selected_row( row ) )
             mark_read_action.triggered.connect( lambda r=row: self.mark_read_row( row ) )
             for tag in status_tags:
@@ -217,6 +220,7 @@ class QueryResultsViewer(QMainWindow):
             context_menu.addAction(open_thread_action)
         else:
             context_menu.addAction(open_newest_action)
+            context_menu.addAction(open_oldest_action)
         context_menu.addAction(mark_read_action)
         for tag in status_tags:
             context_menu.addAction( flag_status_action[ tag ] )
@@ -476,19 +480,10 @@ class QueryResultsViewer(QMainWindow):
         for row in list( set( [ item.row() for item in self.results_table.selectedItems() ] ) ):
             self.open_thread_selected_row( row )
 
-    def open_thread_newest_selected_items(self):
-        for row in list( set( [ item.row() for item in self.results_table.selectedItems() ] ) ):
-            self.open_thread_newest_selected_row( row )
-
     def open_thread_selected_item(self, index):
         """Launches the appropriate viewer based on the selected item."""
         row = index.row()
         self.open_thread_selected_row( row )
-
-    def open_thread_newest_selected_item(self, index):
-        """Launches the appropriate viewer based on the selected item."""
-        row = index.row()
-        self.open_thread_newest_selected_row( row )
 
     def open_thread_selected_row(self, row):
         item_data = self.results_table.item(row, 0).data(Qt.ItemDataRole.UserRole)
@@ -516,10 +511,42 @@ class QueryResultsViewer(QMainWindow):
                 except Exception as e:
                     display_error(self, "Error", f"Could not launch mail viewer: {e}")
 
+    def open_thread_newest_selected_items(self):
+        for row in list( set( [ item.row() for item in self.results_table.selectedItems() ] ) ):
+            self.open_thread_newest_selected_row( row )
+
+    def open_thread_newest_selected_item(self, index):
+        """Launches the appropriate viewer based on the selected item."""
+        row = index.row()
+        self.open_thread_newest_selected_row( row )
+
     def open_thread_newest_selected_row(self, row):
         item_data = self.results_table.item(row, 0).data(Qt.ItemDataRole.UserRole)
         thread_id = item_data.get("thread")
         mail_file_path = newest_message( thread_id )
+        if mail_file_path:
+            logging.info(f"Launching mail viewer for file: {mail_file_path}")
+            try:
+                viewer_path = os.path.join(os.path.dirname(__file__), "view-mail")
+                subprocess.Popen([viewer_path, mail_file_path[0]])
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Could not launch mail viewer: {e}")
+        else:
+                logging.warning("Could not find mail file path for selected row.")
+
+    def open_thread_oldest_selected_items(self):
+        for row in list( set( [ item.row() for item in self.results_table.selectedItems() ] ) ):
+            self.open_thread_oldest_selected_row( row )
+
+    def open_thread_oldest_selected_item(self, index):
+        """Launches the appropriate viewer based on the selected item."""
+        row = index.row()
+        self.open_thread_oldest_selected_row( row )
+
+    def open_thread_oldest_selected_row(self, row):
+        item_data = self.results_table.item(row, 0).data(Qt.ItemDataRole.UserRole)
+        thread_id = item_data.get("thread")
+        mail_file_path = oldest_message( thread_id )
         if mail_file_path:
             logging.info(f"Launching mail viewer for file: {mail_file_path}")
             try:
