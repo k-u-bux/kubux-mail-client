@@ -34,6 +34,25 @@ from query import QueryParser
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 
+def newest_message ( thread_id ):
+    command = ['notmuch', 'search', '--output=files', '--sort=newest-first', '--limit=1', f'thread:{thread_id} and (tag:spam or not tag:spam)']
+    result = subprocess.run(command, capture_output=True, text=True, check=True)
+    messages = result.stdout.strip().split('\n')
+    return messages
+
+def oldest_message ( thread_id ):
+    command = ['notmuch', 'search', '--output=files', '--sort=oldest-first', '--limit=1', f'thread:{thread_id} and (tag:spam or not tag:spam)']
+    result = subprocess.run(command, capture_output=True, text=True, check=True)
+    messages = result.stdout.strip().split('\n')
+    return messages
+
+def messages ( thread_id ):
+    command = ['notmuch', 'search', '--output=files', '--sort=oldest-first', f'thread:{thread_id} and (tag:spam or not tag:spam)']
+    result = subprocess.run(command, capture_output=True, text=True, check=True)
+    messages = result.stdout.strip().split('\n')
+    return messages
+
+
 class QueryResultsViewer(QMainWindow):
     def __init__(self, query_string=config.get_search(), parent=None):
         super().__init__(parent)
@@ -158,8 +177,9 @@ class QueryResultsViewer(QMainWindow):
         
         selected_items = self.results_table.selectedItems();
 
-        # Add actions
+        # Actions
         open_action = QAction("Open", self)
+        open_newest_action = QAction("Open newest in thread", self)
         open_thread_action = QAction("Open Thread", self)
         mark_read_action = QAction("- unread", self)
         status_tags = config.get_status_tags()
@@ -172,6 +192,7 @@ class QueryResultsViewer(QMainWindow):
         modify_action = QAction("Edit Tags", self)
         if selected_items:
             open_action.triggered.connect( self.open_selected_items )
+            open_newest_action.triggered.connect( lambda r=row: self.open_thread_newest_selected_items )
             open_thread_action.triggered.connect( self.open_thread_selected_items )
             mark_read_action.triggered.connect( self.mark_read_selected_items )
             for tag in status_tags:
@@ -181,6 +202,7 @@ class QueryResultsViewer(QMainWindow):
             modify_action.triggered.connect( self.modify_selected_items )
         else:
             open_action.triggered.connect( lambda r=row: self.open_selected_row( row ) )
+            open_newest_action.triggered.connect( lambda r=row: self.open_thread_newest_selected_row( row ) )
             open_thread_action.triggered.connect( lambda r=row: self.open_thread_selected_row( row ) )
             mark_read_action.triggered.connect( lambda r=row: self.mark_read_row( row ) )
             for tag in status_tags:
@@ -191,8 +213,10 @@ class QueryResultsViewer(QMainWindow):
         
         # Add actions to menu in the preferred order
         context_menu.addAction(open_action)
-        if not self.view_mode == "thread":
+        if self.view_mode == "mails":
             context_menu.addAction(open_thread_action)
+        else:
+            context_menu.addAction(open_newest_action)
         context_menu.addAction(mark_read_action)
         for tag in status_tags:
             context_menu.addAction( flag_status_action[ tag ] )
@@ -452,10 +476,19 @@ class QueryResultsViewer(QMainWindow):
         for row in list( set( [ item.row() for item in self.results_table.selectedItems() ] ) ):
             self.open_thread_selected_row( row )
 
+    def open_thread_newest_selected_items(self):
+        for row in list( set( [ item.row() for item in self.results_table.selectedItems() ] ) ):
+            self.open_thread_newest_selected_row( row )
+
     def open_thread_selected_item(self, index):
         """Launches the appropriate viewer based on the selected item."""
         row = index.row()
         self.open_thread_selected_row( row )
+
+    def open_thread_newest_selected_item(self, index):
+        """Launches the appropriate viewer based on the selected item."""
+        row = index.row()
+        self.open_thread_newest_selected_row( row )
 
     def open_thread_selected_row(self, row):
         item_data = self.results_table.item(row, 0).data(Qt.ItemDataRole.UserRole)
@@ -482,6 +515,20 @@ class QueryResultsViewer(QMainWindow):
                     subprocess.Popen([viewer_path, thread_id.replace("thread:","")])
                 except Exception as e:
                     display_error(self, "Error", f"Could not launch mail viewer: {e}")
+
+    def open_thread_newest_selected_row(self, row):
+        item_data = self.results_table.item(row, 0).data(Qt.ItemDataRole.UserRole)
+        thread_id = item_data.get("thread")
+        mail_file_path = newest_message( thread_id )
+        if mail_file_path:
+            logging.info(f"Launching mail viewer for file: {mail_file_path}")
+            try:
+                viewer_path = os.path.join(os.path.dirname(__file__), "view-mail")
+                subprocess.Popen([viewer_path, mail_file_path[0]])
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Could not launch mail viewer: {e}")
+        else:
+                logging.warning("Could not find mail file path for selected row.")
 
 
     # other actions
