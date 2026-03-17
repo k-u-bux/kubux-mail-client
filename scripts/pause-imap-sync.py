@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import sys
+import subprocess
 import argparse
 import os
 from imapclient import IMAPClient
@@ -38,7 +39,9 @@ def load_credentials(config_path: str, from_address: str) -> tuple[str, int, str
         host = config['imap_server']
         port = int(config['imap_port'])
         user = config['username']
-        password = config['password']
+        passwd_cmd = config['passwd_cmd']
+        password = subprocess.check_output(passwd_cmd, shell=True, text=True).strip()
+        # password = config['password']
     except KeyError as e:
         print(f"Error: Missing required key '{e}' in config for '{from_address}'. Please ensure 'imap_server' and 'imap_port' are defined.")
         sys.exit(1)
