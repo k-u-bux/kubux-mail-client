@@ -7,7 +7,7 @@ import time
 import toml
 
 # --- Configuration Constants ---
-DEFAULT_CONFIG = "~/.config/kubux-mail-client/imap-config.toml"
+DEFAULT_CONFIG = "~/.config/kubux-mail-client/smtp-config.toml"
 DEFAULT_MAILBOX = 'INBOX'
 DEFAULT_TIMEOUT = 1800 # seconds
 # -------------------------------
