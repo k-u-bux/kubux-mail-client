@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import sys
+import subprocess
 import argparse
 import os
 import email
@@ -99,9 +100,11 @@ class SendMail:
         smtp_server = account.get("smtp_server")
         smtp_port = account.get("smtp_port")
         username = account.get("username")
-        password = account.get("password")
+        passwd_cmd = account.get("passwd_cmd")        
         sent_dir = account.get("sent_dir")
         failed_dir = account.get("failed_dir");
+        password = subprocess.check_output(passwd_cmd, shell=True, text=True).strip()
+        # password = account.get("password")
 
         if not all([smtp_server, smtp_port, username, password, sent_dir, failed_dir]):
             logging.error("Account configuration incomplete for {from_addr}")
