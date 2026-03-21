@@ -526,7 +526,10 @@ class MailViewer(QMainWindow):
         # Filter out special tags starting with '$'
         all_tags = {tag for tag in set(config.get_status_tags()).union( 
             set(self.tags_state.keys()) ).union(current_tags) if not tag.startswith('$')}
-        self.tags_state = {tag: tag in current_tags for tag in sorted(list(all_tags))}
+        status_tags = sorted( list( set( all_tags ).intersection( set( config.get_status_tags() + [ "unread" ] ) ) ) )
+        non_status_tags = sorted( list( set( all_tags ).difference( set( config.get_status_tags() + [ "unread" ] ) ) ) )
+                                                  
+        self.tags_state = {tag: tag in current_tags for tag in non_status_tags + status_tags}
 
         # Add a button for each tag, styled by its state
         for tag, is_attached in self.tags_state.items():
