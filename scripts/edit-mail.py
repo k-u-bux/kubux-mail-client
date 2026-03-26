@@ -13,7 +13,7 @@ from pathlib import Path
 import tempfile
 import re
 from PySide6.QtWidgets import (
-    QApplication, QMainWindow, QWidget, QVBoxLayout, QTextEdit, QHBoxLayout,
+    QApplication, QMainWindow, QWidget, QVBoxLayout, QPlainTextEdit, QHBoxLayout,
     QPushButton, QLineEdit, QListWidget, QSplitter, QMessageBox, QDialog,
     QFormLayout, QLabel, QFileDialog, QSizePolicy, QMenu, QComboBox,
     QDialogButtonBox, QGroupBox, QAbstractItemView
@@ -162,7 +162,7 @@ class MailEditor(QMainWindow):
 
         self.splitter.addWidget( self.headers_widget );
 
-        self.body_edit = QTextEdit()
+        self.body_edit = QPlainTextEdit()
         self.body_edit.setContentsMargins(0, 0, 0, 0)
         self.body_edit.setFont(config.text_font)
         self.splitter.addWidget(self.body_edit)
