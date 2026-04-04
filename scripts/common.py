@@ -44,11 +44,11 @@ def font_to_html_style(font: QFont) -> str:
             f"font-weight: {weight}; "
             f"font-style: {style};")
 
-def create_summary_text( authors, subject, font ) -> str:
+def create_summary_text( authors, subject, tags, font ) -> str:
     style_str = font_to_html_style( font )
     return (
         f"<div style=\"{style_str} white-space: pre-wrap;\">"
-        f"<p>{html.escape(authors)}</p><p>{html.escape(subject)}</p>"
+        f"<p>{html.escape(authors)}</p><p>{html.escape(subject)}</p><p>{html.escape(tags)}</p>"
         f"</div>"
     )
 

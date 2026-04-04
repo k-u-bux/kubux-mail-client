@@ -305,7 +305,8 @@ class QueryResultsViewer(QMainWindow):
         date_stamp = thread.get("timestamp")
         subject_text = f"<{thread.get('total')}> {thread.get('subject')}"
         authors_text = thread.get("authors", "unknown")
-        summary_text = create_summary_text( authors_text, subject_text, config.get_text_font() )
+        tags_text = " ".join( [ tag for tag in thread.get("tags") if not tag.startswith("$") ] ) 
+        summary_text = create_summary_text( authors_text, subject_text, tags_text, config.get_text_font() )
         # summary_text = f"{authors_text}\n{subject_text}"
 
         date_item = create_date_item(date_stamp)
@@ -327,7 +328,8 @@ class QueryResultsViewer(QMainWindow):
         date_stamp = mail.get("timestamp")
         subject_text = mail.get("headers", {}).get("Subject", "No Subject")
         sender_receiver_text = self._get_sender_receiver(mail)
-        summary_text = create_summary_text( sender_receiver_text, subject_text, config.get_text_font() )
+        tags_text = " ".join( [ tag for tag in  mail.get("tags") if not tag.startswith("$") ] )
+        summary_text = create_summary_text( sender_receiver_text, subject_text, tags_text, config.get_text_font() )
         # summary_text = f"{sender_receiver_text}\n{subject_text}"
 
         date_item = create_date_item(date_stamp)
