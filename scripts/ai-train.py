@@ -7,6 +7,7 @@ import argparse
 
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.svm import LinearSVC, NuSVC, SVC
+from sklearn.neural_network import MLPClassifier
 from sklearn.multiclass import OneVsRestClassifier
 
 import joblib
@@ -109,8 +110,10 @@ def main():
             file = f"{msg["filename"][0]}"
             new_tagged_data[file] = tags
         
-        vectorizer = TfidfVectorizer(ngram_range=(1, 5), stop_words=None, min_df=5, max_df=0.8)
-        classifier = OneVsRestClassifier(LinearSVC(C=1.0, dual=True, max_iter=1000))
+        # vectorizer = TfidfVectorizer(ngram_range=(1, 5), stop_words=None, min_df=5, max_df=0.8)
+        vectorizer = TfidfVectorizer(ngram_range=(1, 4), stop_words=None, min_df=5, max_df=0.8)
+        # classifier = OneVsRestClassifier(LinearSVC(C=1.0, dual=True, max_iter=1000))
+        classifier = OneVsRestClassifier(MLPClassifier(hidden_layer_sizes=(100,100), verbose=True))
 
     # --- Data Preparation and Training (common to both modes) ---
     X_data = []
