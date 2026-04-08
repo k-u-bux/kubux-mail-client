@@ -364,6 +364,9 @@ class MailViewer(QMainWindow):
         if self.shows_html:
             self.mail_content.setHtml(self.mail_html)
         else:
+            cursor = self.mail_content.textCursor()
+            cursor.setCharFormat(QTextCharFormat())
+            self.mail_content.setTextCursor(cursor)
             self.mail_content.setPlainText(self.mail_body)
             # For plain text, we need to detect URLs manually
             self.highlight_urls_in_plain_text()
@@ -413,8 +416,6 @@ class MailViewer(QMainWindow):
             
             # Update the cursor position to search for the next match
             cursor.setPosition(end)
-
-        cursor.setCharFormat(QTextCharFormat()) 
     
 
     def handle_link_clicked(self, url):
