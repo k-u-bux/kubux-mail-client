@@ -413,7 +413,10 @@ class MailViewer(QMainWindow):
             
             # Update the cursor position to search for the next match
             cursor.setPosition(end)
+
+        cursor.setCharFormat(QTextCharFormat()) 
     
+
     def handle_link_clicked(self, url):
         """Handle clicking on a URL by opening it in the default browser."""
         if isinstance(url, str):
