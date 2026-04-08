@@ -284,6 +284,8 @@ class MailViewer(QMainWindow):
         self.mail_content.setFont(config.get_text_font())
         self.mail_content.setOpenLinks(False) 
         self.splitter.addWidget(self.mail_content)
+        self.mail_content.anchorClicked.connect(self.handle_link_clicked)
+        self.mail_content.setTextInteractionFlags(Qt.TextBrowserInteraction)
         
         # Add a context menu for clipboard actions and view raw
         self.mail_content.setContextMenuPolicy(Qt.CustomContextMenu)
@@ -358,13 +360,6 @@ class MailViewer(QMainWindow):
             return
 
         self.update_tags_ui()
-
-        try:
-            self.mail_content.anchorClicked.disconnect(self.handle_link_clicked)
-        except TypeError:
-            pass # Ignore if not connected yet
-        self.mail_content.anchorClicked.connect(self.handle_link_clicked)
-        self.mail_content.setTextInteractionFlags(Qt.TextBrowserInteraction)
 
         if self.shows_html:
             self.mail_content.setHtml(self.mail_html)
