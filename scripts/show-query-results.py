@@ -160,6 +160,7 @@ class QueryResultsViewer(QMainWindow):
         self.results_table.customContextMenuRequested.connect(self.show_context_menu)        
         self.results_table.doubleClicked.connect(self.open_selected_item)
         main_layout.addWidget(self.results_table)
+        self.results_table.sortByColumn(0, Qt.DescendingOrder)
 
     def show_context_menu(self, position):
         """Show context menu with options to delete, edit, or execute a query."""
