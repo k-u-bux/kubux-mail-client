@@ -661,9 +661,9 @@ class MailViewer(QMainWindow):
                 html_body = part.get_payload(decode=True).decode(part.get_content_charset() or 'utf-8', errors='ignore')
 
         if not original_body and html_body:
-            original_body = html_to_plain_text(html_body)
+            original_body = html_to_plain_text( html_body )
 
-        return textwrap.indent(original_body, '> ')
+        return textwrap.indent( original_body, '> ', (lambda dummy: True) )
 
     def reply(self):
         """

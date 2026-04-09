@@ -22,6 +22,7 @@ import shlex
 from email.utils import parseaddr
 from datetime import datetime, timezone
 from importlib import import_module
+from html2text import html2text
 
 def get_run_method ( mod_name ):
     return import_module( mod_name ).run
@@ -60,6 +61,8 @@ def create_summary_text( authors, subject, tags, font ) -> str:
 def html_to_plain_text(html_content: str) -> str:
     if not html_content:
         return ""
+
+    return html2text( html_content )
 
     soup = BeautifulSoup(html_content, "html.parser")
 
