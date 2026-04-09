@@ -508,7 +508,7 @@ class QueryResultsViewer(QMainWindow):
                     import importlib
                     importlib.import_module( "view-thread" ).run( thread_id )
                 except Exception as e:
-                    QMessageBox.critical(self, "Error", f"Could not launch mail viewer: {e}")
+                    QMessageBox.critical(self, "Error", f"Could not launch thread viewer: {e}")
             else:
                 logging.warning("Could not find thread ID for selected row.")
         else: # mails mode
@@ -523,7 +523,7 @@ class QueryResultsViewer(QMainWindow):
                     import importlib
                     importlib.import_module( "view-thread" ).run( thread_id.replace("thread:","") )
                 except Exception as e:
-                    display_error(self, "Error", f"Could not launch mail viewer: {e}")
+                    display_error(self, "Error", f"Could not launch thread viewer: {e}")
 
     def open_thread_newest_selected_items(self):
         for row in list( set( [ item.row() for item in self.results_table.selectedItems() ] ) ):
