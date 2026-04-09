@@ -383,18 +383,6 @@ class QueryResultsViewer(QMainWindow):
         button_pos = self.edit_drafts_button.mapToGlobal(self.edit_drafts_button.rect().bottomLeft())
         menu.exec(button_pos)
 
-
-    # def new_search_action(self):
-    #     try:
-    #         # viewer_path = os.path.join(os.path.dirname(__file__), "show-query-results")
-    #         # subprocess.Popen([viewer_path])
-    #         import importlib
-    #         importlib.import_module( "show-query-results" ).run()
-    #         logging.info(f"Launched query viewer without query.")
-    #     except Exception as e:
-    #         logging.error(f"Failed to launch query viewer: {e}")
-    #         display_error(self, "Launch Error", f"Could not launch show-query-results.py:\n\n{e}")
-
             
     def launch__manager(self):
         try:
