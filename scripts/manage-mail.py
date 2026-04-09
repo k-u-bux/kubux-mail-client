@@ -23,7 +23,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 from config import config
 from query import QueryParser
-from common import display_error, create_draft, create_new_mail_menu, launch_drafts_manager
+from common import display_error, create_draft, create_new_mail_menu, launch_drafts_manager, get_run_method
 
 
 class CustomLineEdit(QLineEdit):
@@ -680,8 +680,7 @@ class QueryEditor(QMainWindow):
         try:
             # viewer_path = os.path.join(os.path.dirname(__file__), "show-query-results")
             # subprocess.Popen([viewer_path, "--query", final_query])
-            import importlib
-            importlib.import_module( "show-query-results" ).run( final_query )
+            get_run_method( "show-query-results" )( final_query )
             logging.info(f"Launched query viewer with query: {final_query}")
         except Exception as e:
             logging.error(f"Failed to launch query viewer: {e}")

@@ -28,7 +28,7 @@ import textwrap
 import base64
 
 from config import config
-from common import display_error, html_to_plain_text, get_db_path
+from common import display_error, html_to_plain_text, get_db_path, get_run_method
 from watcher import DirectoryEventHandler
 from header_widget import MailHeaderWidget
 
@@ -478,8 +478,7 @@ class MailViewer(QMainWindow):
                 try:
                     # viewer_path = os.path.join(os.path.dirname(__file__), "view-thread")
                     # subprocess.Popen([viewer_path, thread_id.replace("thread:","")])
-                    import importlib
-                    importlib.import_module( "view-thread" ).run( thread_id.replace("thread:","") )
+                    get_run_method( "view-thread" )( thread_id.replace("thread:","") )
                 except Exception as e:
                     display_error(self, "Error", f"Could not launch mail viewer: {e}")
 
@@ -632,8 +631,7 @@ class MailViewer(QMainWindow):
             #     return
             # 
             # subprocess.Popen([editor_path, "--mail-file", temp_path])
-            import importlib
-            importlib.import_module( "edit-mail" ).run( temp_path )
+            get_run_method( "edit-mail" )( temp_path )
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to create or open draft: {e}")
 

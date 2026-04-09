@@ -23,7 +23,7 @@ from mail_table_widget import MailTableWidget
 import logging
 from notmuch import find_matching_messages, apply_tag_to_query
 from config import config
-from common import display_error, create_summary_text, create_date_item, get_db_path
+from common import display_error, create_summary_text, create_date_item, get_db_path, get_run_method
 from watcher import DirectoryEventHandler
 
 # Set up basic logging to console
@@ -267,8 +267,7 @@ class ThreadViewer(QMainWindow):
                 try:
                     # viewer_path = os.path.join(os.path.dirname(__file__), "view-mail")
                     # subprocess.Popen([viewer_path, mail_file_path[0]])
-                    import importlib
-                    importlib.import_module( "view-mail" ).run( mail_file_path[0] )
+                    get_run_method( "view-mail" )( mail_file_path[0] )
                 except Exception as e:
                     QMessageBox.critical(self, "Error", f"Could not launch mail viewer: {e}")
             else:

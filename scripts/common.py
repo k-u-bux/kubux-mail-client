@@ -21,6 +21,7 @@ import html
 import shlex
 from email.utils import parseaddr
 from datetime import datetime, timezone
+from importlib import import_module
 
 def output_of_cmd(cmd_str: str) -> str:
     """
@@ -321,3 +322,6 @@ def find_identity( sender_email ):
             return i
     return None
 
+
+def get_run_method ( mod_name ):
+    return import_module( mod_name ).run

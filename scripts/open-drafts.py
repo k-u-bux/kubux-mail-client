@@ -29,7 +29,7 @@ from watcher import DirectoryEventHandler
 
 # Import the shared components
 from config import config
-from common import display_error, create_new_mail_menu, match_address, find_identity
+from common import display_error, create_new_mail_menu, match_address, find_identity, get_run_method
 
 # Set up basic logging to console
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -327,8 +327,7 @@ class DraftsManager(QMainWindow):
 
             # editor_path = os.path.join(os.path.dirname(__file__), "edit-mail")
             # subprocess.Popen([editor_path, "--mail-file", file_path])
-            import importlib
-            importlib.import_module( "edit-mail" ).run( file_path )
+            get_run_method( "edit-mail" )( file_path )
             logging.info(f"Launched mail editor for draft: {file_path}")
        except Exception as e:
             logging.error(f"Failed to launch mail editor: {e}")
