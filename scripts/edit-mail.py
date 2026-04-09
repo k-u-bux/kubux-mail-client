@@ -36,25 +36,6 @@ from header_widget_editable import MailHeaderEditableWidget
 # Set up basic logging to console
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# --- Cancel Drag ---
-
-class GlobalDragFilter(QObject):
-    def eventFilter(self, watched, event):
-        """Intercepts events to manage drag-and-drop state."""
-        
-        # Check for a mouse button release event
-        if event.type() == QEvent.Type.MouseButtonRelease:
-            if event.button() == Qt.MouseButton.LeftButton:
-                logging.info("Mouse release detected. Cancel active drag.")
-                # This will cancel any active drag operation, allowing
-                # the QDrag.exec() call to return.
-                QDrag.cancel()
-                
-        # Always return False so that the event continues to be processed
-        # by its intended target widget.
-        return False
-
-
 # --- Mail Editor Main Class ---
 
 class MailEditor(QMainWindow):
@@ -542,8 +523,18 @@ class MailEditor(QMainWindow):
         self.close()
 
 # --- Main Entry Point ---
+
+keep_alive = []
+
+def run ( args_mail_file, args_change_id ):
+    editor = MailEditor( mail_file_path = args_mail_file, change_id = args_change_id )
+    keep_alive.append( editor )
+    editor.setAttribute(Qt.WA_DeleteOnClose)
+    editor.destroyed.connect(lambda: keep_alive.remove(editor))
+    editor.show()
+
+
 def main():
-    change_message_id = False;
     parser = argparse.ArgumentParser(description="Edit a pre-drafted email.")
     parser.add_argument("--mail-file", required=True, help="The full path to the mail file containing the pre-drafted email.")
     parser.add_argument("--change-id", action='store_true')
@@ -551,16 +542,12 @@ def main():
     
     app = QApplication(sys.argv)
 
-    # Create the filter and install it on the application instance
+    import drag_filter
     drag_filter = GlobalDragFilter()
     app.installEventFilter(drag_filter)
-    
-    # go on
-    # app.setApplicationDisplayName( "Kubux Mail Client" )
     app.setApplicationName( "KubuxMailClient" )
-    editor = MailEditor(mail_file_path=args.mail_file, change_id=args.change_id)
-    editor.show()
-    sys.exit(app.exec())
+
+    run( args.mail_file, args.change_id )
 
 if __name__ == "__main__":
     main()
