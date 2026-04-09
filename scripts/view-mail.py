@@ -476,8 +476,10 @@ class MailViewer(QMainWindow):
             threads = result.stdout.strip().split('\n')
             for thread_id in threads:
                 try:
-                    viewer_path = os.path.join(os.path.dirname(__file__), "view-thread")
-                    subprocess.Popen([viewer_path, thread_id.replace("thread:","")])
+                    # viewer_path = os.path.join(os.path.dirname(__file__), "view-thread")
+                    # subprocess.Popen([viewer_path, thread_id.replace("thread:","")])
+                    import importlib
+                    importlib.import_module( "view-thread" ).run( thread_id.replace("thread:","") )
                 except Exception as e:
                     display_error(self, "Error", f"Could not launch mail viewer: {e}")
 
@@ -622,14 +624,16 @@ class MailViewer(QMainWindow):
                 temp_file.write(msg.as_string())
                 temp_path = temp_file.name
 
-            # Assuming edit-mail.py is in the same directory.
-            # You might need to adjust this path based on your project structure.
-            editor_path = os.path.join(os.path.dirname(__file__), "edit-mail")
-            if not os.path.exists(editor_path):
-                QMessageBox.critical(self, "Error", f"Could not find mail editor at {editor_path}")
-                return
-
-            subprocess.Popen([editor_path, "--mail-file", temp_path])
+            # # Assuming edit-mail.py is in the same directory.
+            # # You might need to adjust this path based on your project structure.
+            # editor_path = os.path.join(os.path.dirname(__file__), "edit-mail")
+            # if not os.path.exists(editor_path):
+            #     QMessageBox.critical(self, "Error", f"Could not find mail editor at {editor_path}")
+            #     return
+            # 
+            # subprocess.Popen([editor_path, "--mail-file", temp_path])
+            import importlib
+            importlib.import_module( "edit-mail" ).run( temp_path )
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to create or open draft: {e}")
 
