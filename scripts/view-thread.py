@@ -265,8 +265,6 @@ class ThreadViewer(QMainWindow):
             if mail_file_path:
                 logging.info(f"Launching mail viewer for file: {mail_file_path}")
                 try:
-                    # viewer_path = os.path.join(os.path.dirname(__file__), "view-mail")
-                    # subprocess.Popen([viewer_path, mail_file_path[0]])
                     get_run_method( "view-mail" )( mail_file_path[0] )
                 except Exception as e:
                     QMessageBox.critical(self, "Error", f"Could not launch mail viewer: {e}")

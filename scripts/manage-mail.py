@@ -678,8 +678,6 @@ class QueryEditor(QMainWindow):
             final_query = query_expression
         
         try:
-            # viewer_path = os.path.join(os.path.dirname(__file__), "show-query-results")
-            # subprocess.Popen([viewer_path, "--query", final_query])
             get_run_method( "show-query-results" )( final_query )
             logging.info(f"Launched query viewer with query: {final_query}")
         except Exception as e:
