@@ -480,11 +480,12 @@ class MailEditor(QMainWindow):
     def clone_message(self):
         new_file_path = self._save_draft_in_new_file()
         if new_file_path:
-            editor_path = os.path.join(os.path.dirname(__file__), "edit-mail")
-            if not (os.path.exists(new_file_path) and os.path.exists(editor_path)):
-                display_error(self, "Error", f"Could not find mail editor at {editor_path}")
-                return
-            subprocess.Popen([editor_path, "--mail-file", str(new_file_path), "--change-id"])
+            # editor_path = os.path.join(os.path.dirname(__file__), "edit-mail")
+            # if not (os.path.exists(new_file_path) and os.path.exists(editor_path)):
+            #     display_error(self, "Error", f"Could not find mail editor at {editor_path}")
+            #     return
+            # subprocess.Popen([editor_path, "--mail-file", str(new_file_path), "--change-id"])
+            run( str(new_file_path), True )
             
     def send_message(self):
         if not self._save_draft():
@@ -526,11 +527,11 @@ class MailEditor(QMainWindow):
 
 keep_alive = []
 
-def run ( args_mail_file, args_change_id ):
+def run ( args_mail_file, args_change_id = False ):
     editor = MailEditor( mail_file_path = args_mail_file, change_id = args_change_id )
     keep_alive.append( editor )
-    editor.setAttribute(Qt.WA_DeleteOnClose)
-    editor.destroyed.connect(lambda: keep_alive.remove(editor))
+    editor.setAttribute( Qt.WA_DeleteOnClose )
+    editor.destroyed.connect( lambda: keep_alive.remove(editor) )
     editor.show()
 
 
@@ -542,12 +543,13 @@ def main():
     
     app = QApplication(sys.argv)
 
-    import drag_filter
+    from drag_filter import GlobalDragFilter
     drag_filter = GlobalDragFilter()
     app.installEventFilter(drag_filter)
     app.setApplicationName( "KubuxMailClient" )
 
     run( args.mail_file, args.change_id )
+    app.exec()
 
 if __name__ == "__main__":
     main()

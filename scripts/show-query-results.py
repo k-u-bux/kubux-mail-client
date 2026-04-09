@@ -384,21 +384,24 @@ class QueryResultsViewer(QMainWindow):
         menu.exec(button_pos)
 
 
-    def new_search_action(self):
-        try:
-            viewer_path = os.path.join(os.path.dirname(__file__), "show-query-results")
-            # subprocess.Popen([viewer_path, "--query", " "])
-            subprocess.Popen([viewer_path])
-            logging.info(f"Launched query viewer without query.")
-        except Exception as e:
-            logging.error(f"Failed to launch query viewer: {e}")
-            display_error(self, "Launch Error", f"Could not launch show-query-results.py:\n\n{e}")
+    # def new_search_action(self):
+    #     try:
+    #         # viewer_path = os.path.join(os.path.dirname(__file__), "show-query-results")
+    #         # subprocess.Popen([viewer_path])
+    #         import importlib
+    #         importlib.import_module( "show-query-results" ).run()
+    #         logging.info(f"Launched query viewer without query.")
+    #     except Exception as e:
+    #         logging.error(f"Failed to launch query viewer: {e}")
+    #         display_error(self, "Launch Error", f"Could not launch show-query-results.py:\n\n{e}")
 
             
     def launch__manager(self):
         try:
-            manager_path = os.path.join(os.path.dirname(__file__), "manage-mail")
-            subprocess.Popen([ manager_path ])
+            # manager_path = os.path.join(os.path.dirname(__file__), "manage-mail")
+            # subprocess.Popen([ manager_path ])
+            import importlib
+            importlib.import_module( "manage-mail" ).run()
             logging.info(f"Launched manage-mail")
         except Exception as e:
             logging.error(f"Failed to launch mail manager: {e}")
@@ -407,8 +410,9 @@ class QueryResultsViewer(QMainWindow):
     def launch_query(self, name):
         logging.info(f"name = {name}")
         try:
-            viewer_path = os.path.join(os.path.dirname(__file__), "show-query-results")
-            subprocess.Popen([viewer_path, "--query", f"${name}"])
+            # viewer_path = os.path.join(os.path.dirname(__file__), "show-query-results")
+            # subprocess.Popen([viewer_path, "--query", f"${name}"])
+            run( f"${name}" )
             logging.info(f"Launched query viewer with query: ${name}")
         except Exception as e:
             logging.error(f"Failed to launch query viewer: {e}")
@@ -458,8 +462,10 @@ class QueryResultsViewer(QMainWindow):
             thread_id = item_data.get("thread")
             if thread_id:
                 try:
-                    viewer_path = os.path.join(os.path.dirname(__file__), "view-thread")
-                    subprocess.Popen([viewer_path, thread_id])
+                    # viewer_path = os.path.join(os.path.dirname(__file__), "view-thread")
+                    # subprocess.Popen([viewer_path, thread_id])
+                    import importlib
+                    importlib.import_module( "view-thread" ).run( thread_id )
                 except Exception as e:
                     QMessageBox.critical(self, "Error", f"Could not launch mail viewer: {e}")
             else:
@@ -469,8 +475,10 @@ class QueryResultsViewer(QMainWindow):
             if mail_file_path:
                 logging.info(f"Launching mail viewer for file: {mail_file_path}")
                 try:
-                    viewer_path = os.path.join(os.path.dirname(__file__), "view-mail")
-                    subprocess.Popen([viewer_path, mail_file_path[0]])
+                    # viewer_path = os.path.join(os.path.dirname(__file__), "view-mail")
+                    # subprocess.Popen([viewer_path, mail_file_path[0]])
+                    import importlib
+                    importlib.import_module( "view-mail" ).run( mail_file_path[ 0 ] )
                 except Exception as e:
                     QMessageBox.critical(self, "Error", f"Could not launch mail viewer: {e}")
             else:
@@ -495,8 +503,10 @@ class QueryResultsViewer(QMainWindow):
             thread_id = item_data.get("thread")
             if thread_id:
                 try:
-                    viewer_path = os.path.join(os.path.dirname(__file__), "view-thread")
-                    subprocess.Popen([viewer_path, thread_id])
+                    # viewer_path = os.path.join(os.path.dirname(__file__), "view-thread")
+                    # subprocess.Popen([viewer_path, thread_id])
+                    import importlib
+                    importlib.import_module( "view-thread" ).run( thread_id )
                 except Exception as e:
                     QMessageBox.critical(self, "Error", f"Could not launch mail viewer: {e}")
             else:
@@ -508,8 +518,10 @@ class QueryResultsViewer(QMainWindow):
             threads = result.stdout.strip().split('\n')
             for thread_id in threads:
                 try:
-                    viewer_path = os.path.join(os.path.dirname(__file__), "view-thread")
-                    subprocess.Popen([viewer_path, thread_id.replace("thread:","")])
+                    # viewer_path = os.path.join(os.path.dirname(__file__), "view-thread")
+                    # subprocess.Popen([viewer_path, thread_id.replace("thread:","")])
+                    import importlib
+                    importlib.import_module( "view-thread" ).run( thread_id.replace("thread:","") )
                 except Exception as e:
                     display_error(self, "Error", f"Could not launch mail viewer: {e}")
 
@@ -529,8 +541,10 @@ class QueryResultsViewer(QMainWindow):
         if mail_file_path:
             logging.info(f"Launching mail viewer for file: {mail_file_path}")
             try:
-                viewer_path = os.path.join(os.path.dirname(__file__), "view-mail")
-                subprocess.Popen([viewer_path, mail_file_path[0]])
+                # viewer_path = os.path.join(os.path.dirname(__file__), "view-mail")
+                # subprocess.Popen([viewer_path, mail_file_path[0]])
+                import importlib
+                importlib.import_module( "view-mail" ).run( mail_file_path[0] )
             except Exception as e:
                 QMessageBox.critical(self, "Error", f"Could not launch mail viewer: {e}")
         else:
@@ -552,8 +566,10 @@ class QueryResultsViewer(QMainWindow):
         if mail_file_path:
             logging.info(f"Launching mail viewer for file: {mail_file_path}")
             try:
-                viewer_path = os.path.join(os.path.dirname(__file__), "view-mail")
-                subprocess.Popen([viewer_path, mail_file_path[0]])
+                # viewer_path = os.path.join(os.path.dirname(__file__), "view-mail")
+                # subprocess.Popen([viewer_path, mail_file_path[0]])
+                import importlib
+                importlib.import_module( "view-mail" ).run( mail_file_path[0] )
             except Exception as e:
                 QMessageBox.critical(self, "Error", f"Could not launch mail viewer: {e}")
         else:
@@ -655,17 +671,30 @@ class QueryResultsViewer(QMainWindow):
             display_error(self, "Launch Error", f"Could not launch config editor:\n\n{e}")
 
 # --- Main Entry Point ---
+
+keep_alive = []
+
+def run ( args_query ):
+    viewer = QueryResultsViewer( query_string = args_query )
+    keep_alive.append( viewer )
+    viewer.setAttribute( Qt.WA_DeleteOnClose )
+    viewer.destroyed.connect( lambda: keep_alive.remove(viewer) )
+    viewer.show()
+ 
 def main():
     parser = argparse.ArgumentParser(description="View notmuch query results in a list.")
     parser.add_argument("--query", help="The notmuch query to display.", default=config.get_search())
     args = parser.parse_args()
     
     app = QApplication(sys.argv)
-    # app.setApplicationDisplayName( "Kubux Mail Client" )
+
+    from drag_filter import GlobalDragFilter
+    drag_filter = GlobalDragFilter()
+    app.installEventFilter(drag_filter)
     app.setApplicationName( "KubuxMailClient" )
-    viewer = QueryResultsViewer(args.query)
-    viewer.show()
-    sys.exit(app.exec())
+
+    run( args.query )
+    app.exec()
 
 if __name__ == "__main__":
     main()

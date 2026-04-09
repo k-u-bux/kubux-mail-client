@@ -678,8 +678,10 @@ class QueryEditor(QMainWindow):
             final_query = query_expression
         
         try:
-            viewer_path = os.path.join(os.path.dirname(__file__), "show-query-results")
-            subprocess.Popen([viewer_path, "--query", final_query])
+            # viewer_path = os.path.join(os.path.dirname(__file__), "show-query-results")
+            # subprocess.Popen([viewer_path, "--query", final_query])
+            import importlib
+            importlib.import_module( "show-query-results" ).run( final_query )
             logging.info(f"Launched query viewer with query: {final_query}")
         except Exception as e:
             logging.error(f"Failed to launch query viewer: {e}")
@@ -721,13 +723,26 @@ class QueryEditor(QMainWindow):
 
 
 # --- Main Entry Point ---
+
+keep_alive = []
+
+def run ():
+    editor = QueryEditor()
+    keep_alive.append( editor )
+    editor.setAttribute( Qt.WA_DeleteOnClose )
+    editor.destroyed.connect( lambda: keep_alive.remove(editor) )
+    editor.show()
+
 def main():
     app = QApplication(sys.argv)
-    # app.setApplicationDisplayName( "Kubux Mail Client" )
+
+    from drag_filter import GlobalDragFilter
+    drag_filter = GlobalDragFilter()
+    app.installEventFilter(drag_filter)
     app.setApplicationName( "KubuxMailClient" )
-    editor = QueryEditor()
-    editor.show()
-    sys.exit(app.exec())
+
+    run()
+    app.exec()
 
 if __name__ == "__main__":
     main()

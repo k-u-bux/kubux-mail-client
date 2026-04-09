@@ -325,8 +325,10 @@ class DraftsManager(QMainWindow):
             if not file_path:
                 return
 
-            editor_path = os.path.join(os.path.dirname(__file__), "edit-mail")
-            subprocess.Popen([editor_path, "--mail-file", file_path])
+            # editor_path = os.path.join(os.path.dirname(__file__), "edit-mail")
+            # subprocess.Popen([editor_path, "--mail-file", file_path])
+            import importlib
+            importlib.import_module( "edit-mail" ).run( file_path )
             logging.info(f"Launched mail editor for draft: {file_path}")
        except Exception as e:
             logging.error(f"Failed to launch mail editor: {e}")
@@ -359,6 +361,16 @@ class DraftsManager(QMainWindow):
             self.delete_row( row )
             
 # --- Main Entry Point ---
+
+keep_alive = []
+
+def run ( args_drafts_dir, args_email ):
+    manager = DraftsManager( drafts_dir_path=args_drafts_dir, sender_email=args_email )
+    keep_alive.append( manager )
+    manager.setAttribute( Qt.WA_DeleteOnClose )
+    manager.destroyed.connect( lambda: keep_alive.remove(manager) )
+    manager.show()
+
 def main():
     parser = argparse.ArgumentParser(description="Manage email drafts.")
     parser.add_argument("--drafts-dir", help="The full path to the drafts directory.")
@@ -366,11 +378,14 @@ def main():
     args = parser.parse_args()
     
     app = QApplication(sys.argv)
-    # app.setApplicationDisplayName( "Kubux Mail Client" )
+
+    from drag_filter import GlobalDragFilter
+    drag_filter = GlobalDragFilter()
+    app.installEventFilter(drag_filter)
     app.setApplicationName( "KubuxMailClient" )
-    manager = DraftsManager(drafts_dir_path=args.drafts_dir, sender_email=args.email)
-    manager.show()
-    sys.exit(app.exec())
+    
+    run( args.drafts_dir, args.email )
+    app.exec()
 
 if __name__ == "__main__":
     main()

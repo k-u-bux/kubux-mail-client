@@ -229,8 +229,10 @@ def create_draft(parent, identity_dict):
                 f.write("Subject: \n\n")
 
         # Launch the mail editor on the new draft file
-        editor_path = os.path.join(os.path.dirname(__file__), "edit-mail")
-        subprocess.Popen([editor_path, "--mail-file", str(draft_path)])
+        # editor_path = os.path.join(os.path.dirname(__file__), "edit-mail")
+        # subprocess.Popen([editor_path, "--mail-file", str(draft_path)])
+        import importlib
+        importlib.import_module( "edit-mail" ).run( str(draft_path) )
         logging.info(f"Launched mail editor for new draft: {draft_path}")
     except Exception as e:
         logging.error(f"Failed to create draft or launch editor: {e}")
@@ -279,12 +281,14 @@ def create_draft_from_message_open_editor(parent, msg):
 
         # Assuming edit-mail.py is in the same directory.
         # You might need to adjust this path based on your project structure.
-        editor_path = os.path.join(os.path.dirname(__file__), "edit-mail")
-        if not os.path.exists(editor_path):
-            QMessageBox.critical(parent, "Error", f"Could not find mail editor at {editor_path}")
-            return
-
-        subprocess.Popen([editor_path, "--mail-file", temp_path])
+        # editor_path = os.path.join(os.path.dirname(__file__), "edit-mail")
+        # if not os.path.exists(editor_path):
+        #     QMessageBox.critical(parent, "Error", f"Could not find mail editor at {editor_path}")
+        #     return
+        #
+        # subprocess.Popen([editor_path, "--mail-file", temp_path])
+        import importlib
+        importlib.import_module( "edit-mail" ).run( temp_path )
     except Exception as e:
         QMessageBox.critical(parent, "Error", f"Failed to create or open draft: {e}")
 
@@ -295,8 +299,10 @@ def launch_drafts_manager(parent, identity_dict):
         drafts_path = str( Path(drafts_path_str).expanduser() )
         drafts_email = identity_dict.get('email', "" )
 
-        viewer_path = os.path.join(os.path.dirname(__file__), "open-drafts")
-        subprocess.Popen([viewer_path, "--drafts-dir", drafts_path, "--email", drafts_email])
+        # viewer_path = os.path.join(os.path.dirname(__file__), "open-drafts")
+        # subprocess.Popen([viewer_path, "--drafts-dir", drafts_path, "--email", drafts_email])
+        import importlib
+        importlib.import_module( "open-drafts" ).run( drafts_path, drafts_email )
         logging.info(f"Launched drafts manager for directory: {drafts_path}")
     except Exception as e:
         logging.error(f"Failed to launch drafts manager: {e}")

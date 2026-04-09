@@ -265,8 +265,10 @@ class ThreadViewer(QMainWindow):
             if mail_file_path:
                 logging.info(f"Launching mail viewer for file: {mail_file_path}")
                 try:
-                    viewer_path = os.path.join(os.path.dirname(__file__), "view-mail")
-                    subprocess.Popen([viewer_path, mail_file_path[0]])
+                    # viewer_path = os.path.join(os.path.dirname(__file__), "view-mail")
+                    # subprocess.Popen([viewer_path, mail_file_path[0]])
+                    import importlib
+                    importlib.import_module( "view-mail" ).run( mail_file_path[0]] )
                 except Exception as e:
                     QMessageBox.critical(self, "Error", f"Could not launch mail viewer: {e}")
             else:
@@ -358,17 +360,30 @@ class ThreadViewer(QMainWindow):
             self.apply_tag_to_row( tag, row )
 
 # --- Main Entry Point ---
+
+keep_alive = []
+
+def run ( args_thread_id ):
+    viewer = ThreadViewer( args_thread_id )
+    keep_alive.append( viewer )
+    viewer.setAttribute( Qt.WA_DeleteOnClose )
+    viewer.destroyed.connect( lambda: keep_alive.remove(viewer) )
+    viewer.show()
+
 def main():
     parser = argparse.ArgumentParser(description="View messages in a specific notmuch thread.")
     parser.add_argument("thread_id", help="The thread ID to display.")
     args = parser.parse_args()
     
     app = QApplication(sys.argv)
-    # app.setApplicationDisplayName( "Kubux Mail Client" )
+
+    from drag_filter import GlobalDragFilter
+    drag_filter = GlobalDragFilter()
+    app.installEventFilter(drag_filter)
     app.setApplicationName( "KubuxMailClient" )
-    viewer = ThreadViewer(args.thread_id)
-    viewer.show()
-    sys.exit(app.exec())
+    
+    run(args.thread_id)
+    app.exec()
 
 if __name__ == "__main__":
     main()

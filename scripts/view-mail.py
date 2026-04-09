@@ -915,18 +915,31 @@ class MailViewer(QMainWindow):
         QMessageBox.information(self, "Action Mocked", message)
 
 
-# --- 3. Main Entry Point ---
+# --- Main Entry Point ---
+
+keep_alive = []
+
+def run ( args_mail_file ):
+    viewer = MailViewer( args_mail_file )
+    keep_alive.append( viewer )
+    viewer.setAttribute( Qt.WA_DeleteOnClose )
+    viewer.destroyed.connect( lambda: keep_alive.remove(viewer) )
+    viewer.show()
+
 def main():
     parser = argparse.ArgumentParser(description="View a single mail file.")
     parser.add_argument("mail_file", help="The full path to the mail file to view.")
     args = parser.parse_args()
     
     app = QApplication(sys.argv)
-    # app.setApplicationDisplayName( "Kubux Mail Client" )
+
+    from drag_filter import GlobalDragFilter
+    drag_filter = GlobalDragFilter()
+    app.installEventFilter(drag_filter)
     app.setApplicationName( "KubuxMailClient" )
-    viewer = MailViewer(args.mail_file)
-    viewer.show()
-    sys.exit(app.exec())
+    
+    run( args.mail_file )
+    app.exec()
 
 if __name__ == "__main__":
     main()
