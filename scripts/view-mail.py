@@ -513,6 +513,10 @@ class MailViewer(QMainWindow):
 
     def update_tags_ui(self):
         """Clears and rebuilds the UI to display the current tags and their states."""
+        # this may happen when dir watcher triggers a racing callback to something moot
+        if not self.tags_layout:
+            return
+
         # Clear existing tag widgets
         while self.tags_layout.count():
             item = self.tags_layout.takeAt(0)
