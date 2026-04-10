@@ -483,8 +483,9 @@ class AddressAwareTextEdit(QTextEdit):
                 event.setDropAction(Qt.MoveAction)
 
                 self.completer_supress_count = self.completer_supress_count + 2
-                return
                 
+                event.mimeData().clear()
+
         super().dropEvent(event)
 
 

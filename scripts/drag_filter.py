@@ -4,6 +4,7 @@ from PySide6.QtGui import QDrag, QGuiApplication, QCursor
 
 class GlobalDragFilter(QObject):
     def eventFilter(self, watched, event):
+        return False
         # Intercepts events to manage drag-and-drop state.
         
         if event.type() == QEvent.Type.MouseButtonRelease:
