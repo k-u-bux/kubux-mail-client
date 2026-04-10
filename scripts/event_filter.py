@@ -2,9 +2,13 @@ import logging
 from PySide6.QtCore import Qt, QObject, QEvent
 from PySide6.QtGui import QDrag, QGuiApplication, QCursor
 
-class GlobalDragFilter(QObject):
+class TriviallyFalseFilter(QObject):
     def eventFilter(self, watched, event):
         return False
+    
+
+class GlobalDragFilter(QObject):
+    def eventFilter(self, watched, event):
         # Intercepts events to manage drag-and-drop state.
         
         if event.type() == QEvent.Type.MouseButtonRelease:
@@ -35,3 +39,7 @@ class GlobalDragFilter(QObject):
         # Optional: update the application-wide cursor state
         QGuiApplication.setOverrideCursor( QCursor( Qt.CursorShape.ArrowCursor ) )
         QGuiApplication.restoreOverrideCursor()
+
+global_drag_filter = TriviallyFalseFilter()
+
+# end of file

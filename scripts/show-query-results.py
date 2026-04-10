@@ -661,9 +661,8 @@ def main():
     
     app = QApplication(sys.argv)
 
-    from drag_filter import GlobalDragFilter
-    drag_filter = GlobalDragFilter()
-    app.installEventFilter(drag_filter)
+    from event_filter import global_drag_filter
+    app.installEventFilter(global_drag_filter)
     app.setApplicationName( "KubuxMailClient" )
 
     run( args.query )
