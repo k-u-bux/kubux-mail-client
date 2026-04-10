@@ -636,6 +636,13 @@ class QueryResultsViewer(QMainWindow):
             logging.error(f"Failed to launch config editor: {e}")
             display_error(self, "Launch Error", f"Could not launch config editor:\n\n{e}")
 
+    def closeEvent(self, event):
+        """Clean up the directory watcher when closing."""
+        logging.info(f"Closing query result viewer for {self.current_query}")
+        self.dir_watcher.stop()
+        super().closeEvent(event)
+
+
 # --- Main Entry Point ---
 
 keep_alive = []

@@ -891,6 +891,12 @@ class MailViewer(QMainWindow):
     def show_mock_action(self, message):
         QMessageBox.information(self, "Action Mocked", message)
 
+    def closeEvent(self, event):
+        """Clean up the directory watcher when closing."""
+        logging.info(f"Closing mail viewer for mail file = {self.mail_file_path}")
+        self.dir_watcher.stop()
+        super().closeEvent(event)
+
 
 # --- Main Entry Point ---
 

@@ -356,6 +356,13 @@ class ThreadViewer(QMainWindow):
         for tag in tags:
             self.apply_tag_to_row( tag, row )
 
+    def closeEvent(self, event):
+        """Clean up the directory watcher when closing."""
+        logging.info(f"Closing thread viewer for thread ID = {self.thread_id}")
+        self.dir_watcher.stop()
+        super().closeEvent(event)
+
+
 # --- Main Entry Point ---
 
 keep_alive = []

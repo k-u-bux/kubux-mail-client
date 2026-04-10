@@ -357,6 +357,13 @@ class DraftsManager(QMainWindow):
         for row in list( set( [ item.row() for item in self.drafts_table.selectedItems() ] ) ):
             self.delete_row( row )
             
+    def closeEvent(self, event):
+        """Clean up the directory watcher when closing."""
+        logging.info(f"Closing drafts viewer for identity = {self.current_identity}")
+        self.dir_watcher.stop()
+        super().closeEvent(event)
+
+
 # --- Main Entry Point ---
 
 keep_alive = []
