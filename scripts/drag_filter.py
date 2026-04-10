@@ -6,10 +6,10 @@ class GlobalDragFilter(QObject):
     def eventFilter(self, watched, event):
         # Intercepts events to manage drag-and-drop state.
         
-        # if event.type() == QEvent.Type.MouseButtonRelease:
-        #     if event.button() == Qt.MouseButton.LeftButton:
-        #         logging.info("Mouse release detected. Cancel active drag.")
-        #         QDrag.cancel()
+        if event.type() == QEvent.Type.MouseButtonRelease:
+            if event.button() == Qt.MouseButton.LeftButton:
+                logging.info("Mouse release detected. Cancel active drag.")
+                QDrag.cancel()
 
         if event.type() == QEvent.Type.DragMove:
             if not (event.buttons() & Qt.MouseButton.LeftButton):
