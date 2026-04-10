@@ -105,30 +105,21 @@ headers = [
 ```
 
 
-### SMTP Configuration (`smtp-config.toml`)
+### SMTP/IMAP Configuration (`smtp-config.toml`)
 
 Configure SMTP settings for sending mail:
 
 ```toml
 [from."you@example.com"]
+imap_server = "imap.example.net"
+imap_port = 993
 smtp_server = "smtp.example.com"
 smtp_port = 587
 username = "you@example.com"
-password = "your-password"
+username = "kubux_net_26@kubux.net"
+passwd_cmd = "decode ~/.auth/imap.example.net"
 sent_dir = "~/.local/share/kubux-mail-client/mail/sent"
 failed_dir = "~/.local/share/kubux-mail-client/mail/failed"
-```
-
-### IMAP Configuration (`imap-config.toml`)
-
-Configure IMAP settings for the pause-imap-sync feature (IMAP IDLE monitoring):
-
-```toml
-[from."you@example.com"]
-imap_server = "imap.example.com"
-imap_port = 993
-username = "you@example.com"
-password = "your-password"
 ```
 
 The `pause-imap-sync` script uses IMAP IDLE to efficiently wait for new mail notifications, reducing unnecessary polling and battery usage on mobile devices.
