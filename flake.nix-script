@@ -81,6 +81,9 @@
             chmod +x $out/bin/decrypt-on-the-fly
             chmod +x $out/bin/mbsync-and-decrypt
 
+            substituteInPlace $out/bin/predict-tags \
+              --replace "python" "${pythonEnv}/bin/python"
+
 	          # Copy man page
 	          # cp kubux-mail-client.1 $out/share/man/man1
 
