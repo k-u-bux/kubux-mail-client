@@ -56,7 +56,7 @@ process_batch() {
             done
             notmuch tag $tags_to_add -- "id:$message_id"
             echo "Applied tags '$tags_to_add' to message ID: $message_id"
-            notify-send -a "Kubux Mail Client" "Incoming mail" "applied tags '${predicted_tags[@]}' to message ID: $message_id"
+            notify-send -i mail-client -a "Kubux Mail Client" "Incoming mail" "applied tags '${predicted_tags[@]}' to message ID: $message_id"
         fi
     done
 }
