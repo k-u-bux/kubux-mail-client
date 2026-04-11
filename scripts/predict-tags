@@ -66,8 +66,10 @@ process_batch() {
                 subj=$( notmuch show --format=text --format-version=1 --body=false id:${message_id} | grep ^Subject: | cut -c10- )
                 notify-send -i mail-client \
                             -a "Kubux Mail Client" \
+                            -- \
                             "Incoming mail from ${from}" \
-                            "${subj} ['${predicted_tags[@]}']"
+                            "${subj} ['${predicted_tags[@]}']" \
+                    || true
             fi
         fi
     done
