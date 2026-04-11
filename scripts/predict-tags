@@ -14,7 +14,7 @@ MODEL_PATH="${SCRIPT_DIR}/classify.pkl"
 CONFIG_PATH="${HOME}/.config/kubux-mail-client/config.toml"
 
 
-DO_NOTIFY=$(python3 -c 'import toml, json, sys; print(json.dumps(toml.load(sys.argv[1])))' ~/.config/kubux-mail-client/config.toml | jq -r '.notifications.post_hook')
+DO_NOTIFY=$(python -c 'import toml, json, sys; print(json.dumps(toml.load(sys.argv[1])))' ~/.config/kubux-mail-client/config.toml | jq -r '.notifications.post_hook')
 
 
 # Set the batch size
