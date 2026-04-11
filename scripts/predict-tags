@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# This script queries the notmuch database for newly imported messages (those with the 'unread' tag),
+# This script queries the notmuch database for newly imported messages (those without the '$tagged' tag),
 # processes them in batches, and applies additional tags based on a classifier.
 
 # Exit immediately if a command exits with a non-zero status.
@@ -56,6 +56,7 @@ process_batch() {
             done
             notmuch tag $tags_to_add -- "id:$message_id"
             echo "Applied tags '$tags_to_add' to message ID: $message_id"
+            notify-send -a "Kubux Mail Client" "Applied tags '$tags_to_add' to message ID: $message_id"
         fi
     done
 }
