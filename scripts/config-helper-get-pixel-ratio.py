@@ -3,3 +3,5 @@ app = QApplication([])
 screen = app.primaryScreen()
 pixel_ratio = screen.physicalDotsPerInch() / screen.logicalDotsPerInch()
 print( pixel_ratio )
+
+# end of file

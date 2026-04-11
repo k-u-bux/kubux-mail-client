@@ -762,3 +762,5 @@ if __name__ == "__main__":
     window.setCentralWidget(central_widget)
     window.show()
     sys.exit(app.exec())
+
+# end of file

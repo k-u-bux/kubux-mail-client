@@ -3,3 +3,5 @@ app = QApplication([])
 screen = app.primaryScreen()
 phys_dpi = screen.physicalDotsPerInch()
 print( phys_dpi )
+
+# end of file

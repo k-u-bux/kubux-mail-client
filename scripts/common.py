@@ -310,5 +310,4 @@ def find_identity( sender_email ):
             return i
     return None
 
-
 # end of file

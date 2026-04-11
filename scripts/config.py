@@ -193,3 +193,5 @@ class Config:
 
 # A global config object for easy access
 config = Config()
+
+# end of file
