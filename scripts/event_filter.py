@@ -40,6 +40,6 @@ class GlobalDragFilter(QObject):
         QGuiApplication.setOverrideCursor( QCursor( Qt.CursorShape.ArrowCursor ) )
         QGuiApplication.restoreOverrideCursor()
 
-global_drag_filter = TriviallyFalseFilter()
+global_drag_filter = GlobalDragFilter()
 
 # end of file
