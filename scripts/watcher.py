@@ -68,3 +68,5 @@ class DirectoryEventHandler(QObject, FileSystemEventHandler):
             self.observer.join()
             self.observer = None
             self.timer.stop()
+
+# end of file

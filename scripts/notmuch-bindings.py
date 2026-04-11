@@ -298,3 +298,5 @@ def _call_error_callback(flag_error, title, message):
     else:
         # 2-arg version
         flag_error(title, message)
+
+# end of file

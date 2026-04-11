@@ -408,3 +408,5 @@ if __name__ == '__main__':
     window = MailClient()
     window.show()
     sys.exit(app.exec())
+
+# end of file

@@ -154,3 +154,5 @@ def update_unseen_from_query( query, flag_error ):
         logging.info("Found '$unseen' tag. Silently replacing with '$unused'.")
         apply_tag_to_query( '+$unused', query, flag_error )
         apply_tag_to_query( '-$unseen', query, flag_error )
+
+# end of file

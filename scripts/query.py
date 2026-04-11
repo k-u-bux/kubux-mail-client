@@ -118,3 +118,5 @@ if __name__ == '__main__':
             print(f"'{q}' -> '{expanded}'")
         except Exception as e:
             print(f"ERROR: {e}")
+
+#end of file

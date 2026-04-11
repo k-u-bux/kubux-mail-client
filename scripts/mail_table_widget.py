@@ -172,3 +172,5 @@ class MailTableWidget(QTableWidget):
         self._hovered_row = -1
         self.setRowCount(0)
         self.clearContents()
+
+# end of file
