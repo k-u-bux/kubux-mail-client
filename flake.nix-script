@@ -49,7 +49,8 @@
             pkgs.gnupg
             pkgs.msmtp
             pkgs.jq
-            pkgs.imagemagick 
+            pkgs.imagemagick
+            pkgs.libnotify 
           ];
           nativeBuildInputs = [ 
             pkgs.makeWrapper
@@ -60,6 +61,7 @@
             pkgs.isync
             pkgs.gnupg
             pkgs.msmtp
+            pkgs.libnotify
           ];
 
           installPhase = ''
