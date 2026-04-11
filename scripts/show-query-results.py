@@ -20,7 +20,7 @@ from PySide6.QtCore import Qt, QSize, QTimer, QItemSelectionModel, QEvent
 from PySide6.QtGui import QFont, QKeySequence, QAction, QColor
 import logging
 
-from notmuch import find_matching_messages, find_matching_threads, apply_tag_to_query, get_tags_from_query, update_unseen_from_query
+from notmuch_api import find_matching_messages, find_matching_threads, apply_tag_to_query, get_tags_from_query, update_unseen_from_query
 from config import config
 from common import (
     display_error, 

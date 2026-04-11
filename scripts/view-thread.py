@@ -21,7 +21,7 @@ from PySide6.QtGui import QFont, QKeySequence, QAction, QColor
 from mail_table_widget import MailTableWidget
 
 import logging
-from notmuch import find_matching_messages, apply_tag_to_query
+from notmuch_api import find_matching_messages, apply_tag_to_query
 from config import config
 from common import display_error, create_summary_text, create_date_item, get_db_path, get_run_method
 from watcher import DirectoryEventHandler

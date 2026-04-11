@@ -12,7 +12,7 @@ from sklearn.multiclass import OneVsRestClassifier
 
 import joblib
 
-from notmuch import find_matching_messages
+from notmuch_api import find_matching_messages
 from config import config 
 
 
