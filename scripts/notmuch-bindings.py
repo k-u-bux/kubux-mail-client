@@ -57,7 +57,7 @@ def notmuch_show(query, sort, flag_error):
     except Exception as e:
         _call_error_callback(flag_error, "Notmuch Query Failed",
                             f"An error occurred while running notmuch:\n\n{e}")
-        os._exit(1)
+        os.exit(1)
 
 
 def _build_message_tree(msg, matched_ids):
@@ -208,7 +208,7 @@ def notmuch_search(query, output, sort, flag_error):
     except Exception as e:
         _call_error_callback(flag_error, "Notmuch Query Failed",
                             f"An error occurred while running notmuch:\n\n{e}")
-        os._exit(1)
+        os.exit(1)
 
 
 def find_matching_threads(query, flag_error):
@@ -247,7 +247,7 @@ def apply_tag_to_query(pm_tag, query, flag_error):
     except Exception as e:
         _call_error_callback(flag_error, "Notmuch Query Failed",
                             f"An error occurred while running notmuch:\n\n{e}")
-        os._exit(1)
+        os.exit(1)
 
 
 def get_tags_from_query(query, flag_error):
