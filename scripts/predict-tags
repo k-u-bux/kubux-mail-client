@@ -56,11 +56,11 @@ process_batch() {
             done
             notmuch tag $tags_to_add -- "id:$message_id"
             echo "Applied tags '$tags_to_add' to message ID: $message_id"
-            from=$( notmuch show --format=text --format-version=1 --body=false id:${message_id} | grep ^From: )
-            subj=$( notmuch show --format=text --format-version=1 --body=false id:${message_id} | grep ^Subject: )
+            from=$( notmuch show --format=text --format-version=1 --body=false id:${message_id} | grep ^From: | cut -c7- )
+            subj=$( notmuch show --format=text --format-version=1 --body=false id:${message_id} | grep ^Subject: | cut -c10- )
             notify-send -i mail-client \
                         -a "Kubux Mail Client" "Incoming mail" \
-                        "$applied tags: '${predicted_tags[@]}'"
+                        "${from}, ${subj}, tags: '${predicted_tags[@]}'"
         fi
     done
 }
