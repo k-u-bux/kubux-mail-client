@@ -8,7 +8,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtGui import (
     QFont, QColor, QPainter, QTextCursor, QDrag, QTextCharFormat, 
-    QTextDocument, QPalette, QKeySequence, QShortcut
+    QTextDocument, QPalette, QKeySequence, QShortcut, QDropEvent
 )
 from PySide6.QtCore import (
     Qt, Signal, QMimeData, QPoint, QSize, QEvent, QRect, QStringListModel
@@ -478,13 +478,29 @@ class AddressAwareTextEdit(QTextEdit):
                 
                 # Ensure the inserted text is visible
                 self.ensureCursorVisible()
+
+
+                # Create empty mime data
+                empty_mime = QMimeData()  # No text set
+            
+                # Create new event with empty mime
+                dummy_event = QDropEvent(
+                    event.position(),           # Same position
+                    event.possibleActions(),    # Same actions
+                    empty_mime,                 # Empty mime data
+                    event.buttons(),            # Same buttons
+                    event.modifiers(),          # Same modifiers
+                    QEvent.Drop                 # Drop event type
+                )
                 
                 event.accept()
                 event.setDropAction(Qt.MoveAction)
 
                 self.completer_supress_count = self.completer_supress_count + 2
-                
                 event.mimeData().clear()
+
+                super().dropEvent( dummy_event )
+                return
 
         super().dropEvent(event)
 
