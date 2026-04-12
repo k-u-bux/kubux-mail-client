@@ -64,6 +64,8 @@ process_batch() {
             if ${DO_NOTIFY}; then
                 from=$( notmuch show --format=text --format-version=1 --body=false id:${message_id} | grep ^From: | cut -c7- )
                 subj=$( notmuch show --format=text --format-version=1 --body=false id:${message_id} | grep ^Subject: | cut -c10- )
+                echo from: ${from}
+                echo subject: ${subj}
                 notify-send -i mail-client \
                             -a "Kubux Mail Client" \
                             -- \
