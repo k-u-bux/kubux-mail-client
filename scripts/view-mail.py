@@ -632,9 +632,9 @@ class MailViewer(QMainWindow):
     def all_other_identities(self):
         return { addr for addr in self.all_involved() if not config.is_me( [addr] ) }
 
-    def get_quoted_body(self):
+    def get_body(self):
         """
-        Extracts and quotes the body of the email.
+        Extracts the body of the email.
         It prioritizes plain text, but falls back to converting HTML to plain text.
         """
         original_body = ""
@@ -645,10 +645,12 @@ class MailViewer(QMainWindow):
                 original_body = part.get_payload(decode=True).decode(part.get_content_charset() or 'utf-8', errors='ignore')
             elif content_type == 'text/html' and not html_body:
                 html_body = part.get_payload(decode=True).decode(part.get_content_charset() or 'utf-8', errors='ignore')
-
         if not original_body and html_body:
             original_body = html_to_plain_text( html_body )
+        return original_body
 
+    def get_quoted_body(self):
+        original_body = self.get_body()
         return textwrap.indent( original_body, '> ', (lambda dummy: True) )
 
     def reply(self):
@@ -774,12 +776,7 @@ class MailViewer(QMainWindow):
                 forwarded_body += f"{h}: {self.message.get(h)}\n"
         forwarded_body += "\n"
         
-        original_body = ""
-        for part in self.message.walk():
-            if part.get_content_type() == 'text/plain':
-                original_body = part.get_content()
-                break
-        forwarded_body += original_body
+        forwarded_body += self.get_body()
         
         original_subject = self.message.get("Subject", "")
         if not original_subject.lower().startswith("fwd:"):
