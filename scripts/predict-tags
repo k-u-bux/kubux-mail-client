@@ -70,7 +70,7 @@ process_batch() {
                             -a "Kubux Mail Client" \
                             -- \
                             "Incoming mail from ${from}" \
-                            "${subj} ['${predicted_tags[@]}']" \
+                            "${subj} ['${predicted_tags[*]}']" \
                     || true
             fi
         fi
