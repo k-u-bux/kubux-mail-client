@@ -128,14 +128,14 @@ class MailViewer(QMainWindow):
         """Parses a real email file from the local filesystem."""
         if not self.mail_file_path.exists():
             logging.error(f"Mail file {self.mail_file_path} does not exist.")
-            os.exit(1)
+            sys.exit(1)
         try:
             mail = mailparser.parse_from_file(self.mail_file_path)
             with open(self.mail_file_path, 'rb') as f:
                 self.message = email.message_from_binary_file(f, policy=policy.default)
         except Exception as e:
             logging.error(f"Failed to parse mail file: {e}")
-            os.exit(1)
+            sys.exit(1)
         # print("parsing message")
         for part in self.message.walk():
             # Prioritize plain text over HTML
@@ -494,7 +494,7 @@ class MailViewer(QMainWindow):
         """Queries the notmuch database for tags of the current mail's message ID."""
         if not self.message_id:
             return []
-        self.tags = get_tags_from_query( f'id:{self.message_id}', display_error )
+        self.tags = get_tags_from_query( f'id:{self.message_id}', lambda *args: display_error( self, *args) )
         return self.tags
 
     def update_tags_ui(self):
@@ -559,9 +559,9 @@ class MailViewer(QMainWindow):
             logging.info(f"Tag '{tag}' removed successfully.")
             self.update_tags_ui()
         except subprocess.CalledProcessError as e:
-            display_error("Failed to Remove Tag", f"Failed to remove tag '{tag}':\n\n{e.stderr}")
+            display_error(self, "Failed to Remove Tag", f"Failed to remove tag '{tag}':\n\n{e.stderr}")
         except FileNotFoundError:
-            display_eerro("Notmuch Not Found", "The 'notmuch' command was not found. Please ensure it is installed and in your PATH.")
+            display_error(self, "Notmuch Not Found", "The 'notmuch' command was not found. Please ensure it is installed and in your PATH.")
     
     def really_remove_tag(self, tag):
         self.tags_state.pop(tag)
@@ -583,7 +583,7 @@ class MailViewer(QMainWindow):
             logging.info(f"Tag '{tag}' added successfully.")
             self.update_tags_ui()
         except subprocess.CalledProcessError as e:
-            display_error("Failed to Add Tag", f"Failed to add tag '{tag}':\n\n{e.stderr}")
+            display_error(self, "Failed to Add Tag", f"Failed to add tag '{tag}':\n\n{e.stderr}")
 
 
     def _create_draft_and_open_editor(self, to_addrs, cc_addrs, subject_text, body_text, in_reply_to=None):

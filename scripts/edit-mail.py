@@ -363,7 +363,7 @@ class MailEditor(QMainWindow):
                     errors='replace'
                 )
             else:
-                display_error("type error", f"Attachment payload has unexpected type: {type(payload_data).__name__}")
+                display_error(self, "type error", f"Attachment payload has unexpected type: {type(payload_data).__name__}")
                 
     
             # 3. Write to a temporary file

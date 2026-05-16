@@ -95,6 +95,9 @@ class Config:
                         "template": "~/.config/kubux-mail-client/draft_template.eml"
                     },
                 ]
+            },
+            "autocomplete": {
+                "headers": []
             }
         }
 
@@ -177,7 +180,7 @@ class Config:
         return path
 
     def get_autocompletions(self, category="headers"):
-        return self.data.get("autocomplete", {}).get(category, "headers")
+        return self.data.get("autocomplete", {}).get(category, [])
 
     def is_me(self, address_string_list) -> bool:
         from_addresses = getaddresses(address_string_list)

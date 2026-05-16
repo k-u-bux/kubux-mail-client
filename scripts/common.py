@@ -13,6 +13,8 @@ import secrets
 import os
 import subprocess
 import shutil
+import tempfile
+import email
 from config import config
 import re
 import html2text
@@ -264,7 +266,7 @@ def create_draft_from_components_and_open_editor(parent, to_addrs, cc_addrs, sub
     Creates a new mail draft and opens it in the external editor.
     """
     msg = email.message.EmailMessage()
-    msg['From'] = MY_EMAIL_ADDRESS
+    msg['From'] = ""
     msg['To'] = ", ".join(to_addrs)
     if cc_addrs:
         msg['Cc'] = ", ".join(cc_addrs)

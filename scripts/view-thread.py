@@ -350,9 +350,8 @@ class ThreadViewer(QMainWindow):
             for tag in tags:
                 self.apply_tag_to_row( tag, row )
 
-    def modify_row(self, index):
+    def modify_row(self, row):
         tags = self.tag_dialog()
-        row = index.row()
         for tag in tags:
             self.apply_tag_to_row( tag, row )
 

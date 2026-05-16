@@ -44,7 +44,7 @@ class DraftsManager(QMainWindow):
         self.current_identity = find_identity( sender_email )
         if not self.current_identity:
             logging.error(f"Sender mail address unknown: {sender_email}")
-            os.exit(1)
+            sys.exit(1)
 
         self.dir_watcher = DirectoryEventHandler( self.reload_drafts )
         
@@ -156,11 +156,6 @@ class DraftsManager(QMainWindow):
     def stop_file_system_watcher(self):
         self.dir_watcher.stop()
 
-    def closeEvent(self, event):
-        """Handle the window close event."""
-        self.stop_file_system_watcher()
-        super().closeEvent(event)
-    
     def update_drafts_folder_button(self):
         """Update the drafts folder button text based on the current identity."""
         if self.current_identity:

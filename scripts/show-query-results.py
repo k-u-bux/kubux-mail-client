@@ -282,7 +282,7 @@ class QueryResultsViewer(QMainWindow):
             
     def _execute_threads_query(self):
         """Fetches and populates the table with thread data."""
-        self.results = find_matching_threads(self.current_query, display_error)
+        self.results = find_matching_threads( self.current_query, lambda *args: display_error(self, *args) )
         self.results_table.setHorizontalHeaderLabels(["Date", "Authors", "Subject"])
         self.results_table.setRowCount(len(self.results))
         self.results_table.setSortingEnabled(False)
@@ -292,7 +292,7 @@ class QueryResultsViewer(QMainWindow):
 
     def _execute_mails_query(self):
         """Fetches and populates the table with mail data."""
-        self.results = find_matching_messages(self.current_query, display_error)
+        self.results = find_matching_messages( self.current_query, lambda *args: display_error(self, *args) )
         self.results_table.setHorizontalHeaderLabels(["Date", "Sender/Receiver", "Subject"])
         self.results_table.setRowCount(len(self.results))
         self.results_table.setSortingEnabled(False)
@@ -622,9 +622,8 @@ class QueryResultsViewer(QMainWindow):
             for tag in tags:
                 self.apply_tag_to_row( tag, row )
 
-    def modify_row(self, index):
+    def modify_row(self, row):
         tags = self.tag_dialog()
-        row = index.row()
         for tag in tags:
             self.apply_tag_to_row( tag, row )
 
