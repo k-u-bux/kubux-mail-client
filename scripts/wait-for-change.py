@@ -2,6 +2,7 @@
 import sys
 import argparse
 import time
+import threading
 from pathlib import Path
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
@@ -10,18 +11,18 @@ DEFAULT_TIMEOUT = 1800  # seconds
 
 
 class ChangeTrigger(FileSystemEventHandler):
-    """Detects any filesystem event and signals to stop waiting."""
+    """Signals via threading.Event on any filesystem event."""
 
     def __init__(self):
-        self.triggered = False
+        self.event = threading.Event()
 
     def on_any_event(self, event):
-        self.triggered = True
+        self.event.set()
 
 
 def read_file_content(path: Path) -> str:
     try:
-        return path.read_text()
+        return path.read_text().rstrip("\n")
     except FileNotFoundError:
         return ""
     except OSError as e:
@@ -55,17 +56,17 @@ def wait_for_change(filepath: Path, expect: str, timeout: int) -> str:
 
     try:
         deadline = time.monotonic() + timeout
-        while time.monotonic() < deadline:
-            if handler.triggered:
-                # re-read and check it actually changed (avoid spurious wakeups)
-                new_content = read_file_content(filepath)
-                if new_content != expect:
-                    return new_content
-                # spurious event (e.g. unrelated file in same dir) — reset and keep waiting
-                handler.triggered = False
-            time.sleep(0.1)
-        # timeout — return current content (which still matches expect)
-        return read_file_content(filepath)
+        while True:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return read_file_content(filepath)
+            handler.event.wait(timeout=remaining)
+            if not handler.event.is_set():
+                return read_file_content(filepath)
+            handler.event.clear()
+            new_content = read_file_content(filepath)
+            if new_content != expect:
+                return new_content
     finally:
         observer.stop()
         observer.join()
