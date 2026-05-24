@@ -77,7 +77,7 @@ def main():
         description="Block until a file changes, with level-triggered pre-check."
     )
     parser.add_argument("--file", required=True, help="File to watch")
-    parser.add_argument("--expect", required=True, help="Expected current content")
+    parser.add_argument("--expect", default="", help="Expected current content (default: empty string)")
     parser.add_argument(
         "--timeout", type=int, default=DEFAULT_TIMEOUT,
         help=f"Maximum time to wait in seconds (default: {DEFAULT_TIMEOUT}s)"
