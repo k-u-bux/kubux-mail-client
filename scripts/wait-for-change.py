@@ -23,9 +23,7 @@ class ChangeTrigger(FileSystemEventHandler):
 def read_file_content(path: Path) -> str:
     try:
         return path.read_text().rstrip("\n")
-    except FileNotFoundError:
-        return ""
-    except OSError as e:
+    except Exception as e:
         print(f"error: cannot read {path}: {e}", file=sys.stderr)
         sys.exit(1)
 
@@ -42,11 +40,8 @@ def wait_for_change(filepath: Path, expect: str, timeout: int) -> str:
     if content != expect:
         return content
 
-    # content matches expect — watch parent dir for changes to this file
+    # watch parent dir for changes to this file
     parent = filepath.parent
-    if not parent.is_dir():
-        print(f"error: parent directory does not exist: {parent}", file=sys.stderr)
-        sys.exit(1)
 
     handler = ChangeTrigger()
     observer = Observer()
@@ -72,11 +67,49 @@ def wait_for_change(filepath: Path, expect: str, timeout: int) -> str:
         observer.join()
 
 
+def wait_for_change_dir(dirpath: Path, timeout: int) -> None:
+    """
+    Block until *any* file change is detected under *dirpath* (recursive),
+    or timeout expires.
+
+    Exits 0 on change, 1 on timeout.
+    """
+    if not dirpath.is_dir():
+        print(f"error: directory does not exist: {dirpath}", file=sys.stderr)
+        sys.exit(1)
+
+    handler = ChangeTrigger()
+    observer = Observer()
+    observer.daemon = True
+    observer.schedule(handler, str(dirpath), recursive=True)
+    observer.start()
+
+    try:
+        deadline = time.monotonic() + timeout
+        while True:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                break
+            handler.event.wait(timeout=remaining)
+            if not handler.event.is_set():
+                break
+            return  # any event → change detected
+    finally:
+        observer.stop()
+        observer.join()
+
+    # timeout reached
+    print(f"timeout ({timeout}s) reached – no change in {dirpath}",
+          file=sys.stderr)
+    sys.exit(1)
+
+
 def main():
     parser = argparse.ArgumentParser(
-        description="Block until a file changes, with level-triggered pre-check."
+        description="Block until a file or directory tree changes, with level-triggered pre-check."
     )
-    parser.add_argument("--file", required=True, help="File to watch")
+    parser.add_argument("--file", help="File to watch")
+    parser.add_argument("--dir", help="Directory to watch (recursively)")
     parser.add_argument("--expect", default="", help="Expected current content (default: empty string)")
     parser.add_argument(
         "--timeout", type=int, default=DEFAULT_TIMEOUT,
@@ -84,12 +117,22 @@ def main():
     )
     args = parser.parse_args()
 
+    if args.file and args.dir:
+        print("error: specify either --file or --dir, not both", file=sys.stderr)
+        sys.exit(1)
+    if not args.file and not args.dir:
+        print("error: either --file or --dir is required", file=sys.stderr)
+        sys.exit(1)
+
+    if args.dir:
+        wait_for_change_dir(Path(args.dir).resolve(), args.timeout)
+        sys.exit(0)
+
     filepath = Path(args.file).resolve()
     new_content = wait_for_change(filepath, args.expect, args.timeout)
 
     print(new_content, end="")
     if new_content == args.expect:
-        # timeout — content never diverged from expect
         print(f"timeout ({args.timeout}s) reached – no change in {args.file}",
               file=sys.stderr)
         sys.exit(1)
