@@ -17,6 +17,7 @@ class ChangeTrigger(FileSystemEventHandler):
         self.event = threading.Event()
 
     def on_any_event(self, event):
+        # print(f"event = {event}")
         self.event.set()
 
 
