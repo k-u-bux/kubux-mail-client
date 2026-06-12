@@ -279,6 +279,7 @@ class QueryResultsViewer(QMainWindow):
             self._execute_threads_query()
         else: # mails mode
             self._execute_mails_query()
+
             
     def _execute_threads_query(self):
         """Fetches and populates the table with thread data."""

@@ -22,14 +22,14 @@ def notmuch_show(query, sort, flag_error):
             "Notmuch Query Failed",
             f"An error occurred while running notmuch:\n\n{e.stderr}"
         )
-        sys.exit(1)
+        raise
 
     except json.JSONDecodeError as e:
         flag_error(
             "Notmuch Output Error",
             f"Failed to parse JSON output from notmuch:\n\n{e}"
         )
-        sys.exit(1)
+        raise
 
 
 # def flatten_message_tree(list_of_threads):
@@ -64,11 +64,14 @@ def flatten_message_tree(list_of_threads):
 
 
 def find_matching_messages(query, flag_error):
-    list_of_messages = flatten_message_tree( notmuch_show(query, "newest-first", flag_error) )
     result = []
-    for msg in list_of_messages:
-        if msg["match"]:
-            result.append( msg )
+    try:
+        list_of_messages = flatten_message_tree( notmuch_show(query, "newest-first", flag_error) )
+        for msg in list_of_messages:
+            if msg["match"]:
+                result.append( msg )
+    except Exception as e:
+        pass
     return result
 
 
@@ -91,20 +94,23 @@ def notmuch_search(query, output, sort, flag_error):
             "Notmuch Query Failed",
             f"An error occurred while running notmuch:\n\n{e.stderr}"
         )
-        sys.exit(1)
+        raise
 
     except json.JSONDecodeError as e:
         flag_error(
             "Notmuch Output Error",
             f"Failed to parse JSON output from notmuch:\n\n{e}"
         )
-        sys.exit(1)
+        raise
 
 
 def find_matching_threads(query, flag_error):
-    list_of_threads = notmuch_search(query, "summary", "newest-first", flag_error)
+    list_of_thread = []
+    try:
+        list_of_threads = notmuch_search(query, "summary", "newest-first", flag_error)
+    except Exception as e:
+        pass
     return list_of_threads
-
 
 
 def apply_tag_to_query(pm_tag, query, flag_error):
@@ -125,14 +131,14 @@ def apply_tag_to_query(pm_tag, query, flag_error):
             "Notmuch Query Failed",
             f"An error occurred while running notmuch:\n\n{e.stderr}"
         )
-        sys.exit(1)
+        raise
 
     except Exception as e:
         flag_error(
             "Something happened.",
             f"Caught Exception: {e}"
         )
-        sys.exit(1)
+        raise
 
 def get_tags_from_query(query, flag_error):
     try:
