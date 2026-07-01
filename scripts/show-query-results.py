@@ -87,6 +87,18 @@ def add_to_history(history, query):
     history.insert(0, query)
     return history[:MAX_HISTORY]
 
+def record_query_to_history(path, query):
+    """Read current history from disk, add query, write back.
+
+    This performs a full read-update-write cycle so that multiple
+    concurrently open windows don't clobber each other's history with
+    a stale in-memory copy.
+    """
+    history = load_history(path)
+    history = add_to_history(history, query)
+    save_history(path, history)
+
+
 
 class QueryResultsViewer(QMainWindow):
     def __init__(self, query_string=config.get_search(), parent=None):
@@ -199,7 +211,7 @@ class QueryResultsViewer(QMainWindow):
         self.history_button.setMenu(self.history_menu)
         query_layout.addWidget(self.history_button)
         self.history_path = config.config_dir / "query_history.json"
-        self.query_history = load_history(self.history_path)
+
 
         # c) I like the table below.
         self.results_table = MailTableWidget()
@@ -313,8 +325,8 @@ class QueryResultsViewer(QMainWindow):
 
     def execute_query(self):
         raw_query = self.query_edit.text()
-        self.query_history = add_to_history(self.query_history, raw_query)
-        save_history(self.history_path, self.query_history)
+        record_query_to_history(self.history_path, raw_query)
+
         parser = QueryParser(config_dir=config.config_dir)
         self.current_query = parser.parse( raw_query )
         logging.info(f"Executing query: '{self.current_query}' in '{self.view_mode}' mode.")
@@ -688,12 +700,14 @@ class QueryResultsViewer(QMainWindow):
 
     def refresh_history_menu(self):
         self.history_menu.clear()
-        if not self.query_history:
+        history = load_history(self.history_path)
+        if not history:
             self.history_menu.addAction("(empty)").setEnabled(False)
             return
-        for q in self.query_history:
+        for q in history:
             action = self.history_menu.addAction(q)
             action.triggered.connect(lambda _, query=q: self._select_history_item(query))
+
 
     def _select_history_item(self, query):
         self.query_edit.setText(query)
