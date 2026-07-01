@@ -202,7 +202,19 @@ class QueryResultsViewer(QMainWindow):
         self.query_edit.setFont(config.get_interface_font())
         self.query_edit.returnPressed.connect(self.execute_query)
         query_layout.addWidget(self.query_edit)
-        self.history_button = QPushButton("∨")
+        # self.history_button = QPushButton("∨")
+        self.history_button = QPushButton("▼")
+        self.history_button.setStyleSheet("""
+                                          QPushButton {
+                                              text-align: center;
+                                              padding-right: 0;
+                                          }
+                                          QPushButton::menu-indicator {
+                                              image: none;
+                                              width: 0;
+                                              height: 0;
+                                          }
+                                          """)
         self.history_button.setFont(config.get_interface_font())
         self.history_button.setFixedWidth(32)
         self.history_menu = QMenu(self)
