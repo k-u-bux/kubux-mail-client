@@ -53,6 +53,41 @@ def messages ( thread_id ):
     return messages
 
 
+MAX_HISTORY = 50
+
+def load_history(path):
+    """Load query history from JSON file."""
+    if not path.exists():
+        return []
+    try:
+        with open(path, "r") as f:
+            data = json.load(f)
+            if isinstance(data, list):
+                return data
+            return []
+    except Exception as e:
+        logging.error(f"Failed to load query history: {e}")
+        return []
+
+def save_history(path, history):
+    """Save query history to JSON file."""
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with open(path, "w") as f:
+            json.dump(history, f)
+    except Exception as e:
+        logging.error(f"Failed to save query history: {e}")
+
+def add_to_history(history, query):
+    """Add a query to history, deduplicating and capping at MAX_HISTORY entries."""
+    if not query or not query.strip():
+        return history
+    if query in history:
+        history.remove(query)
+    history.insert(0, query)
+    return history[:MAX_HISTORY]
+
+
 class QueryResultsViewer(QMainWindow):
     def __init__(self, query_string=config.get_search(), parent=None):
         super().__init__(parent)
@@ -148,11 +183,23 @@ class QueryResultsViewer(QMainWindow):
         self.quit_button.clicked.connect(self.close)
         top_bar_layout.addWidget(self.quit_button)
         
-        # b) below the top row: an edit box for the query.
+        # b) below the top row: an edit box for the query, with a history button.
+        query_layout = QHBoxLayout()
+        main_layout.addLayout(query_layout)
         self.query_edit = QLineEdit(self.current_query)
         self.query_edit.setFont(config.get_interface_font())
         self.query_edit.returnPressed.connect(self.execute_query)
-        main_layout.addWidget(self.query_edit)
+        query_layout.addWidget(self.query_edit)
+        self.history_button = QPushButton("∨")
+        self.history_button.setFont(config.get_interface_font())
+        self.history_button.setFixedWidth(32)
+        self.history_menu = QMenu(self)
+        self.history_menu.setFont(config.get_menu_font())
+        self.history_menu.aboutToShow.connect(self.refresh_history_menu)
+        self.history_button.setMenu(self.history_menu)
+        query_layout.addWidget(self.history_button)
+        self.history_path = config.config_dir / "query_history.json"
+        self.query_history = load_history(self.history_path)
 
         # c) I like the table below.
         self.results_table = MailTableWidget()
@@ -265,8 +312,11 @@ class QueryResultsViewer(QMainWindow):
         self.execute_query()
 
     def execute_query(self):
+        raw_query = self.query_edit.text()
+        self.query_history = add_to_history(self.query_history, raw_query)
+        save_history(self.history_path, self.query_history)
         parser = QueryParser(config_dir=config.config_dir)
-        self.current_query = parser.parse( self.query_edit.text() )
+        self.current_query = parser.parse( raw_query )
         logging.info(f"Executing query: '{self.current_query}' in '{self.view_mode}' mode.")
         
         # Clear hover state when refreshing
@@ -635,6 +685,19 @@ class QueryResultsViewer(QMainWindow):
         except Exception as e:
             logging.error(f"Failed to launch config editor: {e}")
             display_error(self, "Launch Error", f"Could not launch config editor:\n\n{e}")
+
+    def refresh_history_menu(self):
+        self.history_menu.clear()
+        if not self.query_history:
+            self.history_menu.addAction("(empty)").setEnabled(False)
+            return
+        for q in self.query_history:
+            action = self.history_menu.addAction(q)
+            action.triggered.connect(lambda _, query=q: self._select_history_item(query))
+
+    def _select_history_item(self, query):
+        self.query_edit.setText(query)
+        self.execute_query()
 
     def closeEvent(self, event):
         """Clean up the directory watcher when closing."""
