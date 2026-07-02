@@ -4,11 +4,9 @@ import sys
 import argparse
 import os
 import email
-from email.message import EmailMessage
+from email import policy
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from email.utils import formataddr, getaddresses
-from email import policy
 from pathlib import Path
 import tempfile
 import re
@@ -28,6 +26,8 @@ import shutil
 from datetime import datetime
 import secrets
 import base64
+import re
+from email.header import Header
 
 from config import config
 from common import display_error
@@ -232,7 +232,11 @@ class MailEditor(QMainWindow):
         plain_text_body = ""
         for part in self.draft_message.walk():
             if part.get_content_type() == 'text/plain' and not part.get_filename():
-                plain_text_body = part.get_content()
+                payload = part.get_payload(decode=True)
+                if isinstance(payload, bytes):
+                    plain_text_body = payload.decode('utf-8', errors='replace')
+                else:
+                    plain_text_body = str(payload) if payload else ""
                 break
         self.body_edit.setPlainText(plain_text_body)
 
@@ -400,6 +404,28 @@ class MailEditor(QMainWindow):
         # Fallback to the default if no match is found
         return Path("~/.local/share/kubux-mail-client/mail/drafts").expanduser()
 
+    def _encode_header_value(self, value):
+        """RFC 2047 encode non-ASCII display names in address headers."""
+        addrs = re.split(r',\s*', value)
+        encoded_parts = []
+        for addr in addrs:
+            addr = addr.strip()
+            if not addr:
+                continue
+            m = re.match(r'^"([^"]*)"\s*<([^>]+)>$', addr)
+            if m:
+                display_name = m.group(1)
+                addr_spec = m.group(2)
+                if any(ord(c) > 127 for c in display_name):
+                    h = Header(display_name, 'utf-8')
+                    encoded_name = h.encode()
+                    encoded_parts.append(f'"{encoded_name}" <{addr_spec}>')
+                else:
+                    encoded_parts.append(f'"{display_name}" <{addr_spec}>')
+            else:
+                encoded_parts.append(addr)
+        return ", ".join(encoded_parts)
+
     def _save_draft_in_new_file(self):
         try:
             drafts_dir = self._get_selected_identity_drafts_path()
@@ -411,46 +437,45 @@ class MailEditor(QMainWindow):
             new_draft_filename = f"{timestamp_str}-{random_component}.eml"
             new_draft_path = ( drafts_dir / new_draft_filename ).expanduser()
 
+            # Build the body/attachment MIME structure WITHOUT setting
+            # address headers on it — they'd get mangled by as_bytes()
             if self.attachments:
-                draft = MIMEMultipart()
-                body_part = MIMEText(self.body_edit.toPlainText(), 'plain', 'utf-8')
-                draft.attach(body_part)
+                body_part = MIMEMultipart()
+                text_part = MIMEText(self.body_edit.toPlainText(), 'plain', 'utf-8')
+                body_part.attach(text_part)
                 for part in self.attachments:
-                    draft.attach(part)
+                    body_part.attach(part)
             else:
-                # Case 2: No attachments, use a simple EmailMessage
-                draft = email.message.EmailMessage()
-                draft.set_content(self.body_edit.toPlainText(), 'plain', 'utf-8')
-                
+                body_part = email.message.EmailMessage()
+                body_part.set_content(self.body_edit.toPlainText(), 'plain', 'utf-8')
+
+            # Gather all headers as raw strings from the widget
+            headers = self.headers_widget.get_header_values()
+
+            # Add In-Reply-To / References from the original draft
             if self.draft_message:
                 in_reply_to = self.draft_message.get('In-Reply-To')
                 if in_reply_to:
-                    draft['In-Reply-To'] = in_reply_to
+                    headers['In-Reply-To'] = in_reply_to
                 references = self.draft_message.get('References')
                 if references:
-                    draft['References'] = references
+                    headers['References'] = references
 
-            # Get headers from our widget
-            headers = self.headers_widget.get_header_values()
-            
-            # Set all headers from the widget
-            for header_name, value in headers.items():
-                if header_name.lower() in ['to', 'cc', 'bcc']:
-                    # Parse the comma-separated string into (name, address) tuples
-                    addr_pairs = getaddresses([value])
-                    # Format each pair correctly and join with commas
-                    formatted_addrs = [formataddr(pair) for pair in addr_pairs]
-                    draft[header_name] = ", ".join(formatted_addrs)
-                else:
-                    draft[header_name] = value
-                
-            # Get the From address for Message-ID
+            # Generate Message-ID
             from_address = email.utils.parseaddr(headers.get('From', ''))[1]
             domain = from_address.split('@')[1] if '@' in from_address else 'local.machine'
-            draft['Message-ID'] = f"{self.message_id_loc}@{domain}>"
-            
+            headers['Message-ID'] = f"{self.message_id_loc}@{domain}>"
+
+            # Write headers, RFC 2047-encoding non-ASCII display names,
+            # then append the MIME body bytes
+            address_headers = {'to', 'cc', 'bcc', 'from', 'reply-to'}
             with open(new_draft_path, 'wb') as tmp_file:
-                tmp_file.write(draft.as_bytes())
+                for header_name, value in headers.items():
+                    if header_name.lower() in address_headers:
+                        value = self._encode_header_value(value)
+                    line = f"{header_name}: {value}\r\n"
+                    tmp_file.write(line.encode('utf-8'))
+                tmp_file.write(body_part.as_bytes())
 
             return new_draft_path
 

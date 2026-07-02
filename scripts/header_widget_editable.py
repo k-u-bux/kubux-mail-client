@@ -659,6 +659,23 @@ class MailHeaderEditableWidget(QScrollArea):
                         combo.setCurrentIndex(i)
                         break
 
+    def _format_address_header(self, message, header_name):
+        """Format an address header into normalized 'Name' <addr> form."""
+        hdr = message.get(header_name)
+        if not hdr:
+            return ""
+        if hasattr(hdr, 'addresses'):
+            # policy.default gives header objects with .addresses
+            parts = []
+            for addr in hdr.addresses:
+                if addr.display_name:
+                    parts.append(f'"{addr.display_name}" <{addr.addr_spec}>')
+                else:
+                    parts.append(addr.addr_spec)
+            return ", ".join(parts)
+        # Fallback for plain strings
+        return str(hdr)
+
     def populate_from_message(self, message):
         """Populate the header fields from an email message."""
         # Handle the From field specially
@@ -672,10 +689,10 @@ class MailHeaderEditableWidget(QScrollArea):
         
         # Map message headers to editor fields
         header_mapping = {
-            "to_edit": message.get("To", ""),
-            "cc_edit": message.get("Cc", ""),
-            "bcc_edit": message.get("Bcc", ""),
-            "reply_to_edit": message.get("Reply-To", ""),
+            "to_edit": self._format_address_header(message, "To"),
+            "cc_edit": self._format_address_header(message, "Cc"),
+            "bcc_edit": self._format_address_header(message, "Bcc"),
+            "reply_to_edit": self._format_address_header(message, "Reply-To"),
             "subject_edit": message.get("Subject", ""),
             "date_edit": f"{subprocess.run( [ 'date', '-R' ], capture_output=True, text=True).stdout.strip('\n')}"
         }
