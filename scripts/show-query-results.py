@@ -98,6 +98,11 @@ def record_query_to_history(path, query):
     history = add_to_history(history, query)
     save_history(path, history)
 
+def remove_query_from_history ( path, query ):
+    history = load_history( path )
+    if query in history:
+        history.remove( query )
+    save_history( path, history )
 
 
 class QueryResultsViewer(QMainWindow):
@@ -337,11 +342,13 @@ class QueryResultsViewer(QMainWindow):
 
     def execute_query(self):
         raw_query = self.query_edit.text()
-        record_query_to_history(self.history_path, raw_query)
 
         parser = QueryParser(config_dir=config.config_dir)
         self.current_query = parser.parse( raw_query )
         logging.info(f"Executing query: '{self.current_query}' in '{self.view_mode}' mode.")
+
+        # record the query
+        record_query_to_history(self.history_path, raw_query)
         
         # Clear hover state when refreshing
         self.results_table.clear_and_reset_hover()
@@ -722,6 +729,7 @@ class QueryResultsViewer(QMainWindow):
 
 
     def _select_history_item(self, query):
+        remove_query_from_history( self.history_path, query )
         self.query_edit.setText(query)
         self.execute_query()
 
