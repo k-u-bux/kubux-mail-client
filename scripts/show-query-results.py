@@ -3,7 +3,6 @@
 import sys
 import argparse
 import subprocess
-import json
 import os
 from pathlib import Path
 from email.utils import getaddresses
@@ -21,7 +20,7 @@ from PySide6.QtGui import QFont, QKeySequence, QAction, QColor
 import logging
 
 from notmuch_api import find_matching_messages, find_matching_threads, apply_tag_to_query, get_tags_from_query, update_unseen_from_query
-from config import config
+from config import config, load_history, record_query_to_history, remove_query_from_history
 from common import (
     display_error, 
     create_draft, create_new_mail_menu, launch_drafts_manager, create_summary_text, create_date_item, get_run_method,
@@ -51,58 +50,6 @@ def messages ( thread_id ):
     result = subprocess.run(command, capture_output=True, text=True, check=True)
     messages = result.stdout.strip().split('\n')
     return messages
-
-
-MAX_HISTORY = 50
-
-def load_history(path):
-    """Load query history from JSON file."""
-    if not path.exists():
-        return []
-    try:
-        with open(path, "r") as f:
-            data = json.load(f)
-            if isinstance(data, list):
-                return data
-            return []
-    except Exception as e:
-        logging.error(f"Failed to load query history: {e}")
-        return []
-
-def save_history(path, history):
-    """Save query history to JSON file."""
-    try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        with open(path, "w") as f:
-            json.dump(history, f)
-    except Exception as e:
-        logging.error(f"Failed to save query history: {e}")
-
-def add_to_history(history, query):
-    """Add a query to history, deduplicating and capping at MAX_HISTORY entries."""
-    if not query or not query.strip():
-        return history
-    if query in history:
-        history.remove(query)
-    history.insert(0, query)
-    return history[:MAX_HISTORY]
-
-def record_query_to_history(path, query):
-    """Read current history from disk, add query, write back.
-
-    This performs a full read-update-write cycle so that multiple
-    concurrently open windows don't clobber each other's history with
-    a stale in-memory copy.
-    """
-    history = load_history(path)
-    history = add_to_history(history, query)
-    save_history(path, history)
-
-def remove_query_from_history ( path, query ):
-    history = load_history( path )
-    if query in history:
-        history.remove( query )
-    save_history( path, history )
 
 
 class QueryResultsViewer(QMainWindow):
@@ -227,7 +174,7 @@ class QueryResultsViewer(QMainWindow):
         self.history_menu.aboutToShow.connect(self.refresh_history_menu)
         self.history_button.setMenu(self.history_menu)
         query_layout.addWidget(self.history_button)
-        self.history_path = config.config_dir / "query_history.json"
+        self.history_path = config.get_history_path()
 
 
         # c) I like the table below.

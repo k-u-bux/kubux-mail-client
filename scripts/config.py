@@ -6,6 +6,8 @@ from typing import Dict, Any, Optional
 from email.utils import getaddresses
 import subprocess
 from watcher import DirectoryEventHandler
+import logging
+import json
 
 def get_dpi():
     helper_path = os.path.join(os.path.dirname(__file__), "config-helper-get-dpi")
@@ -179,6 +181,12 @@ class Config:
             path = Path( path ).expanduser()
         return path
 
+    def get_max_search_history(self):
+        return self.data.get("searches", {}).get("max_search_history", 20)
+
+    def get_history_path(self):
+        return self.config_dir / "query_history.json"
+
     def get_autocompletions(self, category="headers"):
         return self.data.get("autocomplete", {}).get(category, [])
 
@@ -192,5 +200,55 @@ class Config:
 
 # A global config object for easy access
 config = Config()
+
+
+def load_history ( path ):
+    """Load query history from JSON file."""
+    if not path.exists():
+        return []
+    try:
+        with open( path, "r" ) as f:
+            data = json.load( f )
+            if isinstance( data, list ):
+                return data
+            return []
+    except Exception as e:
+        logging.error( f"Failed to load query history from file {path}, error: {e}" )
+        return []
+
+def save_history ( path, history ):
+    """Save query history to JSON file."""
+    try:
+        path.parent.mkdir( parents=True, exist_ok=True )
+        with open(path, "w") as f:
+            json.dump(history, f)
+    except Exception as e:
+        logging.error(f"Failed to save query history: {e}")
+
+def add_to_history ( history, query, max_size = config.get_max_search_history() ):
+    """Add a query to history, deduplicating and capping at MAX_HISTORY entries."""
+    if not query or not query.strip():
+        return history
+    if query in history:
+        history.remove( query )
+    history.insert( 0, query )
+    return history[:max_size]
+
+def record_query_to_history ( path, query ):
+    """Read current history from disk, add query, write back.
+
+    This performs a full read-update-write cycle so that multiple
+    concurrently open windows don't clobber each other's history with
+    a stale in-memory copy.
+    """
+    history = load_history( path )
+    history = add_to_history( history, query )
+    save_history( path, history )
+
+def remove_query_from_history ( path, query ):
+    history = load_history( path )
+    if query in history:
+        history.remove( query )
+    save_history( path, history )
 
 # end of file
