@@ -173,6 +173,9 @@ class Config:
         return self.data.get("searches", {}).get("suppressed", [])
 
     def get_search(self):
+        search = most_recent_search( self.get_history_path() )
+        if search:
+            return search
         return self.data.get("searches", {}).get("search", "tag:inbox and tag:unread" )
 
     def get_model(self):
@@ -215,6 +218,13 @@ def load_history ( path ):
     except Exception as e:
         logging.error( f"Failed to load query history from file {path}, error: {e}" )
         return []
+
+def most_recent_search ( path ):
+    history = load_history( path )
+    if history:
+        if len( history ) > 0:
+            return history[ 0 ]
+    return None
 
 def save_history ( path, history ):
     """Save query history to JSON file."""
