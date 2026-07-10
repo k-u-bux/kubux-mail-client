@@ -601,7 +601,7 @@ class MailViewer(QMainWindow):
         if cc_addrs:
             msg['Cc'] = ", ".join(cc_addrs)
 
-        msg['Subject'] = Header(subject_text, 'utf-8')
+        msg['Subject'] = str(Header(subject_text, 'utf-8'))
         if in_reply_to:
             msg['In-Reply-To'] = in_reply_to
 
