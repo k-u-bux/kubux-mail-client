@@ -473,6 +473,8 @@ class MailEditor(QMainWindow):
                 for header_name, value in headers.items():
                     if header_name.lower() in address_headers:
                         value = self._encode_header_value(value)
+                    elif any(ord(c) > 127 for c in value):
+                        value = Header(value, 'utf-8').encode()
                     line = f"{header_name}: {value}\r\n"
                     tmp_file.write(line.encode('utf-8'))
                 tmp_file.write(body_part.as_bytes())
