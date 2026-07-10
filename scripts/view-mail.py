@@ -45,6 +45,7 @@ class MailSourceViewer(QDialog):
     """A simple dialog to display the raw content of the mail file."""
     def __init__(self, mail_file_path, parent=None):
         super().__init__(parent)
+        self.setWindowFlags(Qt.Window)
         self.setWindowTitle("Raw Message Source")
         self.resize(800, 600)
 
@@ -482,8 +483,11 @@ class MailViewer(QMainWindow):
 
     def view_source(self):
         try:
-            viewer_dialog = MailSourceViewer(self.mail_file_path, self)
-            viewer_dialog.exec()
+            viewer_dialog = MailSourceViewer(self.mail_file_path)
+            viewer_dialog.setAttribute(Qt.WA_DeleteOnClose)
+            mail_source_viewers.append(viewer_dialog)
+            viewer_dialog.destroyed.connect(lambda: mail_source_viewers.remove(viewer_dialog))
+            viewer_dialog.show()
             logging.info(f"Displayed raw mail source for: {self.mail_file_path.name}")
             
         except Exception as e:
@@ -898,6 +902,7 @@ class MailViewer(QMainWindow):
 # --- Main Entry Point ---
 
 keep_alive = []
+mail_source_viewers = []
 
 def run ( args_mail_file ):
     viewer = MailViewer( args_mail_file )
