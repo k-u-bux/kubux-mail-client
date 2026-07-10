@@ -7,6 +7,7 @@ import os
 import tempfile
 import email
 from email import policy
+from email.header import Header
 from email.utils import getaddresses
 import re
 from pathlib import Path
@@ -600,7 +601,7 @@ class MailViewer(QMainWindow):
         if cc_addrs:
             msg['Cc'] = ", ".join(cc_addrs)
 
-        msg['Subject'] = subject_text
+        msg['Subject'] = Header(subject_text, 'utf-8')
         if in_reply_to:
             msg['In-Reply-To'] = in_reply_to
 
