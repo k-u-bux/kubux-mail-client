@@ -244,18 +244,17 @@ fi
 if ! command -v mbsync &>/dev/null; then
     echo "  Building mbsync from source ..."
     MBSYNC_SRC="$BUILDDIR/isync"
-    git clone --depth=1 https://github.com/yaoweibin/isync.git "$MBSYNC_SRC" 2>/dev/null || true
-    if [[ -f "$MBSYNC_SRC/configure.ac" ]] || [[ -f "$MBSYNC_SRC/configure" ]]; then
-        pushd "$MBSYNC_SRC" >/dev/null
-        if [[ ! -f configure ]]; then
-            autoreconf -fi
-        fi
+    mkdir -p "$MBSYNC_SRC"
+    pushd "$MBSYNC_SRC" >/dev/null
+    # Use official release tarball to avoid git auth prompts
+    curl -sL https://downloads.sourceforge.net/project/isync/isync/1.5.0/isync-1.5.0.tar.gz | tar xz --strip-components=1 -C "$MBSYNC_SRC" 2>/dev/null || true
+    if [[ -f configure ]]; then
         ./configure --prefix="$VENVDIR"
         make -j"$(nproc)"
         make install
-        popd >/dev/null
-        echo "  mbsync built."
     fi
+    popd >/dev/null
+    echo "  mbsync built."
 fi
 
 # msmtp
