@@ -72,8 +72,22 @@ build_src() {
 pkg-config --exists talloc 2>/dev/null || build_src talloc \
   https://download.samba.org/pub/talloc/talloc-2.4.2.tar.gz talloc
 
-pkg-config --exists xapian-core 2>/dev/null || build_src xapian \
-  https://oligarchy.co.uk/xapian/1.4.27/xapian-core-1.4.27.tar.xz xapian
+# Xapian - try primary mirror, fallback to oligarchy.co.uk
+if ! pkg-config --exists xapian-core 2>/dev/null; then
+    echo "  Building xapian ..."
+    local src="$BUILDDIR/xapian"
+    rm -rf "$src"; mkdir -p "$src"; pushd "$src" >/dev/null
+    if ! curl -sL https://downloads.xapian.org/releases/xapian-core-1.4.27.tar.xz | tar xJ --strip-components=1 -C "$src" 2>/dev/null; then
+        curl -sL https://oligarchy.co.uk/xapian/1.4.27/xapian-core-1.4.27.tar.xz | tar xJ --strip-components=1 -C "$src" 2>/dev/null || true
+    fi
+    if [[ -f configure ]]; then
+        ./configure --prefix="$VENVDIR" 2>&1
+        make -j"$(nproc)" 2>&1; make install 2>&1
+        popd >/dev/null; echo "  xapian built."
+    else
+        popd >/dev/null; echo "  WARNING: xapian download failed"; echo "  xapian skipped."
+    fi
+fi
 
 pkg-config --exists gpg-error 2>/dev/null || {
     echo "  Building libgpg-error ..."
