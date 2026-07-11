@@ -222,7 +222,9 @@ if ! command -v notmuch &>/dev/null; then
     git clone --depth=1 git://notmuchmail.org/git/notmuch "$NOTMUCH_SRC" 2>/dev/null || true
     if [[ -f "$NOTMUCH_SRC/version.txt" ]]; then
         pushd "$NOTMUCH_SRC" >/dev/null
-        ./configure --prefix="$VENVDIR"
+        # Set cross_compiling=yes to skip runtime crypto checks on GMime
+        # (the locally-built GMime/GPGME lacks gpg-agent etc. for runtime tests)
+        cross_compiling=yes ./configure --prefix="$VENVDIR"
         make -j"$(nproc)"
         make install
         popd >/dev/null
