@@ -222,9 +222,17 @@ if ! command -v notmuch &>/dev/null; then
     git clone --depth=1 git://notmuchmail.org/git/notmuch "$NOTMUCH_SRC" 2>/dev/null || true
     if [[ -f "$NOTMUCH_SRC/version.txt" ]]; then
         pushd "$NOTMUCH_SRC" >/dev/null
-        # Set cross_compiling=yes to skip runtime crypto checks on GMime
-        # (the locally-built GMime/GPGME lacks gpg-agent etc. for runtime tests)
-        cross_compiling=yes ./configure --prefix="$VENVDIR"
+        # Configure does runtime GMime crypto tests that need gpg-agent.
+        # In a sandbox these fail and cause configure to exit before
+        # generating Makefile.config. Patch configure to reset errors
+        # after the GMime checks so Makefile.config gets created.
+        sed -i 's/^if \[ \$errors -gt 0 \]; then$/errors=0; if [ $errors -gt 0 ]; then/' configure
+        ./configure --prefix="$VENVDIR"
+        # Fix GMime crypto config vars that configure set to 0
+        sed -i \
+          -e 's/^NOTMUCH_GMIME_X509_CERT_VALIDITY=.*/NOTMUCH_GMIME_X509_CERT_VALIDITY=1/' \
+          -e 's/^NOTMUCH_GMIME_VERIFY_WITH_SESSION_KEY=.*/NOTMUCH_GMIME_VERIFY_WITH_SESSION_KEY=1/' \
+          Makefile.config 2>/dev/null || true
         make -j"$(nproc)"
         make install
         popd >/dev/null
