@@ -80,7 +80,94 @@ BUILDDIR="${VENVDIR}/build"
 
 mkdir -p "$BINDIR" "$APPDIR" "$ICONDIR" "$BUILDDIR"
 
-# --- Build missing system deps from source ---
+export PKG_CONFIG_PATH="$VENVDIR/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
+export LD_LIBRARY_PATH="$VENVDIR/lib:${LD_LIBRARY_PATH:-}"
+export CFLAGS="-I$VENVDIR/include"
+export LDFLAGS="-L$VENVDIR/lib"
+export PATH="$VENVDIR/bin:$PATH"
+
+# --- Build helper ---
+build_autoconf() {
+    local name="$1"
+    local url="$2"
+    local dirname="$3"
+    local src_dir="$BUILDDIR/$dirname"
+
+    if [[ -f "$VENVDIR/lib/pkgconfig/${4:-}" ]]; then
+        return 0
+    fi
+    echo "  Building $name ..."
+    mkdir -p "$src_dir"
+    pushd "$src_dir" >/dev/null
+    curl -sL "$url" | tar xz --strip-components=1 -C "$src_dir" 2>/dev/null || {
+        echo "  WARNING: Failed to download $name"
+        popd >/dev/null
+        return 1
+    }
+    ./configure --prefix="$VENVDIR" --disable-shared --enable-static 2>&1 || \
+    ./configure --prefix="$VENVDIR" 2>&1 || {
+        echo "  WARNING: configure failed for $name"
+        popd >/dev/null
+        return 1
+    }
+    make -j"$(nproc)" 2>&1
+    make install 2>&1
+    popd >/dev/null
+    echo "  $name built."
+}
+
+# --- Build notmuch dependencies ---
+
+# talloc
+if ! pkg-config --exists talloc 2>/dev/null; then
+    echo "  Building talloc ..."
+    TALLOC_SRC="$BUILDDIR/talloc"
+    mkdir -p "$TALLOC_SRC"
+    pushd "$TALLOC_SRC" >/dev/null
+    curl -sL https://download.samba.org/pub/talloc/talloc-2.4.2.tar.gz | tar xz --strip-components=1 -C "$TALLOC_SRC" 2>/dev/null || true
+    if [[ -f configure ]]; then
+        ./configure --prefix="$VENVDIR"
+        make -j"$(nproc)"
+        make install
+    fi
+    popd >/dev/null
+    echo "  talloc built."
+fi
+
+# Xapian
+if ! pkg-config --exists xapian-core 2>/dev/null; then
+    echo "  Building Xapian ..."
+    XAPIAN_SRC="$BUILDDIR/xapian"
+    mkdir -p "$XAPIAN_SRC"
+    pushd "$XAPIAN_SRC" >/dev/null
+    curl -sL https://oligarchy.co.uk/xapian/1.4.27/xapian-core-1.4.27.tar.xz | tar xJ --strip-components=1 -C "$XAPIAN_SRC" 2>/dev/null || true
+    if [[ -f configure ]]; then
+        ./configure --prefix="$VENVDIR"
+        make -j"$(nproc)"
+        make install
+    fi
+    popd >/dev/null
+    echo "  Xapian built."
+fi
+
+# GMime
+if ! pkg-config --exists gmime-3.0 2>/dev/null; then
+    echo "  Building GMime ..."
+    GMIME_SRC="$BUILDDIR/gmime"
+    mkdir -p "$GMIME_SRC"
+    pushd "$GMIME_SRC" >/dev/null
+    curl -sL https://github.com/jstedfast/gmime/archive/refs/tags/3.2.15.tar.gz | tar xz --strip-components=1 -C "$GMIME_SRC" 2>/dev/null || true
+    if [[ -f autogen.sh ]]; then
+        NOCONFIGURE=1 ./autogen.sh 2>/dev/null || true
+    fi
+    if [[ -f configure ]]; then
+        ./configure --prefix="$VENVDIR" --disable-gtk-doc
+        make -j"$(nproc)"
+        make install
+    fi
+    popd >/dev/null
+    echo "  GMime built."
+fi
 
 # notmuch
 if ! command -v notmuch &>/dev/null; then
@@ -175,10 +262,6 @@ if ! python3 -c "import notmuch2" 2>/dev/null; then
     if [[ -d "$NOTMUCH_SRC/bindings/python-cffi" ]]; then
         echo "  Building notmuch2 Python bindings ..."
         pushd "$NOTMUCH_SRC/bindings/python-cffi" >/dev/null
-        PKG_CONFIG_PATH="$VENVDIR/lib/pkgconfig:${PKG_CONFIG_PATH:-}" \
-        LD_LIBRARY_PATH="$VENVDIR/lib:${LD_LIBRARY_PATH:-}" \
-        CFLAGS="-I$VENVDIR/include" \
-        LDFLAGS="-L$VENVDIR/lib" \
         python3 -m pip install --quiet . || true
         popd >/dev/null
     fi
@@ -221,6 +304,7 @@ for name in "${WRAP_SCRIPTS[@]}"; do
 #!/usr/bin/env bash
 export TMPDIR="\${TMPDIR:-/tmp}"
 export LD_LIBRARY_PATH="${VENVDIR}/lib:\${LD_LIBRARY_PATH:-}"
+export PKG_CONFIG_PATH="${VENVDIR}/lib/pkgconfig:\${PKG_CONFIG_PATH:-}"
 exec "${VENVDIR}/bin/python" "${BINDIR}/${name}.py" "\$@"
 WRAPEOF
     chmod +x "$wrapper"
