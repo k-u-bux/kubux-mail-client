@@ -90,9 +90,9 @@ if ! command -v notmuch &>/dev/null; then
     git clone --depth=1 git://notmuchmail.org/git/notmuch "$NOTMUCH_SRC" 2>/dev/null || true
     if [[ -f "$NOTMUCH_SRC/version.txt" ]]; then
         pushd "$NOTMUCH_SRC" >/dev/null
-        ./configure --prefix="$VENVDIR" 2>&1 | tail -3
-        make -j"$(nproc)" 2>&1 | tail -3
-        make install 2>&1 | tail -3
+        ./configure --prefix="$VENVDIR"
+        make -j"$(nproc)"
+        make install
         popd >/dev/null
         echo "  notmuch built."
     fi
@@ -106,11 +106,11 @@ if ! command -v mbsync &>/dev/null; then
     if [[ -f "$MBSYNC_SRC/configure.ac" ]] || [[ -f "$MBSYNC_SRC/configure" ]]; then
         pushd "$MBSYNC_SRC" >/dev/null
         if [[ ! -f configure ]]; then
-            autoreconf -fi 2>&1 | tail -3
+            autoreconf -fi
         fi
-        ./configure --prefix="$VENVDIR" 2>&1 | tail -3
-        make -j"$(nproc)" 2>&1 | tail -3
-        make install 2>&1 | tail -3
+        ./configure --prefix="$VENVDIR"
+        make -j"$(nproc)"
+        make install
         popd >/dev/null
         echo "  mbsync built."
     fi
@@ -126,10 +126,10 @@ if ! command -v msmtp &>/dev/null; then
     fi
     if [[ -f "$MSMTP_SRC/configure" ]]; then
         pushd "$MSMTP_SRC" >/dev/null
-        ./configure --prefix="$VENVDIR" --without-libgnutls --with-ssl=openssl 2>&1 | tail -3 || \
-        ./configure --prefix="$VENVDIR" 2>&1 | tail -3
-        make -j"$(nproc)" 2>&1 | tail -3
-        make install 2>&1 | tail -3
+        ./configure --prefix="$VENVDIR" --without-libgnutls --with-ssl=openssl || \
+        ./configure --prefix="$VENVDIR"
+        make -j"$(nproc)"
+        make install
         popd >/dev/null
         echo "  msmtp built."
     fi
@@ -153,11 +153,11 @@ source "${VENVDIR}/bin/activate"
 if ! python3 -m pip --version &>/dev/null; then
     echo "  Installing pip ..."
     curl -sL https://bootstrap.pypa.io/get-pip.py -o "$BUILDDIR/get-pip.py"
-    python3 "$BUILDDIR/get-pip.py" --quiet 2>&1 | tail -3
+    python3 "$BUILDDIR/get-pip.py"
 fi
 
 echo "  Installing Python dependencies ..."
-python3 -m pip install --quiet --upgrade pip 2>&1 | tail -3
+python3 -m pip install --quiet --upgrade pip
 
 python3 -m pip install --quiet \
     PySide6 \
@@ -167,7 +167,7 @@ python3 -m pip install --quiet \
     watchdog \
     mail-parser \
     html2text \
-    beautifulsoup4 2>&1 | tail -5
+    beautifulsoup4
 
 # --- notmuch2 ---
 if ! python3 -c "import notmuch2" 2>/dev/null; then
@@ -179,7 +179,7 @@ if ! python3 -c "import notmuch2" 2>/dev/null; then
         LD_LIBRARY_PATH="$VENVDIR/lib:${LD_LIBRARY_PATH:-}" \
         CFLAGS="-I$VENVDIR/include" \
         LDFLAGS="-L$VENVDIR/lib" \
-        python3 -m pip install --quiet . 2>&1 | tail -5 || true
+        python3 -m pip install --quiet . || true
         popd >/dev/null
     fi
 fi
