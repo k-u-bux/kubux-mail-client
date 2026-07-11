@@ -156,10 +156,9 @@ if ! pkg-config --exists gmime-3.0 2>/dev/null; then
     GMIME_SRC="$BUILDDIR/gmime"
     mkdir -p "$GMIME_SRC"
     pushd "$GMIME_SRC" >/dev/null
-    curl -sL https://github.com/jstedfast/gmime/archive/refs/tags/3.2.15.tar.gz | tar xz --strip-components=1 -C "$GMIME_SRC" 2>/dev/null || true
-    if [[ -f autogen.sh ]]; then
-        NOCONFIGURE=1 ./autogen.sh 2>/dev/null || true
-    fi
+    # Use official release tarball with pre-generated configure
+    curl -sL https://github.com/jstedfast/gmime/releases/download/3.2.15/gmime-3.2.15.tar.xz | tar xJ --strip-components=1 -C "$GMIME_SRC" 2>/dev/null || \
+    curl -sL https://download.gnome.org/sources/gmime/3.2/gmime-3.2.15.tar.xz | tar xJ --strip-components=1 -C "$GMIME_SRC" 2>/dev/null || true
     if [[ -f configure ]]; then
         ./configure --prefix="$VENVDIR" --disable-gtk-doc
         make -j"$(nproc)"
