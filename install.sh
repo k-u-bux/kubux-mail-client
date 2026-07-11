@@ -86,14 +86,15 @@ export CFLAGS="-I$VENVDIR/include"
 export LDFLAGS="-L$VENVDIR/lib"
 export PATH="$VENVDIR/bin:$PATH"
 
-# --- Build helper ---
+# --- Build helpers ---
 build_autoconf() {
     local name="$1"
     local url="$2"
     local dirname="$3"
     local src_dir="$BUILDDIR/$dirname"
+    shift 3
 
-    if [[ -f "$VENVDIR/lib/pkgconfig/${4:-}" ]]; then
+    if [[ -f "$VENVDIR/lib/pkgconfig/${1:-}" ]]; then
         return 0
     fi
     echo "  Building $name ..."
@@ -104,8 +105,7 @@ build_autoconf() {
         popd >/dev/null
         return 1
     }
-    ./configure --prefix="$VENVDIR" --disable-shared --enable-static 2>&1 || \
-    ./configure --prefix="$VENVDIR" 2>&1 || {
+    ./configure --prefix="$VENVDIR" "$@" 2>&1 || {
         echo "  WARNING: configure failed for $name"
         popd >/dev/null
         return 1
@@ -150,22 +150,65 @@ if ! pkg-config --exists xapian-core 2>/dev/null; then
     echo "  Xapian built."
 fi
 
+# libgpg-error (needed by GPGME)
+if ! pkg-config --exists gpg-error 2>/dev/null; then
+    echo "  Building libgpg-error ..."
+    GPGERR_SRC="$BUILDDIR/libgpg-error"
+    mkdir -p "$GPGERR_SRC"
+    pushd "$GPGERR_SRC" >/dev/null
+    curl -sL https://www.gnupg.org/ftp/gcrypt/libgpg-error/libgpg-error-1.51.tar.bz2 | tar xj --strip-components=1 -C "$GPGERR_SRC" 2>/dev/null || true
+    if [[ -f configure ]]; then
+        ./configure --prefix="$VENVDIR"
+        make -j"$(nproc)"
+        make install
+    fi
+    popd >/dev/null
+    echo "  libgpg-error built."
+fi
+
+# libassuan (needed by GPGME)
+if ! pkg-config --exists libassuan 2>/dev/null; then
+    echo "  Building libassuan ..."
+    ASSUAN_SRC="$BUILDDIR/libassuan"
+    mkdir -p "$ASSUAN_SRC"
+    pushd "$ASSUAN_SRC" >/dev/null
+    curl -sL https://www.gnupg.org/ftp/gcrypt/libassuan/libassuan-3.0.2.tar.bz2 | tar xj --strip-components=1 -C "$ASSUAN_SRC" 2>/dev/null || true
+    if [[ -f configure ]]; then
+        ./configure --prefix="$VENVDIR"
+        make -j"$(nproc)"
+        make install
+    fi
+    popd >/dev/null
+    echo "  libassuan built."
+fi
+
+# GPGME
+if ! pkg-config --exists gpgme 2>/dev/null; then
+    echo "  Building GPGME ..."
+    GPGME_SRC="$BUILDDIR/gpgme"
+    mkdir -p "$GPGME_SRC"
+    pushd "$GPGME_SRC" >/dev/null
+    curl -sL https://www.gnupg.org/ftp/gcrypt/gpgme/gpgme-1.24.2.tar.bz2 | tar xj --strip-components=1 -C "$GPGME_SRC" 2>/dev/null || true
+    if [[ -f configure ]]; then
+        ./configure --prefix="$VENVDIR" --disable-gpg-test --disable-g13-test --disable-gpgsm-test
+        make -j"$(nproc)"
+        make install
+    fi
+    popd >/dev/null
+    echo "  GPGME built."
+fi
+
 # GMime
 if ! pkg-config --exists gmime-3.0 2>/dev/null; then
     echo "  Building GMime ..."
     GMIME_SRC="$BUILDDIR/gmime"
     mkdir -p "$GMIME_SRC"
     pushd "$GMIME_SRC" >/dev/null
-    # Use official GNOME release tarball with pre-generated configure
     curl -sL https://download.gnome.org/sources/gmime/3.2/gmime-3.2.15.tar.xz | tar xJ --strip-components=1 -C "$GMIME_SRC" 2>/dev/null || true
     if [[ -f configure ]]; then
-        # GMime configure errors on missing gtk-doc even with --disable-gtk-doc
-        # Set autoconf cache variable to skip the check
-        ./configure --prefix="$VENVDIR" --disable-gtk-doc ac_cv_path_GTKDOC=no 2>&1 || true
-        if [[ -f Makefile ]]; then
-            make -j"$(nproc)" 2>&1
-            make install 2>&1
-        fi
+        ./configure --prefix="$VENVDIR" --disable-gtk-doc ac_cv_path_GTKDOC=no
+        make -j"$(nproc)"
+        make install
     fi
     popd >/dev/null
     echo "  GMime built."
