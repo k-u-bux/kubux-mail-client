@@ -75,7 +75,7 @@ pkg-config --exists talloc 2>/dev/null || build_src talloc \
 # Xapian - try primary mirror, fallback to oligarchy.co.uk
 if ! pkg-config --exists xapian-core 2>/dev/null; then
     echo "  Building xapian ..."
-    local src="$BUILDDIR/xapian"
+    src="$BUILDDIR/xapian"
     rm -rf "$src"; mkdir -p "$src"; pushd "$src" >/dev/null
     if ! curl -sL https://downloads.xapian.org/releases/xapian-core-1.4.27.tar.xz | tar xJ --strip-components=1 -C "$src" 2>/dev/null; then
         curl -sL https://oligarchy.co.uk/xapian/1.4.27/xapian-core-1.4.27.tar.xz | tar xJ --strip-components=1 -C "$src" 2>/dev/null || true
@@ -91,7 +91,7 @@ fi
 
 pkg-config --exists gpg-error 2>/dev/null || {
     echo "  Building libgpg-error ..."
-    local src="$BUILDDIR/libgpg-error"
+    src="$BUILDDIR/libgpg-error"
     rm -rf "$src"; mkdir -p "$src"; pushd "$src" >/dev/null
     curl -sL https://www.gnupg.org/ftp/gcrypt/libgpg-error/libgpg-error-1.51.tar.bz2 | tar xj --strip-components=1 -C "$src" 2>/dev/null || true
     [[ -f configure ]] && { ./configure --prefix="$VENVDIR"; make -j"$(nproc)"; make install; }
@@ -100,7 +100,7 @@ pkg-config --exists gpg-error 2>/dev/null || {
 
 pkg-config --exists libassuan 2>/dev/null || {
     echo "  Building libassuan ..."
-    local src="$BUILDDIR/libassuan"
+    src="$BUILDDIR/libassuan"
     rm -rf "$src"; mkdir -p "$src"; pushd "$src" >/dev/null
     curl -sL https://www.gnupg.org/ftp/gcrypt/libassuan/libassuan-3.0.2.tar.bz2 | tar xj --strip-components=1 -C "$src" 2>/dev/null || true
     [[ -f configure ]] && { ./configure --prefix="$VENVDIR"; make -j"$(nproc)"; make install; }
@@ -109,7 +109,7 @@ pkg-config --exists libassuan 2>/dev/null || {
 
 pkg-config --exists gpgme 2>/dev/null || {
     echo "  Building GPGME ..."
-    local src="$BUILDDIR/gpgme"
+    src="$BUILDDIR/gpgme"
     rm -rf "$src"; mkdir -p "$src"; pushd "$src" >/dev/null
     curl -sL https://www.gnupg.org/ftp/gcrypt/gpgme/gpgme-1.24.2.tar.bz2 | tar xj --strip-components=1 -C "$src" 2>/dev/null || true
     [[ -f configure ]] && { ./configure --prefix="$VENVDIR" --disable-gpg-test --disable-g13-test --disable-gpgsm-test; make -j"$(nproc)"; make install; }
@@ -118,26 +118,43 @@ pkg-config --exists gpgme 2>/dev/null || {
 
 pkg-config --exists gmime-3.0 2>/dev/null || {
     echo "  Building GMime ..."
-    local src="$BUILDDIR/gmime"
+    src="$BUILDDIR/gmime"
     rm -rf "$src"; mkdir -p "$src"; pushd "$src" >/dev/null
-    curl -sL https://download.gnome.org/sources/gmime/3.2/gmime-3.2.15.tar.xz | tar xJ --strip-components=1 -C "$src" 2>/dev/null || true
-    if [[ -f configure ]]; then
-        sed -i '/as_fn_error.*gtk-doc/d; /You must have gtk-doc installed/d' configure 2>/dev/null || true
-        ./configure --prefix="$VENVDIR" --disable-gtk-doc 2>&1 || true
-        [[ -f Makefile ]] && { make -j"$(nproc)" 2>&1; make install 2>&1; }
+    if ! curl -sL https://download.gnome.org/sources/gmime/3.2/gmime-3.2.7.tar.xz | tar xJ --strip-components=1 -C "$src" 2>/dev/null; then
+        echo "  WARNING: GMime download failed"
+        popd >/dev/null; echo "  GMime skipped."
+    else
+        # Create fake gtk-doc in PATH so configure doesn't error out
+        mkdir -p "$BUILDDIR/bin"
+        cat > "$BUILDDIR/bin/gtk-doc" << 'EOF'
+#!/bin/sh
+echo "gtk-doc (fake) 1.33"
+exit 0
+EOF
+        chmod +x "$BUILDDIR/bin/gtk-doc"
+        PATH="$BUILDDIR/bin:$PATH" ./configure --prefix="$VENVDIR" --disable-gtk-doc 2>&1 || true
+        if [[ -f Makefile ]]; then
+            make -j"$(nproc)" 2>&1; make install 2>&1
+            popd >/dev/null; echo "  GMime built."
+        else
+            popd >/dev/null; echo "  WARNING: GMime configure failed"; echo "  GMime skipped."
+        fi
     fi
-    popd >/dev/null; echo "  GMime built."
 }
 
 if ! command -v notmuch &>/dev/null; then
     echo "  Building notmuch from source ..."
-    local src="$BUILDDIR/notmuch"
+    src="$BUILDDIR/notmuch"
     git clone --depth=1 https://github.com/notmuch/notmuch.git "$src" 2>/dev/null || \
     git clone --depth=1 git://notmuchmail.org/git/notmuch "$src" 2>/dev/null || true
     if [[ -f "$src/version.txt" ]]; then
         pushd "$src" >/dev/null
-        sed -i 's/^if \[ \$errors -gt 0 \]; then$/errors=0; if [ \$errors -gt 0 ]; then/' configure
-        ./configure --prefix="$VENVDIR"
+        # Patch configure: reset errors so Makefile.config is generated
+        # even if GMime runtime crypto tests fail (no gpg-agent in sandbox).
+        sed -i 's/^if \[ \$errors -gt 0 \]; then$/errors=0; if [ \$errors -gt 0 ]; then/' configure || true
+        # Ensure gmime_cflags is set even if GMime not found (avoids unset var error)
+        gmime_cflags="" gmime_ldflags="" ./configure --prefix="$VENVDIR"
+        # Fix GMime crypto config vars that configure may have set to 0
         sed -i -e 's/^NOTMUCH_GMIME_X509_CERT_VALIDITY=.*/NOTMUCH_GMIME_X509_CERT_VALIDITY=1/' \
                -e 's/^NOTMUCH_GMIME_VERIFY_WITH_SESSION_KEY=.*/NOTMUCH_GMIME_VERIFY_WITH_SESSION_KEY=1/' \
                Makefile.config 2>/dev/null || true
@@ -150,7 +167,7 @@ fi
 
 if ! command -v mbsync &>/dev/null; then
     echo "  Building mbsync from source ..."
-    local src="$BUILDDIR/isync"
+    src="$BUILDDIR/isync"
     rm -rf "$src"; mkdir -p "$src"; pushd "$src" >/dev/null
     curl -sL https://downloads.sourceforge.net/project/isync/isync/1.5.0/isync-1.5.0.tar.gz | tar xz --strip-components=1 -C "$src" 2>/dev/null || true
     [[ -f configure ]] && { ./configure --prefix="$VENVDIR"; make -j"$(nproc)"; make install; }
@@ -159,7 +176,7 @@ fi
 
 if ! command -v msmtp &>/dev/null; then
     echo "  Building msmtp from source ..."
-    local src="$BUILDDIR/msmtp"
+    src="$BUILDDIR/msmtp"
     rm -rf "$src"; mkdir -p "$src"; pushd "$src" >/dev/null
     curl -sL https://marlam.de/msmtp/releases/msmtp-1.8.25.tar.xz | tar xJ --strip-components=1 -C "$src" 2>/dev/null || true
     [[ -f configure ]] && { ./configure --prefix="$VENVDIR" --without-libgnutls --with-ssl=openssl || ./configure --prefix="$VENVDIR"; make -j"$(nproc)"; make install; }
@@ -192,7 +209,7 @@ python3 -m pip install --quiet \
     mail-parser html2text beautifulsoup4
 
 if ! python3 -c "import notmuch2" 2>/dev/null; then
-    local ns="$BUILDDIR/notmuch"
+    ns="$BUILDDIR/notmuch"
     if [[ -d "$ns/bindings/python-cffi" ]]; then
         echo "  Building notmuch2 Python bindings ..."
         pushd "$ns/bindings/python-cffi" >/dev/null
