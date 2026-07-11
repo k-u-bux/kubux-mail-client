@@ -249,6 +249,13 @@ WRAP
     chmod +x "${BINDIR}/${name}"
 done
 
+# Symlink main binaries to BINDIR
+for bin in notmuch mbsync msmtp; do
+    if [[ -f "$VENVDIR/bin/$bin" ]]; then
+        ln -sf "$VENVDIR/bin/$bin" "$BINDIR/$bin"
+    fi
+done
+
 echo "  Scripts installed to $BINDIR"
 
 # --- Desktop file ---
