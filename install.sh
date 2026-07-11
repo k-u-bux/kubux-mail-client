@@ -70,53 +70,95 @@ else
     exit 1
 fi
 
-# --- Check system dependencies (warn only) ---
-echo ""
-echo "--- Checking system dependencies ---"
-
-MISSING=""
-check_dep() {
-    if ! command -v "$1" &>/dev/null; then
-        echo "  WARNING: '$1' not found. Install it for full functionality."
-        MISSING="$MISSING $1"
-    else
-        echo "  OK: $1 found"
-    fi
-}
-
-check_dep python3
-check_dep notmuch
-check_dep mbsync
-check_dep msmtp
-check_dep gpg
-check_dep jq
-check_dep convert
-check_dep notify-send
-check_dep git
-check_dep gcc
-check_dep make
-check_dep pkg-config
-
-echo ""
-
 # --- Create directories ---
 BINDIR="${PREFIX}/bin"
 SHAREDIR="${PREFIX}/share"
 VENVDIR="${PREFIX}/lib/kubux-mail-client/venv"
 APPDIR="${SHAREDIR}/applications"
 ICONDIR="${SHAREDIR}/icons/hicolor"
+BUILDDIR="${VENVDIR}/build"
 
-mkdir -p "$BINDIR" "$APPDIR" "$ICONDIR"
+mkdir -p "$BINDIR" "$APPDIR" "$ICONDIR" "$BUILDDIR"
 
-# --- Create Python virtualenv and install dependencies ---
+# --- Build missing system deps from source ---
+
+# notmuch
+if ! command -v notmuch &>/dev/null; then
+    echo "  Building notmuch from source ..."
+    NOTMUCH_SRC="$BUILDDIR/notmuch"
+    git clone --depth=1 https://github.com/notmuch/notmuch.git "$NOTMUCH_SRC" 2>/dev/null || \
+    git clone --depth=1 git://notmuchmail.org/git/notmuch "$NOTMUCH_SRC" 2>/dev/null || true
+    if [[ -f "$NOTMUCH_SRC/version.txt" ]]; then
+        pushd "$NOTMUCH_SRC" >/dev/null
+        ./configure --prefix="$VENVDIR" 2>&1 | tail -3
+        make -j"$(nproc)" 2>&1 | tail -3
+        make install 2>&1 | tail -3
+        popd >/dev/null
+        echo "  notmuch built."
+    fi
+fi
+
+# mbsync (isync)
+if ! command -v mbsync &>/dev/null; then
+    echo "  Building mbsync from source ..."
+    MBSYNC_SRC="$BUILDDIR/isync"
+    git clone --depth=1 https://github.com/yaoweibin/isync.git "$MBSYNC_SRC" 2>/dev/null || true
+    if [[ -f "$MBSYNC_SRC/configure.ac" ]] || [[ -f "$MBSYNC_SRC/configure" ]]; then
+        pushd "$MBSYNC_SRC" >/dev/null
+        if [[ ! -f configure ]]; then
+            autoreconf -fi 2>&1 | tail -3
+        fi
+        ./configure --prefix="$VENVDIR" 2>&1 | tail -3
+        make -j"$(nproc)" 2>&1 | tail -3
+        make install 2>&1 | tail -3
+        popd >/dev/null
+        echo "  mbsync built."
+    fi
+fi
+
+# msmtp
+if ! command -v msmtp &>/dev/null; then
+    echo "  Building msmtp from source ..."
+    MSMTP_SRC="$BUILDDIR/msmtp"
+    curl -sL https://marlam.de/msmtp/releases/msmtp-1.8.25.tar.xz | tar xJ -C "$BUILDDIR" 2>/dev/null || true
+    if [[ -d "$BUILDDIR/msmtp-1.8.25" ]]; then
+        mv "$BUILDDIR/msmtp-1.8.25" "$MSMTP_SRC" 2>/dev/null || true
+    fi
+    if [[ -f "$MSMTP_SRC/configure" ]]; then
+        pushd "$MSMTP_SRC" >/dev/null
+        ./configure --prefix="$VENVDIR" --without-libgnutls --with-ssl=openssl 2>&1 | tail -3 || \
+        ./configure --prefix="$VENVDIR" 2>&1 | tail -3
+        make -j"$(nproc)" 2>&1 | tail -3
+        make install 2>&1 | tail -3
+        popd >/dev/null
+        echo "  msmtp built."
+    fi
+fi
+
+# --- Create Python virtualenv ---
 echo "--- Setting up Python virtualenv ---"
-python3 -m venv --clear "$VENVDIR"
+if python3 -m venv --help 2>/dev/null | grep -q -- --without-pip; then
+    python3 -m venv --without-pip "$VENVDIR"
+else
+    python3 -m venv "$VENVDIR" 2>/dev/null || {
+        python3 -m virtualenv "$VENVDIR" 2>/dev/null || {
+            pip3 install --user virtualenv 2>/dev/null || true
+            python3 -m virtualenv "$VENVDIR" 2>/dev/null || true
+        }
+    }
+fi
 source "${VENVDIR}/bin/activate"
 
-echo "Installing Python dependencies via pip ..."
-python3 -m pip install --quiet --upgrade pip
+# Install pip if not present
+if ! python3 -m pip --version &>/dev/null; then
+    echo "  Installing pip ..."
+    curl -sL https://bootstrap.pypa.io/get-pip.py -o "$BUILDDIR/get-pip.py"
+    python3 "$BUILDDIR/get-pip.py" --quiet 2>&1 | tail -3
+fi
 
-# Install packages that don't need special build deps first
+echo "  Installing Python dependencies ..."
+python3 -m pip install --quiet --upgrade pip 2>&1 | tail -3
+
 python3 -m pip install --quiet \
     PySide6 \
     scikit-learn \
@@ -125,62 +167,25 @@ python3 -m pip install --quiet \
     watchdog \
     mail-parser \
     html2text \
-    beautifulsoup4
+    beautifulsoup4 2>&1 | tail -5
 
-# --- notmuch2: build from source if not already available ---
-if python3 -c "import notmuch2" 2>/dev/null; then
-    echo "  notmuch2 already available, skipping."
-else
-    echo "  notmuch2 not found. Building notmuch from source ..."
-
-    NOTMUCH_SRC="$VENVDIR/build/notmuch"
-    mkdir -p "$VENVDIR/build"
-
-    # Use GitHub mirror of notmuch (official git.notmuchmail.org may be slow)
-    if [[ -d "$INSTALL_SRC/.git" ]] && [[ -f "$INSTALL_SRC/version.txt" ]]; then
-        # The repo itself is the notmuch source (unlikely but check)
-        ln -sf "$INSTALL_SRC" "$NOTMUCH_SRC"
-    else
-        echo "  Cloning notmuch source ..."
-        git clone --depth=1 https://github.com/notmuch/notmuch.git "$NOTMUCH_SRC" 2>/dev/null || \
-        git clone --depth=1 git://notmuchmail.org/git/notmuch "$NOTMUCH_SRC" 2>/dev/null || {
-            echo "  WARNING: Failed to clone notmuch source. notmuch2 will be missing."
-            echo "  You can install it later manually."
-            NOTMUCH_SRC=""
-        }
-    fi
-
-    if [[ -n "$NOTMUCH_SRC" ]] && [[ -f "$NOTMUCH_SRC/version.txt" ]]; then
-        pushd "$NOTMUCH_SRC" >/dev/null
-
-        # Try to configure and build notmuch C library
-        if ./configure --prefix="$VENVDIR" 2>&1 | tail -5; then
-            echo "  Building notmuch library ..."
-            make -j"$(nproc)" 2>&1 | tail -5
-            make install 2>&1 | tail -5
-            echo "  notmuch C library installed to $VENVDIR"
-        else
-            echo "  WARNING: notmuch configure failed. Will try pip with source tree."
-        fi
+# --- notmuch2 ---
+if ! python3 -c "import notmuch2" 2>/dev/null; then
+    NOTMUCH_SRC="$BUILDDIR/notmuch"
+    if [[ -d "$NOTMUCH_SRC/bindings/python-cffi" ]]; then
+        echo "  Building notmuch2 Python bindings ..."
+        pushd "$NOTMUCH_SRC/bindings/python-cffi" >/dev/null
+        PKG_CONFIG_PATH="$VENVDIR/lib/pkgconfig:${PKG_CONFIG_PATH:-}" \
+        LD_LIBRARY_PATH="$VENVDIR/lib:${LD_LIBRARY_PATH:-}" \
+        CFLAGS="-I$VENVDIR/include" \
+        LDFLAGS="-L$VENVDIR/lib" \
+        python3 -m pip install --quiet . 2>&1 | tail -5 || true
         popd >/dev/null
-
-        # Install notmuch2 Python bindings from the bundled source
-        if [[ -d "$NOTMUCH_SRC/bindings/python-cffi" ]]; then
-            echo "  Building notmuch2 Python bindings ..."
-            pushd "$NOTMUCH_SRC/bindings/python-cffi" >/dev/null
-            PKG_CONFIG_PATH="$VENVDIR/lib/pkgconfig:${PKG_CONFIG_PATH:-}" \
-            LD_LIBRARY_PATH="$VENVDIR/lib:${LD_LIBRARY_PATH:-}" \
-            CFLAGS="-I$VENVDIR/include" \
-            LDFLAGS="-L$VENVDIR/lib" \
-            python3 -m pip install --quiet . 2>&1 | tail -5 || \
-            echo "  WARNING: notmuch2 build failed. Install it manually."
-            popd >/dev/null
-        fi
     fi
 fi
 
 deactivate
-echo "Python virtualenv ready at $VENVDIR"
+echo "  Python virtualenv ready."
 echo ""
 
 # --- Copy scripts ---
@@ -221,7 +226,7 @@ WRAPEOF
     chmod +x "$wrapper"
 done
 
-echo "Scripts installed to $BINDIR"
+echo "  Scripts installed to $BINDIR"
 echo ""
 
 # --- Install .desktop file ---
@@ -232,9 +237,7 @@ if [[ -f "$DESKTOP_SRC" ]]; then
         -e "s|^Exec=show-query-results|Exec=${BINDIR}/show-query-results|" \
         -e "s|^Exec=manage-mail|Exec=${BINDIR}/manage-mail|" \
         "$DESKTOP_SRC" > "${APPDIR}/kubux-mail-client.desktop"
-    echo "Desktop file installed to ${APPDIR}/kubux-mail-client.desktop"
-else
-    echo "WARNING: kubux-mail-client.desktop not found, skipping."
+    echo "  Desktop file installed."
 fi
 echo ""
 
@@ -247,13 +250,11 @@ if [[ -f "$ICON_SRC" ]] && command -v convert &>/dev/null; then
         mkdir -p "$sizedir"
         convert "$ICON_SRC" -resize "$size" "${sizedir}/kubux-mail-client.png"
     done
-    echo "Icons installed to $ICONDIR"
+    echo "  Icons installed."
 elif [[ -f "$ICON_SRC" ]]; then
-    echo "WARNING: ImageMagick (convert) not found. Copying icon as-is."
     mkdir -p "${ICONDIR}/256x256/apps"
     cp "$ICON_SRC" "${ICONDIR}/256x256/apps/kubux-mail-client.png"
-else
-    echo "WARNING: app-icon.png not found, skipping icons."
+    echo "  Icon copied."
 fi
 echo ""
 
