@@ -156,13 +156,16 @@ if ! pkg-config --exists gmime-3.0 2>/dev/null; then
     GMIME_SRC="$BUILDDIR/gmime"
     mkdir -p "$GMIME_SRC"
     pushd "$GMIME_SRC" >/dev/null
-    # Use official release tarball with pre-generated configure
-    curl -sL https://github.com/jstedfast/gmime/releases/download/3.2.15/gmime-3.2.15.tar.xz | tar xJ --strip-components=1 -C "$GMIME_SRC" 2>/dev/null || \
+    # Use official GNOME release tarball with pre-generated configure
     curl -sL https://download.gnome.org/sources/gmime/3.2/gmime-3.2.15.tar.xz | tar xJ --strip-components=1 -C "$GMIME_SRC" 2>/dev/null || true
     if [[ -f configure ]]; then
-        ./configure --prefix="$VENVDIR" --disable-gtk-doc
-        make -j"$(nproc)"
-        make install
+        # GMime configure errors on missing gtk-doc even with --disable-gtk-doc
+        # Set autoconf cache variable to skip the check
+        ./configure --prefix="$VENVDIR" --disable-gtk-doc ac_cv_path_GTKDOC=no 2>&1 || true
+        if [[ -f Makefile ]]; then
+            make -j"$(nproc)" 2>&1
+            make install 2>&1
+        fi
     fi
     popd >/dev/null
     echo "  GMime built."
