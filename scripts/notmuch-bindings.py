@@ -257,7 +257,7 @@ def get_tags_from_query(query, flag_error):
     try:
         with notmuch2.Database() as db:
             # Append the same filter as the original to ensure we're querying properly
-            query_str = f'{query} and (tag:spam or not tag:spam) and (tag:postpone or not tag:postpone)'
+            query_str = f'{query} and (tag:spam or not tag:spam) and (tag:postponed or not tag:postponed)'
             messages = db.messages(query_str)
             
             tags_set = set()

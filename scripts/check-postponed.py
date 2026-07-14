@@ -3,7 +3,7 @@
 Hourly cron script: lists all postponed messages, revives those whose
 $until date has been reached by removing postpone + $until and adding unread.
 
-Run via: python3 scripts/check-postponed.py
+Run via: python3 scripts/check-postponedd.py
 """
 
 import subprocess
@@ -18,7 +18,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 def run():
     result = subprocess.run(
-        ['notmuch', 'search', '--output=summary', '--format=json', '--sort=oldest-first', 'tag:postpone'],
+        ['notmuch', 'search', '--output=summary', '--format=json', '--sort=oldest-first', 'tag:postponed'],
         capture_output=True, text=True
     )
     if result.returncode != 0:
@@ -65,10 +65,10 @@ def run():
 
         if today >= until_date:
             thread_id = thread.get('thread')
-            query = f'thread:{thread_id} and tag:postpone'
+            query = f'thread:{thread_id} and tag:postponed'
             try:
                 subprocess.run(
-                    ['notmuch', 'tag', '-postpone', f'-$until:{until_str}', '+unread', query],
+                    ['notmuch', 'tag', '-postponed', f'-$until:{until_str}', '+unread', query],
                     check=True, capture_output=True, text=True
                 )
                 print(f"REVIVE {subject} — {authors} ($until:{until_str})")

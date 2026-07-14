@@ -68,7 +68,7 @@ def extract_email_text(file_path: Path) -> str:
 
 def main():
     parser = argparse.ArgumentParser(description="Retrain an existing AI classifier with new data.")
-    parser.add_argument("--query", default='tag:$unused and not tag:unread and (tag:spam or not tag:spam) and (tag:postpone or not tag:postpone)', help="Notmuch query for new training mails.")
+    parser.add_argument("--query", default='tag:$unused and not tag:unread and (tag:spam or not tag:spam) and (tag:postponed or not tag:postponed)', help="Notmuch query for new training mails.")
     parser.add_argument("--model", default=config.get_model(), help="Path to the model file to update.")
     args = parser.parse_args()
 

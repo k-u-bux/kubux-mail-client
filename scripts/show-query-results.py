@@ -34,19 +34,19 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 
 def newest_message ( thread_id ):
-    command = ['notmuch', 'search', '--output=files', '--sort=newest-first', '--limit=1', f'thread:{thread_id} and (tag:spam or not tag:spam) and (tag:postpone or not tag:postpone)']
+    command = ['notmuch', 'search', '--output=files', '--sort=newest-first', '--limit=1', f'thread:{thread_id} and (tag:spam or not tag:spam) and (tag:postponed or not tag:postponed)']
     result = subprocess.run(command, capture_output=True, text=True, check=True)
     messages = result.stdout.strip().split('\n')
     return messages
 
 def oldest_message ( thread_id ):
-    command = ['notmuch', 'search', '--output=files', '--sort=oldest-first', '--limit=1', f'thread:{thread_id} and (tag:spam or not tag:spam) and (tag:postpone or not tag:postpone)']
+    command = ['notmuch', 'search', '--output=files', '--sort=oldest-first', '--limit=1', f'thread:{thread_id} and (tag:spam or not tag:spam) and (tag:postponed or not tag:postponed)']
     result = subprocess.run(command, capture_output=True, text=True, check=True)
     messages = result.stdout.strip().split('\n')
     return messages
 
 def messages ( thread_id ):
-    command = ['notmuch', 'search', '--output=files', '--sort=oldest-first', f'thread:{thread_id} and (tag:spam or not tag:spam) and (tag:postpone or not tag:postpone)']
+    command = ['notmuch', 'search', '--output=files', '--sort=oldest-first', f'thread:{thread_id} and (tag:spam or not tag:spam) and (tag:postponed or not tag:postponed)']
     result = subprocess.run(command, capture_output=True, text=True, check=True)
     messages = result.stdout.strip().split('\n')
     return messages
@@ -517,7 +517,7 @@ class QueryResultsViewer(QMainWindow):
                 logging.warning("Could not find thread ID for selected row.")
         else: # mails mode
             message_id = item_data.get("id");
-            command = ['notmuch', 'search', '--output=threads', '--format=text', f'id:{message_id} and (tag:spam or not tag:spam) and (tag:postpone or not tag:postpone)']
+            command = ['notmuch', 'search', '--output=threads', '--format=text', f'id:{message_id} and (tag:spam or not tag:spam) and (tag:postponed or not tag:postponed)']
             result = subprocess.run(command, capture_output=True, text=True, check=True)
             threads = result.stdout.strip().split('\n')
             for thread_id in threads:

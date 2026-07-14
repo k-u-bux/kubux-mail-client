@@ -500,7 +500,7 @@ class MailViewer(QMainWindow):
 
         try:
             subprocess.run(
-                ['notmuch', 'tag', '+postpone', f'+$until:{until_str}', f'id:{self.message_id}'],
+                ['notmuch', 'tag', '+postponed', f'+$until:{until_str}', f'id:{self.message_id}'],
                 check=True, capture_output=True, text=True
             )
             logging.info(f"Postponed message {self.message_id} until {until_str}")
@@ -512,7 +512,7 @@ class MailViewer(QMainWindow):
 
     def view_thread(self):
         if self.message_id:
-            command = ['notmuch', 'search', '--output=threads', '--format=text', f'id:{self.message_id} and (tag:spam or not tag:spam) and (tag:postpone or not tag:postpone)']
+            command = ['notmuch', 'search', '--output=threads', '--format=text', f'id:{self.message_id} and (tag:spam or not tag:spam) and (tag:postponed or not tag:postponed)']
             result = subprocess.run(command, capture_output=True, text=True, check=True)
             threads = result.stdout.strip().split('\n')
             for thread_id in threads:
