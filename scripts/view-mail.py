@@ -11,14 +11,14 @@ from email.header import Header
 from email.utils import getaddresses
 import re
 from pathlib import Path
+from PySide6.QtCore import Qt, QSize, QUrl, QRegularExpression, QDate
+from PySide6.QtGui import QFont, QKeySequence, QAction, QTextCursor, QTextCharFormat, QColor, QDesktopServices
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QTextBrowser, QTextEdit, QHBoxLayout,
     QPushButton, QListWidget, QSplitter, QMessageBox, QMenu, QGroupBox,
     QFormLayout, QLabel, QInputDialog, QScrollArea, QDialog, QDialogButtonBox,
-    QFileDialog, QSizePolicy, QAbstractItemView
+    QFileDialog, QSizePolicy, QAbstractItemView, QCalendarWidget
 )
-from PySide6.QtCore import Qt, QSize, QUrl, QRegularExpression
-from PySide6.QtGui import QFont, QKeySequence, QAction, QTextCursor, QTextCharFormat, QColor, QDesktopServices
 
 from notmuch_api import find_matching_messages, find_matching_threads, apply_tag_to_query, get_tags_from_query, update_unseen_from_query
 
@@ -239,6 +239,10 @@ class MailViewer(QMainWindow):
         self.render_html_button()
 
         top_bar_layout.addStretch()
+
+        self.postpone_button = QPushButton("Postpone")
+        self.postpone_button.clicked.connect(self.postpone_message)
+        top_bar_layout.addWidget(self.postpone_button)
 
         self.delete_button = QPushButton("Delete")
         self.delete_button.clicked.connect( lambda: self.delete_message() )
@@ -466,9 +470,49 @@ class MailViewer(QMainWindow):
         self.add_tag("deleted")
         self.close()
 
+    def postpone_message(self):
+        """Opens a calendar dialog to pick a date, then adds postpone + $until tags."""
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Postpone Until")
+        dialog.setModal(True)
+
+        layout = QVBoxLayout(dialog)
+
+        label = QLabel("Select date until which to postpone:")
+        layout.addWidget(label)
+
+        calendar = QCalendarWidget()
+        tomorrow = QDate.currentDate().addDays(1)
+        calendar.setSelectedDate(tomorrow)
+        calendar.setMinimumDate(QDate.currentDate().addDays(1))
+        layout.addWidget(calendar)
+
+        button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        button_box.accepted.connect(dialog.accept)
+        button_box.rejected.connect(dialog.reject)
+        layout.addWidget(button_box)
+
+        if dialog.exec() != QDialog.Accepted:
+            return
+
+        selected_date = calendar.selectedDate()
+        until_str = selected_date.toString("yyyy-MM-dd")
+
+        try:
+            subprocess.run(
+                ['notmuch', 'tag', '+postpone', f'+$until:{until_str}', f'id:{self.message_id}'],
+                check=True, capture_output=True, text=True
+            )
+            logging.info(f"Postponed message {self.message_id} until {until_str}")
+        except subprocess.CalledProcessError as e:
+            display_error(self, "Failed to Postpone", f"Failed to postpone message:\n\n{e.stderr}")
+            return
+
+        self.close()
+
     def view_thread(self):
         if self.message_id:
-            command = ['notmuch', 'search', '--output=threads', '--format=text', f'id:{self.message_id} and (tag:spam or not tag:spam)']
+            command = ['notmuch', 'search', '--output=threads', '--format=text', f'id:{self.message_id} and (tag:spam or not tag:spam) and (tag:postpone or not tag:postpone)']
             result = subprocess.run(command, capture_output=True, text=True, check=True)
             threads = result.stdout.strip().split('\n')
             for thread_id in threads:

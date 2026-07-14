@@ -57,7 +57,7 @@ class Config:
                     "todo", "done", "read"
                 ],
                 "suppressed": [
-                    "open", "info"
+                    "open", "info", "postpone"
                 ]
              },
             "bindings": {

@@ -142,7 +142,7 @@ def apply_tag_to_query(pm_tag, query, flag_error):
 
 def get_tags_from_query(query, flag_error):
     try:
-        command = ['notmuch', 'search', '--output=tags', '--format=text', f'{query} and (tag:spam or not tag:spam)']
+        command = ['notmuch', 'search', '--output=tags', '--format=text', f'{query} and (tag:spam or not tag:spam) and (tag:postpone or not tag:postpone)']
         result = subprocess.run(command, capture_output=True, text=True, check=True)            
         tags_list = [tag.strip() for tag in result.stdout.strip().split('\n') if tag.strip()]
         tags = sorted(tags_list)
