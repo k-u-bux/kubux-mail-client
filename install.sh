@@ -244,6 +244,10 @@ for name in ai-classify ai-train edit-mail wait-for-change \
 export TMPDIR="\${TMPDIR:-/tmp}"
 export LD_LIBRARY_PATH="${VENVDIR}/lib:\${LD_LIBRARY_PATH:-}"
 export PKG_CONFIG_PATH="${VENVDIR}/lib/pkgconfig:\${PKG_CONFIG_PATH:-}"
+# Qt 6.5+ needs libxcb-cursor0 for xcb plugin. Fallback to wayland if missing.
+if ! ldconfig -p 2>/dev/null | grep -q libxcb-cursor; then
+    export QT_QPA_PLATFORM=wayland
+fi
 exec "${VENVDIR}/bin/python" "${BINDIR}/${name}.py" "\$@"
 WRAP
     chmod +x "${BINDIR}/${name}"

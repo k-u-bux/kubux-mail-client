@@ -36,11 +36,6 @@ from header_widget import MailHeaderWidget
 # Set up basic logging to console
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# --- CONFIGURATION (PLACEHOLDER) ---
-# NOTE: Replace this with your actual email address.
-# In a future version, this should be loaded from the config file.
-MY_EMAIL_ADDRESS = "your.email@example.com"
-
 
 class MailSourceViewer(QDialog):
     """A simple dialog to display the raw content of the mail file."""
