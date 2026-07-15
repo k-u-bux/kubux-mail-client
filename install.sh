@@ -234,7 +234,7 @@ chmod +x "$BINDIR"/*.py "$BINDIR"/predict-tags "$BINDIR"/decrypt-on-the-fly "$BI
 sed -i "s|^python |${VENVDIR}/bin/python |" "$BINDIR/predict-tags" 2>/dev/null || true
 
 echo "Creating wrapper scripts ..."
-for name in ai-classify ai-train edit-mail wait-for-change \
+for name in ai-classify ai-train check-postponed edit-mail wait-for-change \
              view-mail view-thread open-drafts manage-mail \
              show-query-results send-mail get-message-id \
              pause-imap-sync config-helper-get-pixel-ratio \
