@@ -183,6 +183,19 @@ if ! command -v msmtp &>/dev/null; then
     popd >/dev/null; echo "  msmtp built."
 fi
 
+if ! command -v muchsync &>/dev/null; then
+    echo "  Building muchsync from source ..."
+    src="$BUILDDIR/muchsync"
+    rm -rf "$src"; mkdir -p "$src"; pushd "$src" >/dev/null
+    git clone --depth=1 https://github.com/hannob/muchsync "$src" 2>/dev/null || true
+    if [[ -f "$src/Makefile" ]]; then
+        make CXXFLAGS="-I$VENVDIR/include -I$VENVDIR/include/notmuch" \
+             LDFLAGS="-L$VENVDIR/lib" \
+             PREFIX="$VENVDIR" install 2>&1
+    fi
+    popd >/dev/null; echo "  muchsync built."
+fi
+
 # --- Python virtualenv ---
 echo "--- Setting up Python virtualenv ---"
 if python3 -m venv --help 2>/dev/null | grep -q -- --without-pip; then
@@ -254,7 +267,7 @@ WRAP
 done
 
 # Symlink main binaries to BINDIR
-for bin in notmuch mbsync msmtp; do
+for bin in notmuch mbsync msmtp muchsync; do
     if [[ -f "$VENVDIR/bin/$bin" ]]; then
         ln -sf "$VENVDIR/bin/$bin" "$BINDIR/$bin"
     fi
