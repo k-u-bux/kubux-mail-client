@@ -49,10 +49,10 @@ ICONDIR="${PREFIX}/share/icons/hicolor"
 
 mkdir -p "$BINDIR" "$APPDIR" "$ICONDIR" "$BUILDDIR"
 
-export PKG_CONFIG_PATH="$VENVDIR/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
-export LD_LIBRARY_PATH="$VENVDIR/lib:${LD_LIBRARY_PATH:-}"
+export PKG_CONFIG_PATH="$VENVDIR/lib/pkgconfig:$VENVDIR/lib64/pkgconfig:${PKG_CONFIG_PATH:-}"
+export LD_LIBRARY_PATH="$VENVDIR/lib:$VENVDIR/lib64:${LD_LIBRARY_PATH:-}"
 export CFLAGS="-I$VENVDIR/include"
-export LDFLAGS="-L$VENVDIR/lib"
+export LDFLAGS="-L$VENVDIR/lib -L$VENVDIR/lib64"
 export PATH="$VENVDIR/bin:$PATH"
 
 # --- Build dependencies ---
@@ -183,15 +183,51 @@ if ! command -v msmtp &>/dev/null; then
     popd >/dev/null; echo "  msmtp built."
 fi
 
+# muchsync needs sqlite3 and openssl
+if ! pkg-config --exists sqlite3 2>/dev/null; then
+    echo "  Building sqlite3 from source ..."
+    src="$BUILDDIR/sqlite3"
+    rm -rf "$src"; mkdir -p "$src"; pushd "$src" >/dev/null
+    curl -sL https://sqlite.org/2025/sqlite-autoconf-3490100.tar.gz | tar xz --strip-components=1 -C "$src" 2>/dev/null || true
+    if [[ -f "$src/configure" ]]; then
+        ./configure --prefix="$VENVDIR" 2>&1
+        make -j"$(nproc)" 2>&1
+        make install 2>&1
+    else
+        echo "  WARNING: sqlite3 download failed"
+    fi
+    popd >/dev/null; echo "  sqlite3 built."
+fi
+
+if ! pkg-config --exists libcrypto 2>/dev/null; then
+    echo "  Building openssl from source ..."
+    src="$BUILDDIR/openssl"
+    rm -rf "$src"; mkdir -p "$src"; pushd "$src" >/dev/null
+    curl -sL https://github.com/openssl/openssl/releases/download/openssl-3.5.0/openssl-3.5.0.tar.gz | tar xz --strip-components=1 -C "$src" 2>/dev/null || true
+    if [[ -f "$src/Configure" ]]; then
+        ./Configure --prefix="$VENVDIR" --openssldir="$VENVDIR/ssl" \
+                    -Wl,-rpath,"$VENVDIR/lib" \
+                    no-ssl3 no-tests 2>&1
+        make -j"$(nproc)" 2>&1
+        make install_sw 2>&1
+    else
+        echo "  WARNING: openssl download failed"
+    fi
+    popd >/dev/null; echo "  openssl built."
+fi
+
 if ! command -v muchsync &>/dev/null; then
     echo "  Building muchsync from source ..."
     src="$BUILDDIR/muchsync"
     rm -rf "$src"; mkdir -p "$src"; pushd "$src" >/dev/null
-    git clone --depth=1 https://github.com/hannob/muchsync "$src" 2>/dev/null || true
-    if [[ -f "$src/Makefile" ]]; then
-        make CXXFLAGS="-I$VENVDIR/include -I$VENVDIR/include/notmuch" \
-             LDFLAGS="-L$VENVDIR/lib" \
-             PREFIX="$VENVDIR" install 2>&1
+    curl -sL https://www.muchsync.org/src/muchsync-7.tar.gz | tar xz --strip-components=1 -C "$src" 2>/dev/null || true
+    if [[ -f "$src/configure" ]]; then
+        ./configure --prefix="$VENVDIR" CXXFLAGS="-I$VENVDIR/include -I$VENVDIR/include/notmuch" \
+                    LDFLAGS="-L$VENVDIR/lib -L$VENVDIR/lib64" 2>&1
+        make -j"$(nproc)" 2>&1
+        make install 2>&1
+    else
+        echo "  WARNING: muchsync download or configure not found"
     fi
     popd >/dev/null; echo "  muchsync built."
 fi
