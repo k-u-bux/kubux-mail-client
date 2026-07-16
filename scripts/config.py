@@ -5,6 +5,7 @@ from PySide6.QtGui import QFont
 from typing import Dict, Any, Optional
 from email.utils import getaddresses
 import subprocess
+import fcntl
 from watcher import DirectoryEventHandler
 import logging
 import json
@@ -244,21 +245,54 @@ def add_to_history ( history, query, max_size = config.get_max_search_history() 
     history.insert( 0, query )
     return history[:max_size]
 
-def record_query_to_history ( path, query ):
+def _with_exclusive_lock(path, callback):
+    """Acquire an exclusive lock on *path*, then call callback(history_list).
+    
+    The callback receives the current history list and must return the
+    (possibly modified) list, which is written back atomically under the
+    same lock.  This serialises access across *processes* (not just
+    threads), preventing the TOCTOU race that destroyed the history when
+    two instances of show-query-results ran concurrently.
+    """
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd = os.open(str(path), os.O_RDWR | os.O_CREAT)
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX)
+    except Exception:
+        os.close(fd)
+        raise
+
+    f = os.fdopen(fd, 'r+')
+    try:
+        try:
+            history = json.load(f)
+        except (json.JSONDecodeError, EOFError):
+            history = []
+        history = callback(history)
+        f.seek(0)
+        f.truncate()
+        json.dump(history, f)
+    finally:
+        f.close()
+
+
+def record_query_to_history(path, query):
     """Read current history from disk, add query, write back.
 
-    This performs a full read-update-write cycle so that multiple
-    concurrently open windows don't clobber each other's history with
-    a stale in-memory copy.
+    This performs a full read-update-write cycle under an exclusive file
+    lock so that multiple concurrently open windows don't clobber each
+    other's history with a stale in-memory copy.
     """
-    history = load_history( path )
-    history = add_to_history( history, query )
-    save_history( path, history )
+    _with_exclusive_lock(path, lambda history: add_to_history(history, query))
 
-def remove_query_from_history ( path, query ):
-    history = load_history( path )
-    if query in history:
-        history.remove( query )
-    save_history( path, history )
+
+def remove_query_from_history(path, query):
+    """Remove *query* from the history file under an exclusive lock."""
+    def _remove(history):
+        if query in history:
+            history.remove(query)
+        return history
+    _with_exclusive_lock(path, _remove)
 
 # end of file
