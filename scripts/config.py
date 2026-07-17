@@ -36,6 +36,13 @@ class Config:
         
     def reload_config(self):
         self.data = self.load_config()
+        # Update QToolTip font so config changes take effect immediately (no restart)
+        from PySide6.QtWidgets import QApplication, QToolTip
+        font = self.get_popup_font()
+        QToolTip.setFont(font)
+        app = QApplication.instance()
+        if app:
+            app.setFont(font, "QToolTip")
 
     def load_config(self):
         # Default configuration
@@ -48,7 +55,7 @@ class Config:
                 "text_font": "monospace",
                 "text_font_size": 12,
                 "popup_font": "monospace",
-                "popup_font_size": 12,
+                "popup_font_size": 20,
                 "attachment_font": "monospace",
                 "attachment_font_size": 12
             },

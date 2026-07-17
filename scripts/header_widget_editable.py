@@ -98,7 +98,11 @@ class AddressAwareTextEdit(QTextEdit):
         self.update_autocomplete_model()
         
         # Set font on the completer popup
-        self.completer.popup().setFont(config.get_popup_font())
+        popup = self.completer.popup()
+        popup_font = config.get_popup_font()
+        popup.setFont(popup_font)
+        popup.setStyleSheet(
+            f"QListView {{ font-family: '{popup_font.family()}'; font-size: {popup_font.pointSize()}pt !important; }}")
         
         # Install event filter to catch key events
         self.installEventFilter(self)

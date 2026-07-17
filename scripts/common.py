@@ -32,7 +32,12 @@ def get_run_method ( mod_name ):
 
 def setup_tooltip_font():
     """Set the tooltip font to match the popup font."""
-    QToolTip.setFont(config.get_popup_font())
+    font = config.get_popup_font()
+    QToolTip.setFont(font)
+    # Set at app level for the QToolTip widget class — this is what actually sticks
+    app = QApplication.instance()
+    if app:
+        app.setFont(font, "QToolTip")
 
 def output_of_cmd(cmd_str: str) -> str:
     """
@@ -56,10 +61,9 @@ def font_to_html_style(font: QFont) -> str:
             f"font-weight: {weight}; "
             f"font-style: {style};")
 
-def create_summary_text( authors, subject, tags, font ) -> str:
-    style_str = font_to_html_style( font )
+def create_summary_text( authors, subject, tags ) -> str:
     return (
-        f"<div style=\"{style_str} white-space: pre-wrap;\">"
+        f"<div style=\"white-space: pre-wrap;\">"
         f"<p>{html.escape(authors)}</p><p>{html.escape(subject)}</p><p>{html.escape(tags)}</p>"
         f"</div>"
     )
