@@ -207,17 +207,39 @@ config = Config()
 
 
 def load_history ( path ):
-    """Load query history from JSON file."""
+    """Load query history from JSON file under a shared lock."""
+    path = Path(path)
+    lockpath = path.with_suffix(".json.lock")
+    try:
+        lfd = os.open(str(lockpath), os.O_RDWR | os.O_CREAT)
+    except Exception:
+        return _load_history_unlocked(path)
+    try:
+        fcntl.flock(lfd, fcntl.LOCK_SH)
+    except Exception:
+        os.close(lfd)
+        return _load_history_unlocked(path)
+
+    try:
+        result = _load_history_unlocked(path)
+        logging.info(f"[dbg pid={os.getpid()}] load_history: {len(result)} entries")
+        return result
+    finally:
+        os.close(lfd)
+
+
+def _load_history_unlocked(path):
+    """Read and parse the history file without locking."""
     if not path.exists():
         return []
     try:
-        with open( path, "r" ) as f:
-            data = json.load( f )
-            if isinstance( data, list ):
+        with open(str(path), "r") as f:
+            data = json.load(f)
+            if isinstance(data, list):
                 return data
             return []
     except Exception as e:
-        logging.error( f"Failed to load query history from file {path}, error: {e}" )
+        logging.error(f"[dbg pid={os.getpid()}] load_history FAILED: {e}")
         return []
 
 def most_recent_search ( path ):
@@ -253,28 +275,52 @@ def _with_exclusive_lock(path, callback):
     same lock.  This serialises access across *processes* (not just
     threads), preventing the TOCTOU race that destroyed the history when
     two instances of show-query-results ran concurrently.
+    
+    The write is done to a temp file which is then atomically renamed
+    over the target, so readers that don't hold the lock never see a
+    truncated or partially-written file.
     """
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    fd = os.open(str(path), os.O_RDWR | os.O_CREAT)
+
+    # Lock a separate lock file so we never lock the data file itself
+    # (which would interfere with atomic-rename readers).
+    lockpath = path.with_suffix(".json.lock")
+    lfd = os.open(str(lockpath), os.O_RDWR | os.O_CREAT)
     try:
-        fcntl.flock(fd, fcntl.LOCK_EX)
+        fcntl.flock(lfd, fcntl.LOCK_EX)
     except Exception:
-        os.close(fd)
+        os.close(lfd)
         raise
 
-    f = os.fdopen(fd, 'r+')
     try:
+        # Read current state
         try:
-            history = json.load(f)
-        except (json.JSONDecodeError, EOFError):
+            with open(str(path), "r") as f:
+                history = json.load(f)
+                before = list(history)
+        except (FileNotFoundError, json.JSONDecodeError, EOFError):
             history = []
+            before = []
+
         history = callback(history)
-        f.seek(0)
-        f.truncate()
-        json.dump(history, f)
+
+        # Write to a temp file next to the target, then atomically rename
+        tmp = path.with_suffix(".json.tmp")
+        with open(str(tmp), "w") as f:
+            json.dump(history, f)
+            f.flush()
+            os.fsync(f.fileno())
+        os.rename(str(tmp), str(path))
+
+        logging.info(
+            f"[dbg pid={os.getpid()}] _with_exclusive_lock: "
+            f"before={len(before)} after={len(history)} "
+            f"first_before={before[0] if before else 'None'} "
+            f"first_after={history[0] if history else 'None'}"
+        )
     finally:
-        f.close()
+        os.close(lfd)
 
 
 def record_query_to_history(path, query):
@@ -284,11 +330,13 @@ def record_query_to_history(path, query):
     lock so that multiple concurrently open windows don't clobber each
     other's history with a stale in-memory copy.
     """
+    logging.info(f"[dbg pid={os.getpid()}] record_query_to_history: query='{query}'")
     _with_exclusive_lock(path, lambda history: add_to_history(history, query))
 
 
 def remove_query_from_history(path, query):
     """Remove *query* from the history file under an exclusive lock."""
+    logging.info(f"[dbg pid={os.getpid()}] remove_query_from_history: query='{query}'")
     def _remove(history):
         if query in history:
             history.remove(query)

@@ -292,7 +292,7 @@ class QueryResultsViewer(QMainWindow):
 
         parser = QueryParser(config_dir=config.config_dir)
         self.current_query = parser.parse( raw_query )
-        logging.info(f"Executing query: '{self.current_query}' in '{self.view_mode}' mode.")
+        logging.info(f"[dbg pid={os.getpid()}] execute_query: query='{self.current_query}' mode='{self.view_mode}'")
 
         # record the query
         record_query_to_history(self.history_path, raw_query)
