@@ -46,7 +46,11 @@ class Config:
                 "menu_font": "monospace",
                 "menu_font_size": 12,
                 "text_font": "monospace",
-                "text_font_size": 12
+                "text_font_size": 12,
+                "popup_font": "monospace",
+                "popup_font_size": 12,
+                "attachment_font": "monospace",
+                "attachment_font_size": 12
             },
             "searches": {
                 "search": "tag:inbox and tag:unread",
@@ -148,6 +152,12 @@ class Config:
 
     def get_text_font(self):
         return self.get_font("text")
+
+    def get_popup_font(self):
+        return self.get_font("popup")
+
+    def get_attachment_font(self):
+        return self.get_font("attachment")
 
     def get_visual_setting(self, key):
         return self.data["visual"].get(key)

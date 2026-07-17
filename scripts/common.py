@@ -2,7 +2,7 @@ from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLineEdit, QPushButton, QTableWidget, QTableWidgetItem, QHeaderView,
     QMessageBox, QDialog, QDialogButtonBox, QLabel, QTextEdit,
-    QCheckBox, QAbstractItemView, QMenu,
+    QCheckBox, QAbstractItemView, QMenu, QToolTip,
 )
 from PySide6.QtCore import Qt, QSize, QPoint, QObject, QTimer, QMetaObject
 from PySide6.QtGui import QFont, QKeySequence, QAction
@@ -29,6 +29,10 @@ from html2text import html2text
 def get_run_method ( mod_name ):
     return import_module( mod_name ).run
 
+
+def setup_tooltip_font():
+    """Set the tooltip font to match the popup font."""
+    QToolTip.setFont(config.get_popup_font())
 
 def output_of_cmd(cmd_str: str) -> str:
     """

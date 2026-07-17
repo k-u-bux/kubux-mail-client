@@ -295,7 +295,7 @@ class MailViewer(QMainWindow):
         # Attachments list
         if self.attachments:
             self.attachments_list = QListWidget()
-            self.attachments_list.setFont(config.get_interface_font())
+            self.attachments_list.setFont(config.get_attachment_font())
             self.attachments_list.setMinimumHeight(40)
             self.attachments_list.setMaximumHeight(200)
             self.attachments_list.setSelectionMode(QAbstractItemView.NoSelection)
@@ -958,9 +958,11 @@ def main():
     
     app = QApplication(sys.argv)
 
+    from common import setup_tooltip_font
     from event_filter import global_drag_filter
     app.installEventFilter(global_drag_filter)
     app.setApplicationName( "KubuxMailClient" )
+    setup_tooltip_font()
     
     run( args.mail_file )
     app.exec()

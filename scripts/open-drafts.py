@@ -378,9 +378,11 @@ def main():
     
     app = QApplication(sys.argv)
 
+    from common import setup_tooltip_font
     from event_filter import global_drag_filter
     app.installEventFilter(global_drag_filter)
     app.setApplicationName( "KubuxMailClient" )
+    setup_tooltip_font()
     
     run( args.drafts_dir, args.email )
     app.exec()

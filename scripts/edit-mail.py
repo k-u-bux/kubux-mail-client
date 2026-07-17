@@ -153,6 +153,7 @@ class MailEditor(QMainWindow):
         attachments_layout.setContentsMargins(0, 0, 0, 0)
         
         self.attachments_list = QListWidget()
+        self.attachments_list.setFont(config.get_attachment_font())
         self.attachments_list.setMaximumHeight(80)
         self.attachments_list.setAcceptDrops(True)
         self.attachments_list.setDragDropMode(QListWidget.DragDropMode.DropOnly)
@@ -565,9 +566,11 @@ def main():
     
     app = QApplication(sys.argv)
 
+    from common import setup_tooltip_font
     from event_filter import global_drag_filter
     app.installEventFilter(global_drag_filter)
     app.setApplicationName( "KubuxMailClient" )
+    setup_tooltip_font()
 
     run( args.mail_file, args.change_id )
     app.exec()

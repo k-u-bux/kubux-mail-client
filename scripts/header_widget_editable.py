@@ -97,6 +97,9 @@ class AddressAwareTextEdit(QTextEdit):
         # Get autocomplete options from config
         self.update_autocomplete_model()
         
+        # Set font on the completer popup
+        self.completer.popup().setFont(config.get_popup_font())
+        
         # Install event filter to catch key events
         self.installEventFilter(self)
         
