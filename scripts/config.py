@@ -258,13 +258,14 @@ def save_history ( path, history ):
     except Exception as e:
         logging.error(f"Failed to save query history: {e}")
 
-def add_to_history ( history, query, max_size = config.get_max_search_history() ):
-    """Add a query to history, deduplicating and capping at MAX_HISTORY entries."""
+def add_to_history(history, query):
+    """Add a query to history, deduplicating and capping at max_size entries."""
+    max_size = config.get_max_search_history()
     if not query or not query.strip():
         return history
     if query in history:
-        history.remove( query )
-    history.insert( 0, query )
+        history.remove(query)
+    history.insert(0, query)
     return history[:max_size]
 
 def _with_exclusive_lock(path, callback):
