@@ -200,8 +200,7 @@ class ThreadViewer(QMainWindow):
             subject_text = mail.get("headers", {}).get("Subject", "No Subject")
             tags_text = " ".join( [ tag for tag in  mail.get("tags") if not tag.startswith("$") ] )
             # summary_text = f"{sender_receiver_text}\n{subject_text}"
-            summary_text = create_summary_text( sender_receiver_text, subject_text, tags_text, 
-                                                config.get_text_font() )
+            summary_text = create_summary_text( sender_receiver_text, subject_text, tags_text )
 
             if indent:
                 indent_string = ". " * mail.get('depth', 0)
