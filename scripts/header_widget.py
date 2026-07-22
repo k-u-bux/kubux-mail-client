@@ -11,7 +11,8 @@ from PySide6.QtGui import (
 from PySide6.QtCore import (
     Qt, QRect, QMargins, QPoint, QEvent, QSize
 )
-
+from email.utils import parsedate_to_datetime
+from common import create_date_item
 
 class MailHeaderTableWidget(QTableWidget):
     def __init__(self, parent=None):
@@ -356,12 +357,22 @@ class MailHeaderWidget(QWidget):
         self.address_delegate = AddressDelegate(self.table_widget, config)
         self.table_widget.setItemDelegateForColumn(1, self.address_delegate)
 
+        date_header = message.get("Date")
+        timestamp = 0
+        if date_header:
+            try:
+                dt = parsedate_to_datetime(date_header)
+                if dt:
+                    timestamp = dt.timestamp()
+            except Exception:
+                pass
+
         self.data = [   
             ("Subject:", message.get("Subject")),
             ("From:",    message.get("From")),
             ("To:",      message.get("To")),
             ("Cc:",      message.get("Cc")),
-            ("Date:",    message.get("Date"))
+            ("Date:",    f"{date_header}  [{create_date_item(timestamp).text()}]")
         ]
         
         self.table_widget.setRowCount(len(self.data))
