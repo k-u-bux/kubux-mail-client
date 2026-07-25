@@ -11,11 +11,10 @@ usage() {
 }
 
 get_channel() {
-    python3 -c "
-import toml, sys
-data = toml.load('${CONFIG}')
-print(data['from']['${1}'].get('mbsync_channel', '${1}'))
-"
+    local account="$1"
+    local channel
+    channel=$(grep -A10 "^\[from\.\"$account\"\]" "$CONFIG" | grep -m1 mbsync_channel | sed 's/.*= *"\(.*\)"/\1/')
+    echo "${channel:-$account}"
 }
 
 imap_worker() {
