@@ -28,6 +28,15 @@ imap_worker() {
     local channel
     channel=$(get_channel "$account")
     log "$account" "watching channel $channel"
+    # initial sync before entering IDLE loop
+    (
+        flock -x 200
+        log "$account" "initial sync of channel $channel"
+        mbsync-and-decrypt "$channel"
+        log "$account" "running notmuch new"
+        notmuch new
+        log "$account" "initial sync done"
+    ) 200>"$LOCKFILE"
     while true; do
         pause-imap-sync --config "$CONFIG" --from "$account" || true
         log "$account" "event detected, acquiring lock..."
@@ -72,8 +81,8 @@ check_postponed_loop() {
 
 cleanup() {
     log "main" "shutting down..."
-    kill $(jobs -p) 2>/dev/null
-    wait 2>/dev/null
+    kill -- -$$ 2>/dev/null || true
+    wait 2>/dev/null || true
 }
 trap cleanup SIGINT SIGTERM
 

@@ -10,9 +10,9 @@ trap 'rm -f "$tempfile"' EXIT
 touch "$tempfile"
 
 if [ -n "$CHANNEL" ]; then
-    mbsync "$CHANNEL" -V
+    mbsync "$CHANNEL"
 else
-    mbsync -a -V
+    mbsync -a
 fi
 
 find ${HOME}/.maildir -type f -newer "$tempfile" -exec "${DECRYPT}" {} \;
