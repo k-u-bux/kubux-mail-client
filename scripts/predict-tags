@@ -38,7 +38,7 @@ process_batch() {
         file_map["$file_name"]="$full_path"
         message_id=$( $GET_MESSAGE_ID_SCRIPT "$full_path" )
         if [[ -n "$message_id" ]]; then
-            message_ids+=("id:$message_id")
+            message_ids+=("id:\"$message_id\"")
         else
             echo "Could not find message ID for file: $full_path"
         fi
@@ -59,11 +59,11 @@ process_batch() {
             for tag in "${predicted_tags[@]}"; do
                 tags_to_add+=" +$tag"
             done
-            notmuch tag $tags_to_add -- "id:$message_id"
+            notmuch tag $tags_to_add -- id:"$message_id"
             echo "Applied tags '$tags_to_add' to message ID: $message_id"
             if ${DO_NOTIFY}; then
-                from=$( notmuch show --format=text --format-version=1 --body=false id:${message_id} | grep ^From: | cut -c7- )
-                subj=$( notmuch show --format=text --format-version=1 --body=false id:${message_id} | grep ^Subject: | cut -c10- )
+                from=$( notmuch show --format=text --format-version=1 --body=false id:"${message_id}" | grep ^From: | cut -c7- )
+                subj=$( notmuch show --format=text --format-version=1 --body=false id:"${message_id}" | grep ^Subject: | cut -c10- )
                 echo from: ${from}
                 echo subject: ${subj}
                 notify-send -i mail-client \
