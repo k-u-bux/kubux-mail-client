@@ -45,7 +45,7 @@ class TestConfigInit:
         # Should have default structure
         assert config.data is not None
         assert "visual" in config.data
-        assert "tags" in config.data
+        assert "searches" in config.data
         assert "bindings" in config.data
         assert "email_identities" in config.data
     
@@ -252,20 +252,20 @@ class TestConfigGetTags:
         assert "done" in tags
         assert "read" in tags
     
-    def test_get_tags_default_empty(self, tmp_path):
-        """Test when tags section is missing."""
+    def test_get_tags_default(self, tmp_path):
+        """Test that default tags are used when tags section is missing."""
         config_content = """
 [visual]
 interface_font = "monospace"
 """
         config_file = tmp_path / "config.toml"
         config_file.write_text(config_content)
-        
+
         config = Config(str(config_file))
         tags = config.get_tags()
-        
-        # Should return empty list if not found
-        assert tags == []
+
+        # Should fall back to the built-in default tags
+        assert tags == ["private", "professional"]
 
 
 class TestConfigGetSearch:
@@ -360,8 +360,8 @@ interface_font = "monospace"
         
         config = Config(str(config_file))
         result = config.get_autocompletions()
-        
-        assert result == "headers"
+
+        assert result == []
 
 
 class TestConfigIsMe:

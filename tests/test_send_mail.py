@@ -126,7 +126,7 @@ key = "value"
 class TestSendMailMoveFile:
     """Tests for SendMail._move_file() method."""
     
-    def test_move_file_to_existing_directory(self, tmp_path):
+    def test_move_file_to_existing_directory(self, tmp_path, temp_smtp_config_file):
         """Test moving file to existing directory."""
         sender = SendMail(temp_smtp_config_file)
         
@@ -142,7 +142,7 @@ class TestSendMailMoveFile:
         assert (dest_dir / "source.txt").exists()
         assert (dest_dir / "source.txt").read_text() == "content"
     
-    def test_move_file_creates_directory(self, tmp_path):
+    def test_move_file_creates_directory(self, tmp_path, temp_smtp_config_file):
         """Test that destination directory is created if missing."""
         sender = SendMail(temp_smtp_config_file)
         
@@ -257,14 +257,14 @@ class TestSendMailSendViaSmtp:
     @patch('smtplib.SMTP')
     def test_send_via_smtp_starttls(self, mock_smtp_class, tmp_path, mock_email_message):
         """Test sending via STARTTLS (port 587)."""
-        config_content = """
+        config_content = f"""
 [from."test@example.com"]
 smtp_server = "smtp.example.com"
 smtp_port = 587
 username = "test@example.com"
-password = "test-pass"
-sent_dir = "/tmp/sent"
-failed_dir = "/tmp/failed"
+passwd_cmd = "echo test-pass"
+sent_dir = "{tmp_path}/sent"
+failed_dir = "{tmp_path}/failed"
 """
         config_file = tmp_path / "config.toml"
         config_file.write_text(config_content)
@@ -289,14 +289,14 @@ failed_dir = "/tmp/failed"
     @patch('smtplib.SMTP_SSL')
     def test_send_via_smtp_ssl(self, mock_smtp_class, tmp_path, mock_email_message):
         """Test sending via SSL (port 465)."""
-        config_content = """
+        config_content = f"""
 [from."test@example.com"]
 smtp_server = "smtp.example.com"
 smtp_port = 465
 username = "test@example.com"
-password = "test-pass"
-sent_dir = "/tmp/sent"
-failed_dir = "/tmp/failed"
+passwd_cmd = "echo test-pass"
+sent_dir = "{tmp_path}/sent"
+failed_dir = "{tmp_path}/failed"
 """
         config_file = tmp_path / "config.toml"
         config_file.write_text(config_content)
@@ -312,71 +312,83 @@ failed_dir = "/tmp/failed"
         
         sender.send_file(str(email_file))
         
-        # Verify SSL flow (no starttls)
-        mock_smtp_class.assert_called_once_with("smtp.example.com", 465)
+        # Verify SSL flow (no starttls); SMTP_SSL is called with an SSL context
+        mock_smtp_class.assert_called_once()
+        args, kwargs = mock_smtp_class.call_args
+        assert args == ("smtp.example.com", 465)
+        assert "context" in kwargs
         assert mock_smtp_instance.starttls.call_count == 0  # No starttls
         mock_smtp_instance.login.assert_called_once_with("test@example.com", "test-pass")
         mock_smtp_instance.send_message.assert_called_once()
     
     @patch('smtplib.SMTP')
     def test_send_via_smtp_smtp_exception(self, mock_smtp_class, tmp_path):
-        """Test handling SMTPException."""
+        """Test handling SMTPException: file moves to failed dir, then SystemExit."""
         from smtplib import SMTPException
-        config_content = """
+        failed_dir = tmp_path / "failed"
+        config_content = f"""
 [from."test@example.com"]
 smtp_server = "smtp.example.com"
 smtp_port = 587
 username = "test@example.com"
-password = "test-pass"
-sent_dir = "/tmp/sent"
-failed_dir = "/tmp/failed"
+passwd_cmd = "echo test-pass"
+sent_dir = "{tmp_path}/sent"
+failed_dir = "{failed_dir}"
 """
         config_file = tmp_path / "config.toml"
         config_file.write_text(config_content)
-        
+
         # Setup mock to raise exception
         mock_smtp_instance = MagicMock()
         mock_smtp_class.return_value.__enter__.return_value = mock_smtp_instance
         mock_smtp_instance.send_message.side_effect = SMTPException("Connection failed")
-        
+
         sender = SendMail(str(config_file))
-        
+
         email_file = tmp_path / "test.eml"
         email_file.write_text("From: test@example.com\n\nBody")
-        
-        # Should not raise exception, but move to failed directory
-        sender.send_file(str(email_file))
-        
-        # File should be moved to failed directory
-        # (Note: This will try to create /tmp/failed which may not exist)
+
+        # send-mail exits with an error after moving the file to failed_dir
+        with pytest.raises(SystemExit):
+            sender.send_file(str(email_file))
+
+        # File should have been moved to the failed directory
+        assert not email_file.exists()
+        assert (failed_dir / "test.eml").exists()
     
     @patch('smtplib.SMTP')
     def test_send_via_smtp_general_exception(self, mock_smtp_class, tmp_path):
-        """Test handling general exceptions."""
-        config_content = """
+        """Test handling general exceptions: file moves to failed dir, then SystemExit."""
+        failed_dir = tmp_path / "failed"
+        config_content = f"""
 [from."test@example.com"]
 smtp_server = "smtp.example.com"
 smtp_port = 587
 username = "test@example.com"
-password = "test-pass"
-sent_dir = "/tmp/sent"
-failed_dir = "/tmp/failed"
+passwd_cmd = "echo test-pass"
+sent_dir = "{tmp_path}/sent"
+failed_dir = "{failed_dir}"
 """
         config_file = tmp_path / "config.toml"
         config_file.write_text(config_content)
-        
+
         # Setup mock to raise exception
         mock_smtp_instance = MagicMock()
         mock_smtp_class.return_value.__enter__.return_value = mock_smtp_instance
         mock_smtp_instance.send_message.side_effect = Exception("Unexpected error")
-        
+
         sender = SendMail(str(config_file))
-        
+
         email_file = tmp_path / "test.eml"
         email_file.write_text("From: test@example.com\n\nBody")
-        
-        # Should not raise exception, but move to failed directory
-        sender.send_file(str(email_file))
+
+        # send-mail exits with an error after moving the file to failed_dir
+        with pytest.raises(SystemExit):
+            sender.send_file(str(email_file))
+
+        # File should have been moved to the failed directory
+        assert not email_file.exists()
+        assert (failed_dir / "test.eml").exists()
     
     @patch('smtplib.SMTP')
     def test_send_via_smtp_moves_to_sent(self, mock_smtp_class, tmp_path):
@@ -389,9 +401,9 @@ failed_dir = "/tmp/failed"
 smtp_server = "smtp.example.com"
 smtp_port = 587
 username = "test@example.com"
-password = "test-pass"
+passwd_cmd = "echo test-pass"
 sent_dir = "{sent_dir}"
-failed_dir = "/tmp/failed"
+failed_dir = "{tmp_path}/failed"
 """
         config_file = tmp_path / "config.toml"
         config_file.write_text(config_content)
