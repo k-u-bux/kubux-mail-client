@@ -75,11 +75,13 @@
             cp -P $src/scripts/predict-tags $out/bin/
             cp -P $src/scripts/decrypt-on-the-fly $out/bin/
             cp -P $src/scripts/mbsync-and-decrypt $out/bin/
+            cp -P $src/scripts/pull-from-imap-server $out/bin/
             chmod +x $out/bin/*.py
             # chmod +x $out/bin/*.sh
             chmod +x $out/bin/predict-tags
             chmod +x $out/bin/decrypt-on-the-fly
             chmod +x $out/bin/mbsync-and-decrypt
+            chmod +x $out/bin/pull-from-imap-server
 
             substituteInPlace $out/bin/predict-tags \
               --replace "python" "${pythonEnv}/bin/python"
