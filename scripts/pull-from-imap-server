@@ -5,6 +5,12 @@ set -e
 CONFIG="${CONFIG:-$HOME/.config/kubux-mail-client/smtp-config.toml}"
 LOCKFILE="$HOME/.maildir/.postprocess.lock"
 
+log() {
+    local tag="$1"
+    shift
+    echo "[$(date +%H:%M:%S)] [$tag] $*"
+}
+
 usage() {
     echo "Usage: $(basename "$0") <account1> [<account2> ...]"
     exit 1
@@ -21,12 +27,17 @@ imap_worker() {
     local account="$1"
     local channel
     channel=$(get_channel "$account")
+    log "$account" "watching channel $channel"
     while true; do
         pause-imap-sync --config "$CONFIG" --from "$account" || true
+        log "$account" "event detected, acquiring lock..."
         (
             flock -x 200
+            log "$account" "syncing channel $channel"
             mbsync-and-decrypt "$channel"
+            log "$account" "running notmuch new"
             notmuch new
+            log "$account" "done"
         ) 200>"$LOCKFILE"
     done
 }
@@ -37,7 +48,9 @@ ai_train_loop() {
         if [ $((RANDOM % 1000)) -lt 3 ]; then
             (
                 flock -x 200
+                log "ai-train" "training..."
                 ai-train
+                log "ai-train" "done"
             ) 200>"$LOCKFILE"
         fi
     done
@@ -48,7 +61,9 @@ check_postponed_loop() {
         sleep 3600
         (
             flock -x 200
+            log "check-postponed" "checking..."
             check-postponed
+            log "check-postponed" "done"
         ) 200>"$LOCKFILE"
     done
 }
@@ -67,5 +82,5 @@ PIDS+=($!)
 check_postponed_loop &
 PIDS+=($!)
 
-trap 'kill ${PIDS[@]} 2>/dev/null; exit' SIGINT SIGTERM
+trap 'log "main" "shutting down..."; kill ${PIDS[@]} 2>/dev/null; exit' SIGINT SIGTERM
 wait
