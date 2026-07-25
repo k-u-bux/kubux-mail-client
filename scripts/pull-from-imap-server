@@ -80,6 +80,7 @@ check_postponed_loop() {
 [ $# -ge 1 ] || usage
 
 cleanup() {
+    trap '' SIGINT SIGTERM
     log "main" "shutting down..."
     kill -- -$$ 2>/dev/null || true
     wait 2>/dev/null || true
