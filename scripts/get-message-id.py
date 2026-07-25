@@ -16,7 +16,7 @@ def get_message_id_from_file(file_path):
     try:
         with open(file_path, 'rb') as f:
             msg = email.message_from_binary_file(f, policy=policy.default)
-            message_id = msg.get('Message-ID')
+            message_id = msg['Message-ID']
             if message_id:
                 return message_id.strip('<>')
             else:
