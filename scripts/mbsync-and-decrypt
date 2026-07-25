@@ -3,10 +3,16 @@
 SCRIPT_DIR=$( dirname $( realpath "${BASH_SOURCE[0]}" ) )
 DECRYPT="${SCRIPT_DIR}/decrypt-on-the-fly"
 
+CHANNEL="${1:-}"
+
 tempfile=$(mktemp)
 trap 'rm -f "$tempfile"' EXIT
 touch "$tempfile"
 
-mbsync -a -V
+if [ -n "$CHANNEL" ]; then
+    mbsync "$CHANNEL" -V
+else
+    mbsync -a -V
+fi
 
 find ${HOME}/.maildir -type f -newer "$tempfile" -exec "${DECRYPT}" {} \;

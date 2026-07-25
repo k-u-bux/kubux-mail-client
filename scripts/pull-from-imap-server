@@ -1,21 +1,72 @@
 #! /usr/bin/env bash
 
 set -e
-ACCOUNT="${1:?Usage: pull-from-imap-server <account>}"
-TIMESTAMP=~/.maildir/timestamp
-CHECK_POSTPONED_TIMESTAMP=$(mktemp /tmp/check-postponed-XXXXXX)
-date +%s > "$CHECK_POSTPONED_TIMESTAMP"
 
-mbsync-and-decrypt; notmuch new; sleep 20;
-rpasswd > $TIMESTAMP
+CONFIG="${CONFIG:-$HOME/.config/kubux-mail-client/smtp-config.toml}"
+LOCKFILE="$HOME/.maildir/.postprocess.lock"
 
-while true; do
-    date +[%H:%M:%S]
-    pause-imap-sync --from "$ACCOUNT";
-    mbsync-and-decrypt; notmuch new; sleep 5
-    rpasswd > $TIMESTAMP
-    [ $((RANDOM % 1000)) -lt 3 ] && ai-train || sleep 5
-    [ $(( $(date +%s) - $(cat "$CHECK_POSTPONED_TIMESTAMP") )) -ge 3600 ] \
-        && { check-postponed; date +%s > "$CHECK_POSTPONED_TIMESTAMP"; } \
-        || sleep 5
+usage() {
+    echo "Usage: $(basename "$0") <account1> [<account2> ...]"
+    exit 1
+}
+
+get_channel() {
+    python3 -c "
+import toml, sys
+data = toml.load('${CONFIG}')
+print(data['from']['${1}'].get('mbsync_channel', '${1}'))
+"
+}
+
+imap_worker() {
+    local account="$1"
+    local channel
+    channel=$(get_channel "$account")
+    while true; do
+        pause-imap-sync --config "$CONFIG" --from "$account" || true
+        (
+            flock -x 200
+            mbsync-and-decrypt "$channel"
+            notmuch new
+        ) 200>"$LOCKFILE"
+    done
+}
+
+ai_train_loop() {
+    while true; do
+        sleep 900
+        if [ $((RANDOM % 1000)) -lt 3 ]; then
+            (
+                flock -x 200
+                ai-train
+            ) 200>"$LOCKFILE"
+        fi
+    done
+}
+
+check_postponed_loop() {
+    while true; do
+        sleep 3600
+        (
+            flock -x 200
+            check-postponed
+        ) 200>"$LOCKFILE"
+    done
+}
+
+[ $# -ge 1 ] || usage
+
+PIDS=()
+
+for account in "$@"; do
+    imap_worker "$account" &
+    PIDS+=($!)
 done
+
+ai_train_loop &
+PIDS+=($!)
+check_postponed_loop &
+PIDS+=($!)
+
+trap 'kill ${PIDS[@]} 2>/dev/null; exit' SIGINT SIGTERM
+wait
