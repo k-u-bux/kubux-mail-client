@@ -107,7 +107,7 @@ class SendMail:
         # password = account.get("password")
 
         if not all([smtp_server, smtp_port, username, password, sent_dir, failed_dir]):
-            logging.error("Account configuration incomplete for {from_addr}")
+            logging.error(f"Account configuration incomplete for {from_addr}")
             sys.exit(1)
             return
 

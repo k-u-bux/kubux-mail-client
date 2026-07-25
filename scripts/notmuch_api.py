@@ -105,7 +105,7 @@ def notmuch_search(query, output, sort, flag_error):
 
 
 def find_matching_threads(query, flag_error):
-    list_of_thread = []
+    list_of_threads = []
     try:
         list_of_threads = notmuch_search(query, "summary", "newest-first", flag_error)
     except Exception as e:

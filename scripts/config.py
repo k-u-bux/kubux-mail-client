@@ -145,7 +145,7 @@ class Config:
         pt_size = self.data["visual"][f"{font_type}_font_size"]
         pixel_size = pt_size * get_pixel_ratio()
         font = QFont(self.data["visual"][f"{font_type}_font"])
-        font.setPointSize(pixel_size)
+        font.setPointSizeF(pixel_size)
         return font 
 
     def get_font(self, font_type: str):

@@ -3,7 +3,7 @@
 Hourly cron script: lists all postponed messages, revives those whose
 $until date has been reached by removing postpone + $until and adding unread.
 
-Run via: python3 scripts/check-postponedd.py
+Run via: python3 scripts/check-postponed.py
 """
 
 import subprocess

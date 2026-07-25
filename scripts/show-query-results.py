@@ -217,8 +217,8 @@ class QueryResultsViewer(QMainWindow):
         modify_action = QAction("Edit Tags", self)
         if selected_items:
             open_action.triggered.connect( self.open_selected_items )
-            open_newest_action.triggered.connect( lambda r=row: self.open_thread_newest_selected_items )
-            open_oldest_action.triggered.connect( lambda r=row: self.open_thread_oldest_selected_items )
+            open_newest_action.triggered.connect( self.open_thread_newest_selected_items )
+            open_oldest_action.triggered.connect( self.open_thread_oldest_selected_items )
             open_thread_action.triggered.connect( self.open_thread_selected_items )
             mark_read_action.triggered.connect( self.mark_read_selected_items )
             for tag in status_tags:

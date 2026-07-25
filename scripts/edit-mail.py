@@ -369,8 +369,8 @@ class MailEditor(QMainWindow):
                 )
             else:
                 display_error(self, "type error", f"Attachment payload has unexpected type: {type(payload_data).__name__}")
-                
-    
+                return
+
             # 3. Write to a temporary file
             temp_file_descriptor, temp_path = tempfile.mkstemp(prefix="mail_attach_", suffix=f"_{filename}")
             
@@ -407,24 +407,21 @@ class MailEditor(QMainWindow):
 
     def _encode_header_value(self, value):
         """RFC 2047 encode non-ASCII display names in address headers."""
-        addrs = re.split(r',\s*', value)
         encoded_parts = []
-        for addr in addrs:
-            addr = addr.strip()
-            if not addr:
+        for display_name, addr_spec in email.utils.getaddresses([value]):
+            if not addr_spec:
+                # Unparseable fragment — keep it as-is rather than dropping it
+                if display_name:
+                    encoded_parts.append(display_name)
                 continue
-            m = re.match(r'^"([^"]*)"\s*<([^>]+)>$', addr)
-            if m:
-                display_name = m.group(1)
-                addr_spec = m.group(2)
+            if display_name:
                 if any(ord(c) > 127 for c in display_name):
-                    h = Header(display_name, 'utf-8')
-                    encoded_name = h.encode()
+                    encoded_name = Header(display_name, 'utf-8').encode()
                     encoded_parts.append(f'"{encoded_name}" <{addr_spec}>')
                 else:
                     encoded_parts.append(f'"{display_name}" <{addr_spec}>')
             else:
-                encoded_parts.append(addr)
+                encoded_parts.append(addr_spec)
         return ", ".join(encoded_parts)
 
     def _save_draft_in_new_file(self):

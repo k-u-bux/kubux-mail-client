@@ -47,9 +47,9 @@ class QueryParser:
         Expands named queries in the given expression.
         Handles nested queries and checks for circular dependencies.
         """
-        return self._expand_queries(query_expression, [], [])
+        return self._expand_queries(query_expression, [])
 
-    def _expand_queries(self, expression: str, visited: list, trace: list) -> str:
+    def _expand_queries(self, expression: str, trace: list) -> str:
         """Recursive helper function to expand queries."""
         # Find all named query references
         references = re.findall(r'\$(\w+)', expression)
@@ -69,7 +69,7 @@ class QueryParser:
             referenced_query = self.named_queries[ref]
             
             # Recursively expand the referenced query
-            expanded_sub_query = self._expand_queries(referenced_query, visited + [expression], trace + [ref])
+            expanded_sub_query = self._expand_queries(referenced_query, trace + [ref])
             
             # Substitute the reference with the expanded query, wrapped in parentheses
             # to preserve notmuch's operator precedence

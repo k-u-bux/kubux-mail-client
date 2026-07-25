@@ -125,14 +125,14 @@ class MailViewer(QMainWindow):
         """Parses a real email file from the local filesystem."""
         if not self.mail_file_path.exists():
             logging.error(f"Mail file {self.mail_file_path} does not exist.")
-            sys.exit(1)
+            raise FileNotFoundError(f"Mail file does not exist: {self.mail_file_path}")
         try:
             mail = mailparser.parse_from_file(self.mail_file_path)
             with open(self.mail_file_path, 'rb') as f:
                 self.message = email.message_from_binary_file(f, policy=policy.default)
         except Exception as e:
             logging.error(f"Failed to parse mail file: {e}")
-            sys.exit(1)
+            raise RuntimeError(f"Failed to parse mail file {self.mail_file_path}: {e}") from e
         # print("parsing message")
         for part in self.message.walk():
             # Prioritize plain text over HTML
@@ -945,7 +945,12 @@ keep_alive = []
 mail_source_viewers = []
 
 def run ( args_mail_file ):
-    viewer = MailViewer( args_mail_file )
+    try:
+        viewer = MailViewer( args_mail_file )
+    except Exception as e:
+        logging.error(f"Could not open mail viewer: {e}")
+        QMessageBox.critical(None, "Cannot Open Mail", f"Could not open the mail file:\n\n{e}")
+        return
     keep_alive.append( viewer )
     viewer.setAttribute( Qt.WA_DeleteOnClose )
     viewer.destroyed.connect( lambda: keep_alive.remove(viewer) )

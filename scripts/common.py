@@ -245,7 +245,7 @@ def create_draft(parent, identity_dict):
                 f.write("To: \n")
                 f.write(f"Cc: {identity_dict['name']} <{identity_dict['email']}>\n")
                 f.write("Subject: \n\n")
-            get_run_method( "edit-mail" )( str(draft_path) )
+        get_run_method( "edit-mail" )( str(draft_path) )
         logging.info(f"Launched mail editor for new draft: {draft_path}")
     except Exception as e:
         logging.error(f"Failed to create draft or launch editor: {e}")
@@ -315,8 +315,11 @@ def match_address (header, address):
     return ( normalize_address( header ) == normalize_address( address ) )
 
 def find_identity( sender_email ):
+    if not sender_email:
+        return None
+    sender_email = sender_email.casefold()
     for i in config.get_identities():
-        if sender_email == i.get('email'):
+        if sender_email == ( i.get('email') or "" ).casefold():
             return i
     return None
 

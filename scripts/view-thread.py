@@ -275,13 +275,9 @@ class ThreadViewer(QMainWindow):
         display_error( self, title, message )
 
     def row_to_query(self, row):
-        item_data = self.results_table.item(row, 0).data(Qt.ItemDataRole.UserRole)        
-        if self.view_mode == "threads":
-            thread_id = item_data.get("thread")
-            return f"thread:{thread_id}"
-        else:
-            message_id = item_data.get("id")
-            return f"id:{message_id}"
+        item_data = self.results_table.item(row, 0).data(Qt.ItemDataRole.UserRole)
+        message_id = item_data.get("id")
+        return f"id:{message_id}"
 
     def apply_tag_to_row(self, pm_tag, row):
         apply_tag_to_query( pm_tag, self.row_to_query(row), self.show_error )

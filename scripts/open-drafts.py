@@ -44,7 +44,9 @@ class DraftsManager(QMainWindow):
         self.current_identity = find_identity( sender_email )
         if not self.current_identity:
             logging.error(f"Sender mail address unknown: {sender_email}")
-            sys.exit(1)
+            display_error(None, "Unknown Identity",
+                         f"The sender address is not a configured identity:\n\n{sender_email}")
+            raise ValueError(f"Sender mail address unknown: {sender_email}")
 
         self.dir_watcher = DirectoryEventHandler( self.reload_drafts )
         
@@ -101,8 +103,8 @@ class DraftsManager(QMainWindow):
         row = self.drafts_table.rowAt(position.y())
         column = self.drafts_table.columnAt(position.x())
         
-        # Skip if we're outside the table or on the empty input row
-        if row < 0 or column < 0 or row == 0:
+        # Skip if we're outside the table
+        if row < 0 or column < 0:
             return
         
         # Store the row and column for later use
@@ -364,7 +366,12 @@ class DraftsManager(QMainWindow):
 keep_alive = []
 
 def run ( args_drafts_dir, args_email ):
-    manager = DraftsManager( drafts_dir_path=args_drafts_dir, sender_email=args_email )
+    try:
+        manager = DraftsManager( drafts_dir_path=args_drafts_dir, sender_email=args_email )
+    except ValueError as e:
+        # Error already shown to the user in the constructor
+        logging.error(f"Could not open drafts manager: {e}")
+        return
     keep_alive.append( manager )
     manager.setAttribute( Qt.WA_DeleteOnClose )
     manager.destroyed.connect( lambda: keep_alive.remove(manager) )
