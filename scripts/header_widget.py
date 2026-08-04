@@ -398,6 +398,14 @@ class MailHeaderWidget(QWidget):
                 self.table_widget.setItem(row_idx, 1, value_item)
                 row_idx = row_idx + 1
     
+    def update_fonts(self):
+        """Recreate delegates and repaint after config changes."""
+        self.label_delegate = LabelDelegate(self.table_widget, config)
+        self.table_widget.setItemDelegateForColumn(0, self.label_delegate)
+        self.address_delegate = AddressDelegate(self.table_widget, config)
+        self.table_widget.setItemDelegateForColumn(1, self.address_delegate)
+        self.table_widget.viewport().update()
+
     def get_selected_addresses(self):
         """Return list of all selected email addresses"""
         addresses = []

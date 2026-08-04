@@ -22,7 +22,7 @@ from mail_table_widget import MailTableWidget
 
 import logging
 from notmuch_api import find_matching_messages, apply_tag_to_query
-from config import config
+from config import config, Config
 from common import display_error, create_summary_text, create_date_item, get_db_path, get_run_method
 from watcher import DirectoryEventHandler
 
@@ -46,6 +46,8 @@ class ThreadViewer(QMainWindow):
 
         self.dir_watcher = DirectoryEventHandler( self.execute_query )
         self.dir_watcher.watch( get_db_path() )
+
+        Config.register_callback(self._on_config_changed)
 
     def setup_ui(self):
         central_widget = QWidget()
@@ -350,9 +352,19 @@ class ThreadViewer(QMainWindow):
         for tag in tags:
             self.apply_tag_to_row( tag, row )
 
+    def _on_config_changed(self):
+        """Reapply fonts and relayout after config changes."""
+        central_widget = self.centralWidget()
+        if central_widget:
+            central_widget.setFont(config.get_text_font())
+        self.view_mode_button.setFont(config.get_interface_font())
+        self.quit_button.setFont(config.get_interface_font())
+        self.results_table.update_font()
+
     def closeEvent(self, event):
         """Clean up the directory watcher when closing."""
         logging.info(f"Closing thread viewer for thread ID = {self.thread_id}")
+        Config.unregister_callback(self._on_config_changed)
         self.dir_watcher.stop()
         super().closeEvent(event)
 

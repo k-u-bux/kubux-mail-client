@@ -20,7 +20,7 @@ from PySide6.QtGui import QFont, QKeySequence, QAction, QColor
 import logging
 
 from notmuch_api import find_matching_messages, find_matching_threads, apply_tag_to_query, get_tags_from_query, update_unseen_from_query
-from config import config, load_history, record_query_to_history, remove_query_from_history
+from config import config, Config, load_history, record_query_to_history, remove_query_from_history
 from common import (
     display_error, 
     create_draft, create_new_mail_menu, launch_drafts_manager, create_summary_text, create_date_item, get_run_method,
@@ -68,6 +68,8 @@ class QueryResultsViewer(QMainWindow):
 
         self.dir_watcher = DirectoryEventHandler( self.execute_query )
         self.dir_watcher.watch( get_db_path() )
+
+        Config.register_callback(self._on_config_changed)
 
     def refresh_more_menu(self):
         self.more_menu.clear()        
@@ -680,9 +682,26 @@ class QueryResultsViewer(QMainWindow):
         self.query_edit.setText(query)
         self.execute_query()
 
+    def _on_config_changed(self):
+        """Reapply fonts and relayout after config changes."""
+        central_widget = self.centralWidget()
+        if central_widget:
+            central_widget.setFont(config.get_text_font())
+        self.view_mode_button.setFont(config.get_interface_font())
+        self.new_mail_button.setFont(config.get_interface_font())
+        self.edit_drafts_button.setFont(config.get_interface_font())
+        self.more_button.setFont(config.get_interface_font())
+        self.quit_button.setFont(config.get_interface_font())
+        self.query_edit.setFont(config.get_interface_font())
+        self.history_button.setFont(config.get_interface_font())
+        self.more_menu.setFont(config.get_menu_font())
+        self.history_menu.setFont(config.get_menu_font())
+        self.results_table.update_font()
+
     def closeEvent(self, event):
         """Clean up the directory watcher when closing."""
         logging.info(f"Closing query result viewer for {self.current_query}")
+        Config.unregister_callback(self._on_config_changed)
         self.dir_watcher.stop()
         super().closeEvent(event)
 

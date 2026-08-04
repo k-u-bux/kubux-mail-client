@@ -21,7 +21,7 @@ import logging
 # Set up basic logging to console
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-from config import config
+from config import config, Config
 from query import QueryParser
 from common import display_error, create_draft, create_new_mail_menu, launch_drafts_manager, get_run_method
 
@@ -150,6 +150,8 @@ class QueryEditor(QMainWindow):
         
         self.setup_ui()
         self.load_queries_into_table()
+        
+        Config.register_callback(self._on_config_changed)
         
     def setup_ui(self):
         central_widget = QWidget()
@@ -717,7 +719,26 @@ class QueryEditor(QMainWindow):
             logging.error(f"Failed to launch config editor: {e}")
             display_error(self, "Launch Error", f"Could not launch config editor:\n\n{e}")
 
+    def _on_config_changed(self):
+        """Reapply fonts and relayout after config changes."""
+        central_widget = self.centralWidget()
+        if central_widget:
+            central_widget.setFont(config.get_interface_font())
+        self.new_mail_button.setFont(config.get_interface_font())
+        self.edit_drafts_button.setFont(config.get_interface_font())
+        self.edit_config_button.setFont(config.get_interface_font())
+        self.quit_button.setFont(config.get_interface_font())
+        self.query_table.setFont(config.get_text_font())
+        # Recreate delegate to pick up new font
+        self.text_delegate = NoSelectTextDelegate()
+        self.drag_handle_delegate = DragHandleDelegate()
+        for col in range(2):
+            self.query_table.setItemDelegateForColumn(col, self.text_delegate)
+        self.query_table.setItemDelegateForColumn(2, self.drag_handle_delegate)
 
+    def closeEvent(self, event):
+        Config.unregister_callback(self._on_config_changed)
+        super().closeEvent(event)
 
 # --- Main Entry Point ---
 

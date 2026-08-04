@@ -28,7 +28,7 @@ from mail_table_widget import MailTableWidget
 from watcher import DirectoryEventHandler
 
 # Import the shared components
-from config import config
+from config import config, Config
 from common import display_error, create_new_mail_menu, match_address, find_identity, get_run_method
 
 # Set up basic logging to console
@@ -51,6 +51,8 @@ class DraftsManager(QMainWindow):
         self.dir_watcher = DirectoryEventHandler( self.reload_drafts )
         
         self.setup_ui()
+
+        Config.register_callback(self._on_config_changed)
         
         # Load the initial drafts directory from the command-line argument
         if drafts_dir_path:
@@ -354,9 +356,21 @@ class DraftsManager(QMainWindow):
         for row in list( set( [ item.row() for item in self.drafts_table.selectedItems() ] ) ):
             self.delete_row( row )
             
+    def _on_config_changed(self):
+        """Reapply fonts and relayout after config changes."""
+        central_widget = self.centralWidget()
+        if central_widget:
+            central_widget.setFont(config.get_interface_font())
+        self.new_mail_button.setFont(config.get_interface_font())
+        self.drafts_folder_button.setFont(config.get_interface_font())
+        self.drafts_folder_button.setMenu(self._create_drafts_menu())
+        self.quit_button.setFont(config.get_interface_font())
+        self.drafts_table.update_font()
+
     def closeEvent(self, event):
         """Clean up the directory watcher when closing."""
         logging.info(f"Closing drafts viewer for identity = {self.current_identity}")
+        Config.unregister_callback(self._on_config_changed)
         self.dir_watcher.stop()
         super().closeEvent(event)
 

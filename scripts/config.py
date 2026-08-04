@@ -21,6 +21,17 @@ def get_pixel_ratio():
     return pixel_ratio
 
 class Config:
+    _callbacks = []
+
+    @classmethod
+    def register_callback(cls, cb):
+        cls._callbacks.append(cb)
+
+    @classmethod
+    def unregister_callback(cls, cb):
+        if cb in cls._callbacks:
+            cls._callbacks.remove(cb)
+
     def __init__(self, config_file: str = "~/.config/kubux-mail-client/config.toml"):
         self.config_path = Path(config_file).expanduser()
         self.config_dir = self.config_path.parent
@@ -30,19 +41,32 @@ class Config:
         self.interface_font = self.get_font('interface')
         self.menu_font = self.get_font('menu')
         self.text_font = self.get_font('text')
+        self.popup_font = self.get_font('popup')
+        self.attachment_font = self.get_font('attachment')
 
         self.dir_watcher = DirectoryEventHandler( self.reload_config )
         self.dir_watcher.watch( self.config_dir )
         
     def reload_config(self):
         self.data = self.load_config()
+        # Recalculate all cached fonts
+        self.interface_font = self.get_font('interface')
+        self.menu_font = self.get_font('menu')
+        self.text_font = self.get_font('text')
+        self.popup_font = self.get_font('popup')
+        self.attachment_font = self.get_font('attachment')
         # Update QToolTip font so config changes take effect immediately (no restart)
         from PySide6.QtWidgets import QApplication, QToolTip
-        font = self.get_popup_font()
-        QToolTip.setFont(font)
+        QToolTip.setFont(self.popup_font)
         app = QApplication.instance()
         if app:
-            app.setFont(font, "QToolTip")
+            app.setFont(self.popup_font, "QToolTip")
+        # Notify all subscribers
+        for cb in Config._callbacks:
+            try:
+                cb()
+            except Exception:
+                pass
 
     def load_config(self):
         # Default configuration

@@ -167,6 +167,12 @@ class MailTableWidget(QTableWidget):
     
     # ========== Helper Methods ==========
     
+    def update_font(self):
+        """Reapply font from config (called on config changes)."""
+        self.setFont(config.get_text_font())
+        self.horizontalHeader().setHighlightSections(False)
+        self._fix_column_widths(self._width_ratio)
+
     def clear_and_reset_hover(self):
         """Clear the table and reset hover state."""
         self._hovered_row = -1

@@ -28,7 +28,7 @@ import json
 import textwrap
 import base64
 
-from config import config
+from config import config, Config
 from common import display_error, html_to_plain_text, get_db_path, get_run_method
 from watcher import DirectoryEventHandler
 from header_widget import MailHeaderWidget
@@ -99,6 +99,8 @@ class MailViewer(QMainWindow):
 
         self.dir_watcher = DirectoryEventHandler( self.update_tags_ui )
         self.dir_watcher.watch( get_db_path() )
+
+        Config.register_callback(self._on_config_changed)
 
     def render_html_button ( self ):
         self.toggle_html_button.setFont(config.get_interface_font())
@@ -971,9 +973,33 @@ class MailViewer(QMainWindow):
     def show_mock_action(self, message):
         QMessageBox.information(self, "Action Mocked", message)
 
+    def _on_config_changed(self):
+        """Reapply fonts and relayout after config changes."""
+        central_widget = self.centralWidget()
+        if central_widget:
+            central_widget.setFont(config.get_interface_font())
+        self.compose_button.setFont(config.get_interface_font())
+        self.compose_menu.setFont(config.get_menu_font())
+        self.tags_button.setFont(config.get_interface_font())
+        self.tags_menu.setFont(config.get_menu_font())
+        self.view_thread_button.setFont(config.get_interface_font())
+        self.view_source_button.setFont(config.get_interface_font())
+        self.toggle_header_visibility_button.setFont(config.get_interface_font())
+        self.toggle_html_button.setFont(config.get_interface_font())
+        self.postpone_button.setFont(config.get_interface_font())
+        self.delete_button.setFont(config.get_interface_font())
+        self.quit_button.setFont(config.get_interface_font())
+        self.mail_content.setFont(config.get_text_font())
+        if hasattr(self, 'attachments_list') and self.attachments_list:
+            self.attachments_list.setFont(config.get_attachment_font())
+        self.headers_group_box.update_fonts()
+        # Rebuild tags UI to pick up new interface font
+        self.update_tags_ui()
+
     def closeEvent(self, event):
         """Clean up the directory watcher when closing."""
         logging.info(f"Closing mail viewer for mail file = {self.mail_file_path}")
+        Config.unregister_callback(self._on_config_changed)
         self.dir_watcher.stop()
         super().closeEvent(event)
 
