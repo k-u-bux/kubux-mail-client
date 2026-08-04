@@ -241,8 +241,8 @@ class MailViewer(QMainWindow):
         top_bar_layout.addStretch()
 
         self.postpone_button = QPushButton("Postpone")
-        self.postpone_button.clicked.connect(self.postpone_message)
         top_bar_layout.addWidget(self.postpone_button)
+        self.update_postpone_button()
 
         self.delete_button = QPushButton("Delete")
         self.delete_button.clicked.connect( lambda: self.delete_message() )
@@ -470,6 +470,44 @@ class MailViewer(QMainWindow):
         self.add_tag("deleted")
         self.close()
 
+    def update_postpone_button(self):
+        """Sets button text/action based on whether message is currently postponed."""
+        try:
+            self.postpone_button.clicked.disconnect()
+        except RuntimeError:
+            pass  # no connections yet
+
+        tags = self.get_tags()
+        if 'postponed' in tags:
+            self.postpone_button.setText("Unpostpone")
+            self.postpone_button.clicked.connect(self.unpostpone_message)
+        else:
+            self.postpone_button.setText("Postpone")
+            self.postpone_button.clicked.connect(self.postpone_message)
+
+    def unpostpone_message(self):
+        """Removes postponed + $until tags, flips button back to Postpone."""
+        import re
+        tags = self.get_tags()
+        until_tag = None
+        for tag in tags:
+            if tag.startswith('$until:'):
+                until_tag = tag
+                break
+
+        try:
+            cmd = ['notmuch', 'tag', '-postponed', f'id:{self.message_id}']
+            if until_tag:
+                cmd.insert(2, f'-{until_tag}')
+            subprocess.run(cmd, check=True, capture_output=True, text=True)
+            logging.info(f"Unpostponed message {self.message_id}")
+        except subprocess.CalledProcessError as e:
+            display_error(self, "Failed to Unpostpone", f"Failed to unpostpone message:\n\n{e.stderr}")
+            return
+
+        self.update_postpone_button()
+        self.update_tags_ui()
+
     def postpone_message(self):
         """Opens a calendar dialog to pick a date, then adds postpone + $until tags."""
         dialog = QDialog(self)
@@ -508,7 +546,8 @@ class MailViewer(QMainWindow):
             display_error(self, "Failed to Postpone", f"Failed to postpone message:\n\n{e.stderr}")
             return
 
-        self.close()
+        self.update_postpone_button()
+        self.update_tags_ui()
 
     def view_thread(self):
         if self.message_id:
