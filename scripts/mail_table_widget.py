@@ -9,7 +9,7 @@ from PySide6.QtWidgets import (
     QTableWidget, QHeaderView, QAbstractItemView, QProxyStyle, QApplication, QStyle
 )
 from PySide6.QtCore import Qt, QTimer, QEvent
-from PySide6.QtGui import QColor
+from PySide6.QtGui import QColor, QFontMetrics
 
 from config import config
 
@@ -172,6 +172,10 @@ class MailTableWidget(QTableWidget):
         self.setFont(config.get_text_font())
         self.horizontalHeader().setHighlightSections(False)
         self._fix_column_widths(self._width_ratio)
+        fm = QFontMetrics(config.get_text_font())
+        row_height = fm.height() + 4
+        for row in range(self.rowCount()):
+            self.setRowHeight(row, row_height)
 
     def clear_and_reset_hover(self):
         """Clear the table and reset hover state."""

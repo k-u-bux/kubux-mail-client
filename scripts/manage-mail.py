@@ -729,6 +729,16 @@ class QueryEditor(QMainWindow):
         self.edit_config_button.setFont(config.get_interface_font())
         self.quit_button.setFont(config.get_interface_font())
         self.query_table.setFont(config.get_text_font())
+        # Update font on existing items and set uniform row heights
+        text_font = config.get_text_font()
+        fm = QFontMetrics(text_font)
+        row_height = fm.height() + 4
+        for row in range(self.query_table.rowCount()):
+            for col in range(2):
+                item = self.query_table.item(row, col)
+                if item:
+                    item.setFont(text_font)
+            self.query_table.setRowHeight(row, row_height)
         # Recreate delegate to pick up new font
         self.text_delegate = NoSelectTextDelegate()
         self.drag_handle_delegate = DragHandleDelegate()
