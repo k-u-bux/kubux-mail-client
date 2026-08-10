@@ -1014,11 +1014,13 @@ class MailViewer(QMainWindow):
             return base64.b64decode(part['payload'])
         else:
             # CONVERSION: The payload is a string (str), so we must encode it to bytes.
-            # Assuming 'UTF-8' encoding for non-binary text attachments.
+            # mailparser decodes the payload with the part's charset already;
+            # re-encode with that same charset to restore the original bytes.
+            # (The dict key is 'charset', not 'encoding'.)
             text_payload_str = part['payload']
             if not isinstance(text_payload_str, str):
                 raise TypeError("Expected attachment payload to be a string when 'binary' is false.")
-            encoding = part.get('encoding') or 'utf-8' 
+            encoding = part.get('charset') or 'utf-8'
             return text_payload_str.encode(encoding)
 
 
