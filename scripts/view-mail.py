@@ -75,6 +75,20 @@ class SafeTextBrowser(QTextBrowser):
         return box.clickedButton() == load_btn
 
 
+def _decode_text_payload(payload, charset):
+    """Decode a text/plain or text/html payload per the configured policy.
+
+    No charset -> UTF-8.  Declared charset -> used as-is.  If that fails
+    (unknown name or invalid byte sequence) -> latin-1, which never fails.
+    """
+    if not payload:
+        return ""
+    try:
+        return payload.decode(charset or "utf-8")
+    except (LookupError, UnicodeDecodeError):
+        return payload.decode("latin-1")
+
+
 def is_attachment(message):
     """A message is an attachment if it embeds another email (message/*)."""
     return message.get_content_maintype() == 'message'
@@ -190,14 +204,14 @@ class MailViewer(QMainWindow):
         # print("parsing message")
         for part in custom_walk(self.message):
             if part.get_content_type() == 'text/plain':
-                body_text = part.get_content()
+                body_text = _decode_text_payload(part.get_payload(decode=True), part.get_content_charset())
                 if self.mail_body:
                     self.mail_body += "\n\n" + body_text
                 else:
                     self.mail_body = body_text
                 self.has_text_body = True
             if part.get_content_type() == 'text/html':
-                body_html = part.get_content()
+                body_html = _decode_text_payload(part.get_payload(decode=True), part.get_content_charset())
                 sanitized_html = self.sanitize_html_fonts(body_html)
                 if self.mail_html:
                     self.mail_html += "<br><br>" + sanitized_html
@@ -819,13 +833,13 @@ class MailViewer(QMainWindow):
         for part in custom_walk(self.message):
             content_type = part.get_content_type()
             if content_type == 'text/plain':
-                body_text = part.get_payload(decode=True).decode(part.get_content_charset() or 'utf-8', errors='ignore')
+                body_text = _decode_text_payload(part.get_payload(decode=True), part.get_content_charset())
                 if original_body:
                     original_body += "\n\n" + body_text
                 else:
                     original_body = body_text
             elif content_type == 'text/html':
-                body_html = part.get_payload(decode=True).decode(part.get_content_charset() or 'utf-8', errors='ignore')
+                body_html = _decode_text_payload(part.get_payload(decode=True), part.get_content_charset())
                 if html_body:
                     html_body += "\n\n" + body_html
                 else:
