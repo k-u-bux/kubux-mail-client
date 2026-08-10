@@ -431,49 +431,76 @@ class MailViewer(QMainWindow):
             # For plain text, we need to detect URLs manually
             self.highlight_urls_in_plain_text()
         
+    def _strip_trailing_punct(self, url: str):
+        """Return (trimmed_url, chars_removed).
+
+        The greedy URL regex can swallow trailing punctuation (e.g. a
+        period, comma or closing paren).  Trim that punctuation from the
+        value used for the click target and report how many characters
+        were removed so the caller can shrink the visible (colored) range
+        to match.
+        """
+        orig_len = len(url)
+        url = url.rstrip('.,;:!?)]}')
+        # Only strip a trailing quote if it is unpaired
+        if url.endswith('"') and url.count('"') % 2 == 1:
+            url = url[:-1]
+        if url.endswith("'") and url.count("'") % 2 == 1:
+            url = url[:-1]
+        return url, orig_len - len(url)
+
     def highlight_urls_in_plain_text(self):
         """Find and highlight URLs in plain text content."""
         # Comprehensive URL regex pattern
         url_pattern = r'(https?://[^\s<>"]+|www\.[^\s<>"]+|file://[^\s<>"\[\]]+)'
-        
+
         # Create a QRegularExpression for matching
         url_regex = QRegularExpression(url_pattern)
-        
+
         # Get the document from the QTextEdit
         document = self.mail_content.document()
-        
+
         # Create a base format for highlighting URLs (no AnchorHref yet)
         base_url_format = QTextCharFormat()
         base_url_format.setForeground(QColor("#0000FF"))  # Blue color for links
         base_url_format.setUnderlineStyle(QTextCharFormat.SingleUnderline)
         base_url_format.setAnchor(True)
         base_url_format.setToolTip("Click to open link")
-        
+
         # Start finding all matches in the document
         cursor = QTextCursor(document)
-        
+
         while not cursor.isNull() and not cursor.atEnd():
             # Search for the URL pattern
             match = url_regex.match(document.toPlainText(), cursor.position())
-            
+
             if not match.hasMatch():
                 break
-                
+
             # Get the matched URL
             url = match.captured(0)
             start = match.capturedStart(0)
             end = match.capturedEnd(0)
-            
+
+            # Trim trailing punctuation from the click target, and shrink
+            # the visible (colored) range to match.
+            href, removed = self._strip_trailing_punct(url)
+            # www. links lack a scheme -> make them absolute so they aren't
+            # resolved against the guessed base URL in handle_link_clicked.
+            if href.startswith("www."):
+                href = "https://" + href
+            end -= removed
+
             # Select the text range
             cursor.setPosition(start)
             cursor.setPosition(end, QTextCursor.KeepAnchor)
-            
+
             match_format = QTextCharFormat(base_url_format)
-            match_format.setAnchorHref(url)
-            
+            match_format.setAnchorHref(href)
+
             # Apply URL format
             cursor.setCharFormat(match_format)
-            
+
             # Update the cursor position to search for the next match
             cursor.setPosition(end)
     
