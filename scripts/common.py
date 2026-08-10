@@ -9,7 +9,6 @@ from PySide6.QtGui import QFont, QKeySequence, QAction
 import logging
 import sys
 from pathlib import Path
-from datetime import datetime
 import secrets
 import os
 import subprocess
