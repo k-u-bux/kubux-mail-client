@@ -23,7 +23,11 @@ from mail_table_widget import MailTableWidget
 import logging
 from notmuch_api import find_matching_messages, apply_tag_to_query
 from config import config, Config
-from common import display_error, create_summary_text, create_date_item, get_db_path, get_run_method
+from common import (
+    display_error, create_summary_text, create_date_item, get_db_path, get_run_method,
+    get_row_tags, row_has_tag, each_selected_row, toggle_row_tag, tag_dialog,
+    get_sender_receiver, setup_key_bindings
+)
 from watcher import DirectoryEventHandler
 
 # Set up basic logging to console
@@ -156,13 +160,7 @@ class ThreadViewer(QMainWindow):
             "quit": self.close,
             "refresh": self.execute_query
         }
-        for name, func in actions.items():
-            key_seq = config.get_keybinding(name)
-            if key_seq:
-                action = QAction(self)
-                action.setShortcut(QKeySequence(key_seq))
-                action.triggered.connect(func)
-                self.addAction(action)
+        setup_key_bindings(self, actions)
 
     def toggle_view_mode(self):
         if self.view_mode == "tree":
@@ -221,38 +219,22 @@ class ThreadViewer(QMainWindow):
             
     def _get_sender_receiver(self, message):
         """Extracts the sender/receiver based on my email address."""
-        from_field = message.get("headers", {}).get("From", "unknown <nobody@nowhere.net>")
-        if isinstance(from_field, str):
-            authors_string_list = [from_field]
-        else: # assuming it's a list
-            authors_string_list = from_field
-        if not config.is_me(authors_string_list):
-            return from_field
-        else:
-            return "to: " + message.get("headers", {}).get("To", "unknown <nobody@nowhere.net>")
+        return get_sender_receiver(message, config)
 
     # get_tags
     def get_tags( self, row ):
-        item_data = self.results_table.item(row, 0).data(Qt.ItemDataRole.UserRole)
-        tags = item_data.get("tags")
-        return tags
+        return get_row_tags(self.results_table, row)
     
     def has_tag( self, row, tag ):
-        if tag in self.get_tags( row ):
-            return True
-        else:
-            return False
+        return row_has_tag(self.results_table, row, tag)
 
     def toggle_tag( self, row, tag ):
-        if self.has_tag( row, tag ):
-            self.apply_tag_to_row(f"-{tag}", row )
-        else:
-            self.apply_tag_to_row(f"+{tag}", row )
+        toggle_row_tag(self.results_table, row, tag, self.apply_tag_to_row)
 
 
     # open
     def open_selected_items(self):
-        for row in list( set( [ item.row() for item in self.results_table.selectedItems() ] ) ):
+        for row in each_selected_row(self.results_table):
             self.open_selected_row( row )
 
     def open_selected_item(self, index):
@@ -285,17 +267,14 @@ class ThreadViewer(QMainWindow):
         apply_tag_to_query( pm_tag, self.row_to_query(row), self.show_error )
 
     def tag_dialog(self):
-        text, ok = QInputDialog.getText(self, "Tags", "+/-tag(s) (separated by commas):")
-        if ok and text:
-            return [t.strip() for t in text.split(',')]
-        return []
+        return tag_dialog(self)
 
    # mark read
     def mark_read_row(self, row):
         self.apply_tag_to_row("-unread", row)
 
     def mark_read_selected_items(self):
-        for row in list( set( [ item.row() for item in self.results_table.selectedItems() ] ) ):
+        for row in each_selected_row(self.results_table):
             self.mark_read_row( row )
 
     def mark_read_selected_item(self, index):
@@ -308,7 +287,7 @@ class ThreadViewer(QMainWindow):
         self.toggle_tag( row, status_tag )
 
     def flag_status_selected_items(self, status_tag):
-        for row in list( set( [ item.row() for item in self.results_table.selectedItems() ] ) ):
+        for row in each_selected_row(self.results_table):
             self.flag_status_row( row, status_tag )
 
     def flag_status_selected_item(self, index, status_tag):
@@ -321,7 +300,7 @@ class ThreadViewer(QMainWindow):
         self.apply_tag_to_row("+spam", row)
 
     def flag_spam_selected_items(self):
-        for row in list( set( [ item.row() for item in self.results_table.selectedItems() ] ) ):
+        for row in each_selected_row(self.results_table):
             self.flag_spam_row( row )
 
     def flag_spam_selected_item(self, index):
@@ -333,7 +312,7 @@ class ThreadViewer(QMainWindow):
         self.apply_tag_to_row("+deleted", row)
 
     def delete_selected_items(self):
-        for row in list( set( [ item.row() for item in self.results_table.selectedItems() ] ) ):
+        for row in each_selected_row(self.results_table):
             self.delete_row( row )
 
     def delete_selected_item(self, index):
@@ -343,7 +322,7 @@ class ThreadViewer(QMainWindow):
     # modify tags
     def modify_selected_items(self):
         tags = self.tag_dialog()
-        for row in list( set( [ item.row() for item in self.results_table.selectedItems() ] ) ):
+        for row in each_selected_row(self.results_table):
             for tag in tags:
                 self.apply_tag_to_row( tag, row )
 

@@ -2,7 +2,7 @@ from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLineEdit, QPushButton, QTableWidget, QTableWidgetItem, QHeaderView,
     QMessageBox, QDialog, QDialogButtonBox, QLabel, QTextEdit,
-    QCheckBox, QAbstractItemView, QMenu, QToolTip,
+    QCheckBox, QAbstractItemView, QMenu, QToolTip, QInputDialog,
 )
 from PySide6.QtCore import Qt, QSize, QPoint, QObject, QTimer, QMetaObject
 from PySide6.QtGui import QFont, QKeySequence, QAction
@@ -322,5 +322,54 @@ def find_identity( sender_email ):
         if sender_email == ( i.get('email') or "" ).casefold():
             return i
     return None
+
+# --- Shared table/tag helpers (used by show-query-results.py and view-thread.py) ---
+
+def get_row_tags(table, row):
+    """Tags from the UserRole payload stored in (row, 0)."""
+    item = table.item(row, 0)
+    if not item:
+        return []
+    data = item.data(Qt.ItemDataRole.UserRole)
+    return data.get("tags", []) if data else []
+
+def row_has_tag(table, row, tag):
+    return tag in get_row_tags(table, row)
+
+def each_selected_row(table):
+    """Unique row indices of all selected items."""
+    return list(set(item.row() for item in table.selectedItems()))
+
+def toggle_row_tag(table, row, tag, apply_tag):
+    """apply_tag(op, row) is called with '+tag' or '-tag'."""
+    op = f"-{tag}" if row_has_tag(table, row, tag) else f"+{tag}"
+    apply_tag(op, row)
+
+def tag_dialog(parent):
+    text, ok = QInputDialog.getText(parent, "Tags", "+/-tag(s) (separated by commas):")
+    return [t.strip() for t in text.split(',')] if ok and text else []
+
+def apply_tag_to_selected(table, apply_tag, op_getter):
+    """Apply a tag operation to every selected row. op_getter(row) returns the op."""
+    for row in each_selected_row(table):
+        apply_tag(op_getter(row), row)
+
+def get_sender_receiver(message, config):
+    """'From' if not me, else 'to: <To>'."""
+    from_field = message.get("headers", {}).get("From", "unknown <nobody@nowhere.net>")
+    authors_string_list = [from_field] if isinstance(from_field, str) else from_field
+    if not config.is_me(authors_string_list):
+        return from_field
+    return "to: " + message.get("headers", {}).get("To", "unknown <nobody@nowhere.net>")
+
+def setup_key_bindings(window, actions):
+    """Bind config keybindings to actions on the given window."""
+    for name, func in actions.items():
+        key_seq = config.get_keybinding(name)
+        if key_seq:
+            action = QAction(window)
+            action.setShortcut(QKeySequence(key_seq))
+            action.triggered.connect(func)
+            window.addAction(action)
 
 # end of file
