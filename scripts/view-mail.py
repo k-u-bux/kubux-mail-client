@@ -714,6 +714,14 @@ class MailViewer(QMainWindow):
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to create or open draft: {e}")
 
+    def reply_to_addr(self):
+        """Returns the Reply-To address if present, else the From address."""
+        reply_to = self.message.get("Reply-To")
+        if reply_to:
+            return getaddresses([reply_to])[0][1]
+        sender = self.message.get("From")
+        return getaddresses([sender])[0][1] if sender else ""
+
     def all_involved(self):
         sender = self.message.get("From")
         sender_addr = getaddresses([sender])[0][1] if sender else ""
@@ -772,8 +780,7 @@ class MailViewer(QMainWindow):
         if not self.message:
             return
         
-        sender = self.message.get("From")
-        sender_addr = getaddresses([sender])[0][1] if sender else ""
+        sender_addr = self.reply_to_addr()
         
         from_addr = self.my_first_identity()
 
@@ -797,8 +804,7 @@ class MailViewer(QMainWindow):
         if not self.message:
             return
         
-        sender = self.message.get("From")
-        sender_addr = getaddresses([sender])[0][1] if sender else ""
+        sender_addr = self.reply_to_addr()
         to_list = [sender_addr]
        
         all_recipients = self.all_involved()
