@@ -175,12 +175,59 @@ class LabelDelegate(QStyledItemDelegate):
             return text[start:end]
         return None
 
+def split_addresses(text):
+    """Split an address-list into (start, end) spans of each address.
+    Handles RFC 5322 §3.4: quoted strings, angle-addr, domain literals,
+    nested comments, and quoted-pair escapes. A comma separates addresses
+    only when none of these constructs is open."""
+    spans = []
+    start = 0
+    in_quote = False
+    in_angle = False
+    in_bracket = False
+    comment_depth = 0
+    i = 0
+    n = len(text)
+    while i < n:
+        c = text[i]
+        if c == '\\' and i + 1 < n:      # quoted-pair escape
+            i += 2
+            continue
+        if in_quote:
+            if c == '"':
+                in_quote = False
+        elif in_angle:
+            if c == '>':
+                in_angle = False
+        elif in_bracket:
+            if c == ']':
+                in_bracket = False
+        elif comment_depth:
+            if c == '(':
+                comment_depth += 1
+            elif c == ')':
+                comment_depth -= 1
+        else:
+            if c == '"':
+                in_quote = True
+            elif c == '<':
+                in_angle = True
+            elif c == '[':
+                in_bracket = True
+            elif c == '(':
+                comment_depth = 1
+            elif c == ',':
+                spans.append((start, i))
+                start = i + 1
+        i += 1
+    if start < n:
+        spans.append((start, n))
+    return spans
+
 class AddressDelegate(QStyledItemDelegate):
     def __init__(self, parent, config):
         super().__init__(parent)
         self.selected_addresses = {} # Key: (row, col) tuple, Value: list of selected addresses
-        # Match full address: "Name <email>", Name <email>, <email>, or just email, explude separating commas
-        self.email_regex = r'(?:"([^"]+)"|([^<>,]+))?\s*<([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})>|[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}'
         self.config = config
         self.text_selection = {}  # (row, col) -> (start_char, end_char)
         self.selection_start_cell = None
@@ -312,9 +359,9 @@ class AddressDelegate(QStyledItemDelegate):
             
             char_pos = doc.documentLayout().hitTest(hit_point, Qt.HitTestAccuracy.ExactHit)
             
-            for match in re.finditer(self.email_regex, text):
-                if match.start() <= char_pos <= match.end():
-                    address = match.group(0)
+            for (s, e) in split_addresses(text):
+                if s <= char_pos <= e:
+                    address = text[s:e].strip()
                     
                     if (row, col) not in self.selected_addresses:
                         self.selected_addresses[(row, col)] = []
