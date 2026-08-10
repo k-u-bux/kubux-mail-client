@@ -30,7 +30,7 @@ import base64
 import hashlib
 
 from config import config, Config
-from common import display_error, html_to_plain_text, get_db_path, get_run_method
+from common import display_error, html_to_plain_text, get_db_path, get_run_method, show_window, run_gui_app
 from watcher import DirectoryEventHandler
 from header_widget import MailHeaderWidget
 
@@ -1155,7 +1155,6 @@ class MailViewer(QMainWindow):
 
 # --- Main Entry Point ---
 
-keep_alive = []
 mail_source_viewers = []
 
 def run ( args_mail_file ):
@@ -1165,26 +1164,13 @@ def run ( args_mail_file ):
         logging.error(f"Could not open mail viewer: {e}")
         QMessageBox.critical(None, "Cannot Open Mail", f"Could not open the mail file:\n\n{e}")
         return
-    keep_alive.append( viewer )
-    viewer.setAttribute( Qt.WA_DeleteOnClose )
-    viewer.destroyed.connect( lambda: keep_alive.remove(viewer) )
-    viewer.show()
+    show_window( viewer )
 
 def main():
     parser = argparse.ArgumentParser(description="View a single mail file.")
     parser.add_argument("mail_file", help="The full path to the mail file to view.")
     args = parser.parse_args()
-    
-    app = QApplication(sys.argv)
-
-    from common import setup_tooltip_font
-    from event_filter import global_drag_filter
-    app.installEventFilter(global_drag_filter)
-    app.setApplicationName( "KubuxMailClient" )
-    setup_tooltip_font()
-    
-    run( args.mail_file )
-    app.exec()
+    run_gui_app( run, args.mail_file )
 
 if __name__ == "__main__":
     main()

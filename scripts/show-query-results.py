@@ -25,7 +25,8 @@ from common import (
     display_error, 
     create_draft, create_new_mail_menu, launch_drafts_manager, create_summary_text, create_date_item, get_run_method,
     get_db_path, get_row_tags, row_has_tag, each_selected_row, toggle_row_tag, tag_dialog,
-    apply_tag_to_selected, get_sender_receiver, setup_key_bindings
+    apply_tag_to_selected, get_sender_receiver, setup_key_bindings, show_window, run_gui_app,
+    edit_drafts_menu, edit_config_action
 )
 from watcher import DirectoryEventHandler
 from query import QueryParser
@@ -386,21 +387,7 @@ class QueryResultsViewer(QMainWindow):
         Displays a menu of identities and launches open-drafts.py
         for the selected identity's drafts folder.
         """
-        identities = config.get_identities()
-        if not identities:
-            display_error(self, "Identities not found", "No email identities are configured. Please check your config file.")
-            return
-
-        menu = QMenu(self)
-        menu.setFont(config.get_menu_font())
-        for identity in identities:
-            action_text = f"From: {identity.get('name', '')} <{identity.get('email', '')}>"
-            action = menu.addAction(action_text)
-            action.triggered.connect(lambda checked, i=identity: launch_drafts_manager(self,i))
-
-        # Get the position of the Edit Drafts button and show the menu
-        button_pos = self.edit_drafts_button.mapToGlobal(self.edit_drafts_button.rect().bottomLeft())
-        menu.exec(button_pos)
+        edit_drafts_menu(self, self.edit_drafts_button)
 
             
     def launch__manager(self):
@@ -635,12 +622,7 @@ class QueryResultsViewer(QMainWindow):
             self.apply_tag_to_row( tag, row )
 
     def edit_config_action(self):
-        try:
-            subprocess.Popen(["xdg-open", config.config_path])
-            logging.info(f"Launched xdg-open {config.config_path}")
-        except Exception as e:
-            logging.error(f"Failed to launch config editor: {e}")
-            display_error(self, "Launch Error", f"Could not launch config editor:\n\n{e}")
+        edit_config_action(self)
 
     def refresh_history_menu(self):
         self.history_menu.clear()
@@ -684,30 +666,15 @@ class QueryResultsViewer(QMainWindow):
 
 # --- Main Entry Point ---
 
-keep_alive = []
-
 def run ( args_query ):
     viewer = QueryResultsViewer( query_string = args_query )
-    keep_alive.append( viewer )
-    viewer.setAttribute( Qt.WA_DeleteOnClose )
-    viewer.destroyed.connect( lambda: keep_alive.remove(viewer) )
-    viewer.show()
+    show_window( viewer )
  
 def main():
     parser = argparse.ArgumentParser(description="View notmuch query results in a list.")
     parser.add_argument("--query", help="The notmuch query to display.", default=config.get_search())
     args = parser.parse_args()
-    
-    app = QApplication(sys.argv)
-
-    from common import setup_tooltip_font
-    from event_filter import global_drag_filter
-    app.installEventFilter(global_drag_filter)
-    app.setApplicationName( "KubuxMailClient" )
-    setup_tooltip_font()
-
-    run( args.query )
-    app.exec()
+    run_gui_app( run, args.query )
 
 if __name__ == "__main__":
     main()

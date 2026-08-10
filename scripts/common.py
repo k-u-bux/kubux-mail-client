@@ -328,6 +328,53 @@ def find_identity( sender_email ):
             return i
     return None
 
+# --- Shared GUI boilerplate (used by all GUI scripts) ---
+
+_keep_alive = []
+
+def show_window(widget):
+    """Show a top-level widget, keeping a reference so it isn't garbage-collected."""
+    _keep_alive.append(widget)
+    widget.setAttribute(Qt.WA_DeleteOnClose)
+    widget.destroyed.connect(lambda: _keep_alive.remove(widget))
+    widget.show()
+
+def run_gui_app(run_func, *args):
+    """Set up the QApplication and run the given run_func(*args) inside it."""
+    app = QApplication(sys.argv)
+    from event_filter import global_drag_filter
+    app.installEventFilter(global_drag_filter)
+    app.setApplicationName("KubuxMailClient")
+    setup_tooltip_font()
+    run_func(*args)
+    app.exec()
+
+def edit_drafts_menu(parent, button):
+    """Menu of identities; launches open-drafts.py for the selected identity."""
+    identities = config.get_identities()
+    if not identities:
+        display_error(parent, "Identities not found", "No email identities are configured. Please check your config file.")
+        return
+
+    menu = QMenu(parent)
+    menu.setFont(config.get_menu_font())
+    for identity in identities:
+        action_text = f"From: {identity.get('name', '')} <{identity.get('email', '')}>"
+        action = menu.addAction(action_text)
+        action.triggered.connect(lambda checked, i=identity: launch_drafts_manager(parent, i))
+
+    button_pos = button.mapToGlobal(button.rect().bottomLeft())
+    menu.exec(button_pos)
+
+def edit_config_action(parent):
+    """Open the config file in the default editor."""
+    try:
+        subprocess.Popen(["xdg-open", config.config_path])
+        logging.info(f"Launched xdg-open {config.config_path}")
+    except Exception as e:
+        logging.error(f"Failed to launch config editor: {e}")
+        display_error(parent, "Launch Error", f"Could not launch config editor:\n\n{e}")
+
 # --- Shared table/tag helpers (used by show-query-results.py and view-thread.py) ---
 
 def get_row_tags(table, row):

@@ -30,7 +30,7 @@ import re
 from email.header import Header
 
 from config import config
-from common import display_error
+from common import display_error, show_window, run_gui_app
 from header_widget_editable import MailHeaderEditableWidget
 
 # Set up basic logging to console
@@ -545,14 +545,9 @@ class MailEditor(QMainWindow):
 
 # --- Main Entry Point ---
 
-keep_alive = []
-
 def run ( args_mail_file, args_change_id = False ):
     editor = MailEditor( mail_file_path = args_mail_file, change_id = args_change_id )
-    keep_alive.append( editor )
-    editor.setAttribute( Qt.WA_DeleteOnClose )
-    editor.destroyed.connect( lambda: keep_alive.remove(editor) )
-    editor.show()
+    show_window( editor )
 
 
 def main():
@@ -560,17 +555,7 @@ def main():
     parser.add_argument("--mail-file", required=True, help="The full path to the mail file containing the pre-drafted email.")
     parser.add_argument("--change-id", action='store_true')
     args = parser.parse_args()
-    
-    app = QApplication(sys.argv)
-
-    from common import setup_tooltip_font
-    from event_filter import global_drag_filter
-    app.installEventFilter(global_drag_filter)
-    app.setApplicationName( "KubuxMailClient" )
-    setup_tooltip_font()
-
-    run( args.mail_file, args.change_id )
-    app.exec()
+    run_gui_app( run, args.mail_file, args.change_id )
 
 if __name__ == "__main__":
     main()

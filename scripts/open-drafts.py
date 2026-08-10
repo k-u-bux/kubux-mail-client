@@ -29,7 +29,7 @@ from watcher import DirectoryEventHandler
 
 # Import the shared components
 from config import config, Config
-from common import display_error, create_new_mail_menu, match_address, find_identity, get_run_method
+from common import display_error, create_new_mail_menu, match_address, find_identity, get_run_method, show_window, run_gui_app
 
 # Set up basic logging to console
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -377,8 +377,6 @@ class DraftsManager(QMainWindow):
 
 # --- Main Entry Point ---
 
-keep_alive = []
-
 def run ( args_drafts_dir, args_email ):
     try:
         manager = DraftsManager( drafts_dir_path=args_drafts_dir, sender_email=args_email )
@@ -386,27 +384,14 @@ def run ( args_drafts_dir, args_email ):
         # Error already shown to the user in the constructor
         logging.error(f"Could not open drafts manager: {e}")
         return
-    keep_alive.append( manager )
-    manager.setAttribute( Qt.WA_DeleteOnClose )
-    manager.destroyed.connect( lambda: keep_alive.remove(manager) )
-    manager.show()
+    show_window( manager )
 
 def main():
     parser = argparse.ArgumentParser(description="Manage email drafts.")
     parser.add_argument("--drafts-dir", help="The full path to the drafts directory.")
     parser.add_argument("--email", help="The senders email address.")
     args = parser.parse_args()
-    
-    app = QApplication(sys.argv)
-
-    from common import setup_tooltip_font
-    from event_filter import global_drag_filter
-    app.installEventFilter(global_drag_filter)
-    app.setApplicationName( "KubuxMailClient" )
-    setup_tooltip_font()
-    
-    run( args.drafts_dir, args.email )
-    app.exec()
+    run_gui_app( run, args.drafts_dir, args.email )
 
 if __name__ == "__main__":
     main()

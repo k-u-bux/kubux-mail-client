@@ -23,7 +23,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 from config import config, Config
 from query import QueryParser
-from common import display_error, create_draft, create_new_mail_menu, launch_drafts_manager, get_run_method
+from common import display_error, create_draft, create_new_mail_menu, launch_drafts_manager, get_run_method, show_window, run_gui_app, edit_drafts_menu, edit_config_action
 
 
 class CustomLineEdit(QLineEdit):
@@ -695,29 +695,10 @@ class QueryEditor(QMainWindow):
         Displays a menu of identities and launches open-drafts.py
         for the selected identity's drafts folder.
         """
-        identities = config.get_identities()
-        if not identities:
-            display_error(self, "Identities not found", "No email identities are configured. Please check your config file.")
-            return
-
-        menu = QMenu(self)
-        menu.setFont(config.get_menu_font())
-        for identity in identities:
-            action_text = f"From: {identity.get('name', '')} <{identity.get('email', '')}>"
-            action = menu.addAction(action_text)
-            action.triggered.connect(lambda checked, i=identity: launch_drafts_manager(self,i))
-
-        # Get the position of the Edit Drafts button and show the menu
-        button_pos = self.edit_drafts_button.mapToGlobal(self.edit_drafts_button.rect().bottomLeft())
-        menu.exec(button_pos)
+        edit_drafts_menu(self, self.edit_drafts_button)
 
     def edit_config_action(self):
-        try:
-            subprocess.Popen(["xdg-open", config.config_path])
-            logging.info(f"Launched xdg-open {config.config_path}")
-        except Exception as e:
-            logging.error(f"Failed to launch config editor: {e}")
-            display_error(self, "Launch Error", f"Could not launch config editor:\n\n{e}")
+        edit_config_action(self)
 
     def _on_config_changed(self):
         """Reapply fonts and relayout after config changes."""
@@ -752,26 +733,12 @@ class QueryEditor(QMainWindow):
 
 # --- Main Entry Point ---
 
-keep_alive = []
-
 def run ():
     editor = QueryEditor()
-    keep_alive.append( editor )
-    editor.setAttribute( Qt.WA_DeleteOnClose )
-    editor.destroyed.connect( lambda: keep_alive.remove(editor) )
-    editor.show()
+    show_window( editor )
 
 def main():
-    app = QApplication(sys.argv)
-
-    from common import setup_tooltip_font
-    from event_filter import global_drag_filter
-    app.installEventFilter(global_drag_filter)
-    app.setApplicationName( "KubuxMailClient" )
-    setup_tooltip_font()
-
-    run()
-    app.exec()
+    run_gui_app( run )
 
 if __name__ == "__main__":
     main()

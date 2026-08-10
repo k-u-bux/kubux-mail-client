@@ -26,7 +26,7 @@ from config import config, Config
 from common import (
     display_error, create_summary_text, create_date_item, get_db_path, get_run_method,
     get_row_tags, row_has_tag, each_selected_row, toggle_row_tag, tag_dialog,
-    get_sender_receiver, setup_key_bindings
+    get_sender_receiver, setup_key_bindings, show_window, run_gui_app
 )
 from watcher import DirectoryEventHandler
 
@@ -350,30 +350,15 @@ class ThreadViewer(QMainWindow):
 
 # --- Main Entry Point ---
 
-keep_alive = []
-
 def run ( args_thread_id ):
     viewer = ThreadViewer( args_thread_id )
-    keep_alive.append( viewer )
-    viewer.setAttribute( Qt.WA_DeleteOnClose )
-    viewer.destroyed.connect( lambda: keep_alive.remove(viewer) )
-    viewer.show()
+    show_window( viewer )
 
 def main():
     parser = argparse.ArgumentParser(description="View messages in a specific notmuch thread.")
     parser.add_argument("thread_id", help="The thread ID to display.")
     args = parser.parse_args()
-    
-    app = QApplication(sys.argv)
-
-    from common import setup_tooltip_font
-    from event_filter import global_drag_filter
-    app.installEventFilter(global_drag_filter)
-    app.setApplicationName( "KubuxMailClient" )
-    setup_tooltip_font()
-    
-    run(args.thread_id)
-    app.exec()
+    run_gui_app( run, args.thread_id )
 
 if __name__ == "__main__":
     main()
