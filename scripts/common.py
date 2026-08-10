@@ -269,32 +269,6 @@ def create_new_mail_menu(parent):
     button_pos = parent.new_mail_button.mapToGlobal(QPoint(0, parent.new_mail_button.height()))
     menu.exec(button_pos)
 
-def create_draft_from_components_and_open_editor(parent, to_addrs, cc_addrs, subject_text, body_text, in_reply_to=None):
-    """
-    Creates a new mail draft and opens it in the external editor.
-    """
-    msg = email.message.EmailMessage()
-    msg['From'] = ""
-    msg['To'] = ", ".join(to_addrs)
-    if cc_addrs:
-        msg['Cc'] = ", ".join(cc_addrs)
-
-    msg['Subject'] = subject_text
-    if in_reply_to:
-        msg['In-Reply-To'] = in_reply_to
-
-    msg.set_content(body_text)
-    create_draft_from_message_open_editor(parent, msg)
-
-def create_draft_from_message_open_editor(parent, msg):
-    try:
-        with tempfile.NamedTemporaryFile(mode='w+', delete=False, suffix=".eml") as temp_file:
-            temp_file.write(msg.as_string())
-            temp_path = temp_file.name
-        get_run_method( "edit-mail" )( temp_path )
-    except Exception as e:
-        QMessageBox.critical(parent, "Error", f"Failed to create or open draft: {e}")
-
 def launch_drafts_manager(parent, identity_dict):
     """Launches the drafts manager script for a given identity's drafts folder."""
     try:
