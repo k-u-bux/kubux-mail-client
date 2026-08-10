@@ -1111,11 +1111,6 @@ class MailViewer(QMainWindow):
         copy_action = QAction("Copy", self)
         copy_action.triggered.connect(self.mail_content.copy)
         menu.addAction(copy_action)
-        menu.addSeparator()
-        
-        view_raw_action = QAction("View Raw Message", self)
-        view_raw_action.triggered.connect(lambda: self.show_mock_action("Raw message will be opened in $EDITOR."))
-        menu.addAction(view_raw_action)
 
         menu.exec(self.mail_content.mapToGlobal(pos))
         
