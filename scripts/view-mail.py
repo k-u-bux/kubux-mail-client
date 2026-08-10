@@ -30,7 +30,7 @@ import base64
 import hashlib
 
 from config import config, Config
-from common import display_error, html_to_plain_text, get_db_path, get_run_method, show_window, run_gui_app
+from common import display_error, html_to_plain_text, get_db_path, get_run_method, show_window, run_gui_app, tag_dialog
 from watcher import DirectoryEventHandler
 from header_widget import MailHeaderWidget
 
@@ -432,7 +432,7 @@ class MailViewer(QMainWindow):
             "reply": self.reply,
             "reply_all": self.reply_all,
             "forward": self.forward,
-            "edit_tags": lambda: self.show_mock_action("Edit Tags action triggered by key binding."),
+            "edit_tags": self.edit_tags_action,
             "zoom_in": lambda: self.mail_content.zoomIn(1),
             "zoom_out": lambda: self.mail_content.zoomOut(1),
             "select_all": self.mail_content.selectAll
@@ -760,6 +760,15 @@ class MailViewer(QMainWindow):
             for tag in new_tags:
                 self.add_tag(tag)
             self.update_tags_ui()
+
+    def edit_tags_action(self):
+        """Opens the shared tag dialog and applies the +/-tag ops to this mail."""
+        tags = tag_dialog(self)
+        for tag in tags:
+            if tag.startswith('+'):
+                self.add_tag(tag[1:])
+            elif tag.startswith('-'):
+                self.remove_tag(tag[1:])
 
     def remove_tag(self, tag):
         """Removes a tag from the current mail using the notmuch command."""
@@ -1114,9 +1123,6 @@ class MailViewer(QMainWindow):
 
         menu.exec(self.mail_content.mapToGlobal(pos))
         
-    def show_mock_action(self, message):
-        QMessageBox.information(self, "Action Mocked", message)
-
     def _on_config_changed(self):
         """Reapply fonts and relayout after config changes."""
         central_widget = self.centralWidget()
