@@ -27,6 +27,7 @@ import subprocess
 import json
 import textwrap
 import base64
+import hashlib
 
 from config import config, Config
 from common import display_error, html_to_plain_text, get_db_path, get_run_method
@@ -524,19 +525,17 @@ class MailViewer(QMainWindow):
         if isinstance(url, str):
             url = QUrl(url)
             
-        # Check for relative URLs and convert them to absolute if needed
+        # Relative URLs cannot be resolved safely: the base would have to be
+        # guessed from spoofable headers (From/Reply-To/List-Post/List-Id),
+        # which an attacker fully controls. Drop them instead.
         if url.isRelative():
-            # Try to determine base URL from message
-            base_url = None
-            for header in ["List-Post", "List-Id", "Reply-To", "From"]:
-                if self.message.get(header):
-                    domain = self.extract_domain_from_header(self.message.get(header))
-                    if domain:
-                        base_url = f"https://{domain}"
-                        break
-            
-            if base_url:
-                url = QUrl(base_url).resolved(url)
+            QMessageBox.warning(
+                self,
+                "Relative URL",
+                "This message contains a relative link, which cannot be opened safely.\n\n"
+                f"Link: {url.toString()}"
+            )
+            return
         
         # Validate the URL scheme for security
         scheme = url.scheme().lower()
@@ -1033,7 +1032,15 @@ class MailViewer(QMainWindow):
             # Decode the base64 payload
             payload_bytes = self.get_attachment_payload( attachment_part )
 
-            with tempfile.NamedTemporaryFile(suffix=f"_{filename}", delete=False) as temp_file:
+            # Sanitize the filename: keep only the basename, strip path
+            # separators and null bytes (path-traversal protection).
+            safe_name = os.path.basename(filename.replace("\\", "/"))
+            safe_name = safe_name.replace("\x00", "").strip()
+            # Short hash of the original filename keeps the suffix unique even
+            # if two attachments share a basename after sanitization.
+            name_hash = hashlib.sha1(filename.encode("utf-8", "replace")).hexdigest()[:8]
+
+            with tempfile.NamedTemporaryFile(suffix=f"_{name_hash}_{safe_name}", delete=False) as temp_file:
                 temp_file.write(payload_bytes)
                 temp_file.flush()
                 os.fsync(temp_file.fileno()) # Force write to disk
