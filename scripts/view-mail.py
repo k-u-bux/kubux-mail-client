@@ -95,6 +95,13 @@ def is_attachment(message):
     return message.get_content_maintype() == 'message'
 
 
+def _extract_body(html):
+    """Return the inner HTML of the <body> element, or the input unchanged
+    if there is no <body> (i.e. it is an HTML fragment)."""
+    m = re.search(r'<body[^>]*>(.*)</body>', html, re.IGNORECASE | re.DOTALL)
+    return m.group(1) if m else html
+
+
 def custom_walk(message):
     """Walk the message tree like walk(), but prune message attachment
     subtrees so forwarded/attached emails are not inlined into the body."""
@@ -213,6 +220,10 @@ class MailViewer(QMainWindow):
                 self.has_text_body = True
             if part.get_content_type() == 'text/html':
                 body_html = _decode_text_payload(part.get_payload(decode=True), part.get_content_charset())
+                # Take only the <body> inner content so joining several
+                # full HTML documents (each with their own <html>/<body>)
+                # does not produce invalid HTML.
+                body_html = _extract_body(body_html)
                 sanitized_html = self.sanitize_html_fonts(body_html)
                 if self.mail_html:
                     self.mail_html += "<br><br>" + sanitized_html
@@ -567,7 +578,18 @@ class MailViewer(QMainWindow):
 
 
     def sanitize_html_fonts(self, html_content: str) -> str:
-        """Removes hardcoded font-size declarations from HTML to allow Qt to scale the font."""
+        """Remove layout-breaking and unscalable constructs from HTML.
+
+        Strips <style> and <script> blocks (a <style> block can e.g. hide
+        the whole message with 'body { display: none; }' or force a huge
+        table width), then removes hardcoded font-size declarations so Qt
+        can scale the font.  Qt's QTextBrowser does not run JS, so
+        <script> is inert anyway.
+        """
+        html_content = re.sub(r'<style[^>]*>.*?</style>', '', html_content,
+                              flags=re.IGNORECASE | re.DOTALL)
+        html_content = re.sub(r'<script[^>]*>.*?</script>', '', html_content,
+                              flags=re.IGNORECASE | re.DOTALL)
         # This regex finds any font-size declaration in a style attribute and removes it.
         return re.sub(r'font-size:\s*[^;"]+;?', '', html_content, flags=re.IGNORECASE)
 
