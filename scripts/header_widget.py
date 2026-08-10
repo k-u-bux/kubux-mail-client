@@ -361,6 +361,11 @@ class MailHeaderWidget(QWidget):
         timestamp = 0
         if date_header:
             try:
+                # RFC 5322 §3.3: zone may be 2 or 4 digits ("+02" or "+0200").
+                # Python's parsedate_to_datetime misreads 2-digit as minutes (+00:02).
+                date_header = re.sub(
+                    r"([+-]\d{2})$", r"\g<1>00", date_header.strip()
+                )
                 dt = parsedate_to_datetime(date_header)
                 if dt:
                     timestamp = dt.timestamp()
