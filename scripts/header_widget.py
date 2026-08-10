@@ -69,111 +69,114 @@ class MailHeaderTableWidget(QTableWidget):
                 if text:
                     QApplication.clipboard().setText(text, QClipboard.Clipboard)
 
-class LabelDelegate(QStyledItemDelegate):
+class TextSelectableDelegate(QStyledItemDelegate):
+    """Base delegate with shared text-selection machinery.
+
+    Subclasses override _font() and _text_width() to customise rendering,
+    and may add their own paint() highlights / editorEvent() handling.
+    """
     def __init__(self, parent, config):
         super().__init__(parent)
         self.config = config
-        self.bold_font = self.config.get_text_font()
-        self.bold_font.setBold(True)
         self.text_selection = {}  # (row, col) -> (start_char, end_char)
         self.selection_start_cell = None
+
+    def _font(self):
+        return self.config.get_text_font()
+
+    def _text_width(self, index):
+        return None  # no word-wrap by default
+
+    def _make_doc(self, index):
+        doc = QTextDocument()
+        doc.setDefaultFont(self._font())
+        text = index.data(Qt.DisplayRole) if index.data(Qt.DisplayRole) else ""
+        doc.setPlainText(text)
+        width = self._text_width(index)
+        if width:
+            doc.setTextWidth(width)
+        return doc
+
+    def _char_pos(self, doc, index, pos):
+        hit_point = pos - self.parent().visualRect(index).topLeft()
+        char_pos = doc.documentLayout().hitTest(hit_point, Qt.HitTestAccuracy.ExactHit)
+        text = index.data(Qt.DisplayRole) if index.data(Qt.DisplayRole) else ""
+        # hitTest returns -1 when beyond text boundaries
+        if char_pos < 0:
+            return len(text)
+        return max(0, min(char_pos, len(text)))
+
+    def _apply_selection_highlight(self, doc, index):
+        row, col = index.row(), index.column()
+        selection = self.text_selection.get((row, col))
+        if selection and selection[0] != selection[1]:
+            cursor = QTextCursor(doc)
+            start, end = min(selection[0], selection[1]), max(selection[0], selection[1])
+            cursor.setPosition(start)
+            cursor.setPosition(end, QTextCursor.KeepAnchor)
+            char_format = QTextCharFormat()
+            char_format.setBackground(QColor(180, 200, 255))  # Light blue
+            cursor.setCharFormat(char_format)
+
+    def start_text_selection(self, index, pos):
+        row, col = index.row(), index.column()
+        doc = self._make_doc(index)
+        char_pos = self._char_pos(doc, index, pos)
+        self.text_selection.clear()
+        self.selection_start_cell = (row, col)
+        self.text_selection[(row, col)] = (char_pos, char_pos)
+        self.parent().viewport().update()
+
+    def update_text_selection(self, index, pos):
+        row, col = index.row(), index.column()
+        if self.selection_start_cell != (row, col):
+            return
+        doc = self._make_doc(index)
+        char_pos = self._char_pos(doc, index, pos)
+        self.text_selection[(row, col)] = (self.text_selection[(row, col)][0], char_pos)
+        self.parent().viewport().update()
+
+    def finalize_selection(self, index):
+        text = self.get_selected_text(index)
+        if text:
+            clipboard = QApplication.clipboard()
+            clipboard.setText(text, QClipboard.Mode.Selection)  # For middle-click paste
+
+    def get_selected_text(self, index):
+        row, col = index.row(), index.column()
+        selection = self.text_selection.get((row, col))
+        if selection and selection[0] != selection[1]:
+            text = index.data(Qt.DisplayRole) if index.data(Qt.DisplayRole) else ""
+            start, end = min(selection[0], selection[1]), max(selection[0], selection[1])
+            return text[start:end]
+        return None
+
+class LabelDelegate(TextSelectableDelegate):
+    def __init__(self, parent, config):
+        super().__init__(parent, config)
+        self.bold_font = self.config.get_text_font()
+        self.bold_font.setBold(True)
+
+    def _font(self):
+        return self.bold_font
 
     def paint(self, painter: QPainter, option: QStyleOptionViewItem, index):
         # Force consistent appearance regardless of selection state
         opt = QStyleOptionViewItem(option)
         opt.state &= ~QStyle.State_Selected
         opt.state &= ~QStyle.State_HasFocus
-        
-        doc = QTextDocument()
-        doc.setDefaultFont(self.bold_font)
-        text = index.data(Qt.DisplayRole) if index.data(Qt.DisplayRole) else ""
-        doc.setPlainText(text)
-        
-        # Apply text selection highlight
-        row, col = index.row(), index.column()
-        selection = self.text_selection.get((row, col))
-        
-        if selection and selection[0] != selection[1]:
-            cursor = QTextCursor(doc)
-            start, end = min(selection[0], selection[1]), max(selection[0], selection[1])
-            cursor.setPosition(start)
-            cursor.setPosition(end, QTextCursor.KeepAnchor)
-            
-            char_format = QTextCharFormat()
-            char_format.setBackground(QColor(180, 200, 255))  # Light blue
-            cursor.setCharFormat(char_format)
-        
+
+        doc = self._make_doc(index)
+        self._apply_selection_highlight(doc, index)
+
         painter.save()
         painter.translate(opt.rect.topLeft())
         doc.drawContents(painter)
         painter.restore()
 
     def sizeHint(self, option, index):
-        doc = QTextDocument()
-        doc.setDefaultFont(self.bold_font)
-        text = index.data(Qt.DisplayRole) if index.data(Qt.DisplayRole) else ""
-        doc.setPlainText(f"{text} ")
+        doc = self._make_doc(index)
         return QSize(doc.idealWidth(), doc.documentLayout().documentSize().height())
-    
-    def start_text_selection(self, index, pos):
-        row, col = index.row(), index.column()
-        text = index.data(Qt.DisplayRole) if index.data(Qt.DisplayRole) else ""
-        
-        doc = QTextDocument()
-        doc.setDefaultFont(self.bold_font)
-        doc.setPlainText(text)
-        
-        hit_point = pos - self.parent().visualRect(index).topLeft()
-        char_pos = doc.documentLayout().hitTest(hit_point, Qt.HitTestAccuracy.ExactHit)
-        
-        # hitTest returns -1 when beyond text boundaries
-        if char_pos < 0:
-            char_pos = len(text)
-        else:
-            char_pos = max(0, min(char_pos, len(text)))
-        
-        self.text_selection.clear()
-        self.selection_start_cell = (row, col)
-        self.text_selection[(row, col)] = (char_pos, char_pos)
-        self.parent().viewport().update()
-    
-    def update_text_selection(self, index, pos):
-        row, col = index.row(), index.column()
-        if self.selection_start_cell != (row, col):
-            return
-        
-        text = index.data(Qt.DisplayRole) if index.data(Qt.DisplayRole) else ""
-        doc = QTextDocument()
-        doc.setDefaultFont(self.bold_font)
-        doc.setPlainText(text)
-        
-        hit_point = pos - self.parent().visualRect(index).topLeft()
-        char_pos = doc.documentLayout().hitTest(hit_point, Qt.HitTestAccuracy.ExactHit)
-        
-        # hitTest returns -1 when beyond text boundaries
-        if char_pos < 0:
-            char_pos = len(text)
-        else:
-            char_pos = max(0, min(char_pos, len(text)))
-        
-        self.text_selection[(row, col)] = (self.text_selection[(row, col)][0], char_pos)
-        self.parent().viewport().update()
-    
-    def finalize_selection(self, index):
-        text = self.get_selected_text(index)
-        if text:
-            clipboard = QApplication.clipboard()
-            clipboard.setText(text, QClipboard.Mode.Selection)  # For middle-click paste
-    
-    def get_selected_text(self, index):
-        row, col = index.row(), index.column()
-        selection = self.text_selection.get((row, col))
-        
-        if selection and selection[0] != selection[1]:
-            text = index.data(Qt.DisplayRole) if index.data(Qt.DisplayRole) else ""
-            start, end = min(selection[0], selection[1]), max(selection[0], selection[1])
-            return text[start:end]
-        return None
 
 def split_addresses(text):
     """Split an address-list into (start, end) spans of each address.
@@ -224,51 +227,40 @@ def split_addresses(text):
         spans.append((start, n))
     return spans
 
-class AddressDelegate(QStyledItemDelegate):
+class AddressDelegate(TextSelectableDelegate):
     def __init__(self, parent, config):
-        super().__init__(parent)
+        super().__init__(parent, config)
         self.selected_addresses = {} # Key: (row, col) tuple, Value: list of selected addresses
-        self.config = config
-        self.text_selection = {}  # (row, col) -> (start_char, end_char)
-        self.selection_start_cell = None
+
+    def _text_width(self, index):
+        return self.parent().visualRect(index).width()
 
     def paint(self, painter: QPainter, option: QStyleOptionViewItem, index):
         # Force consistent appearance regardless of selection state
         opt = QStyleOptionViewItem(option)
         opt.state &= ~QStyle.State_Selected
         opt.state &= ~QStyle.State_HasFocus
-        
-        doc = QTextDocument()
-        doc.setDefaultFont(self.config.get_text_font())
+
+        doc = self._make_doc(index)
         text = index.data(Qt.DisplayRole) if index.data(Qt.DisplayRole) else ""
-        doc.setPlainText(text)
-        doc.setTextWidth(opt.rect.width())
-        
+
         row, col = index.row(), index.column()
         addresses_to_highlight = self.selected_addresses.get((row, col), [])
-        
+
         cursor = QTextCursor(doc)
-        
+
         # Apply email address highlighting (yellow)
         for address in addresses_to_highlight:
             for match in re.finditer(re.escape(address), text):
                 cursor.setPosition(match.start())
                 cursor.setPosition(match.end(), QTextCursor.KeepAnchor)
-                
+
                 char_format = QTextCharFormat()
                 char_format.setBackground(QColor("yellow"))
                 cursor.setCharFormat(char_format)
-        
+
         # Apply text selection highlighting (light blue, on top)
-        selection = self.text_selection.get((row, col))
-        if selection and selection[0] != selection[1]:
-            start, end = min(selection[0], selection[1]), max(selection[0], selection[1])
-            cursor.setPosition(start)
-            cursor.setPosition(end, QTextCursor.KeepAnchor)
-            
-            char_format = QTextCharFormat()
-            char_format.setBackground(QColor(180, 200, 255))  # Light blue
-            cursor.setCharFormat(char_format)
+        self._apply_selection_highlight(doc, index)
 
         painter.save()
         painter.translate(opt.rect.topLeft())
@@ -276,74 +268,8 @@ class AddressDelegate(QStyledItemDelegate):
         painter.restore()
 
     def sizeHint(self, option, index):
-        doc = QTextDocument()
-        doc.setDefaultFont(self.config.get_text_font())
-        text = index.data(Qt.DisplayRole) if index.data(Qt.DisplayRole) else ""
-        doc.setPlainText(text)
-        doc.setTextWidth(option.rect.width())
+        doc = self._make_doc(index)
         return QSize(doc.idealWidth(), doc.documentLayout().documentSize().height())
-    
-    def start_text_selection(self, index, pos):
-        row, col = index.row(), index.column()
-        text = index.data(Qt.DisplayRole) if index.data(Qt.DisplayRole) else ""
-        
-        doc = QTextDocument()
-        doc.setDefaultFont(self.config.get_text_font())
-        doc.setPlainText(text)
-        doc.setTextWidth(self.parent().visualRect(index).width())
-        
-        hit_point = pos - self.parent().visualRect(index).topLeft()
-        char_pos = doc.documentLayout().hitTest(hit_point, Qt.HitTestAccuracy.ExactHit)
-        
-        # hitTest returns -1 when beyond text boundaries
-        if char_pos < 0:
-            char_pos = len(text)
-        else:
-            char_pos = max(0, min(char_pos, len(text)))
-        
-        self.text_selection.clear()
-        self.selection_start_cell = (row, col)
-        self.text_selection[(row, col)] = (char_pos, char_pos)
-        self.parent().viewport().update()
-    
-    def update_text_selection(self, index, pos):
-        row, col = index.row(), index.column()
-        if self.selection_start_cell != (row, col):
-            return
-        
-        text = index.data(Qt.DisplayRole) if index.data(Qt.DisplayRole) else ""
-        doc = QTextDocument()
-        doc.setDefaultFont(self.config.get_text_font())
-        doc.setPlainText(text)
-        doc.setTextWidth(self.parent().visualRect(index).width())
-        
-        hit_point = pos - self.parent().visualRect(index).topLeft()
-        char_pos = doc.documentLayout().hitTest(hit_point, Qt.HitTestAccuracy.ExactHit)
-        
-        # hitTest returns -1 when beyond text boundaries
-        if char_pos < 0:
-            char_pos = len(text)
-        else:
-            char_pos = max(0, min(char_pos, len(text)))
-        
-        self.text_selection[(row, col)] = (self.text_selection[(row, col)][0], char_pos)
-        self.parent().viewport().update()
-    
-    def finalize_selection(self, index):
-        text = self.get_selected_text(index)
-        if text:
-            clipboard = QApplication.clipboard()
-            clipboard.setText(text, QClipboard.Mode.Selection)  # For middle-click paste
-    
-    def get_selected_text(self, index):
-        row, col = index.row(), index.column()
-        selection = self.text_selection.get((row, col))
-        
-        if selection and selection[0] != selection[1]:
-            text = index.data(Qt.DisplayRole) if index.data(Qt.DisplayRole) else ""
-            start, end = min(selection[0], selection[1]), max(selection[0], selection[1])
-            return text[start:end]
-        return None
 
     def editorEvent(self, event, model, option, index):
         if event.type() == QEvent.Type.MouseButtonPress and event.button() == Qt.RightButton:
