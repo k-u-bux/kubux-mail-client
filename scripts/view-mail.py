@@ -37,6 +37,20 @@ from header_widget import MailHeaderWidget
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 
+def is_attachment(message):
+    """A message is an attachment if it embeds another email (message/*)."""
+    return message.get_content_maintype() == 'message'
+
+
+def custom_walk(message):
+    """Walk the message tree like walk(), but prune message attachment
+    subtrees so forwarded/attached emails are not inlined into the body."""
+    yield message
+    if message.is_multipart() and not is_attachment(message):
+        for subpart in message.get_payload():
+            yield from custom_walk(subpart)
+
+
 class MailSourceViewer(QDialog):
     """A simple dialog to display the raw content of the mail file."""
     def __init__(self, mail_file_path, parent=None):
@@ -136,16 +150,21 @@ class MailViewer(QMainWindow):
             logging.error(f"Failed to parse mail file: {e}")
             raise RuntimeError(f"Failed to parse mail file {self.mail_file_path}: {e}") from e
         # print("parsing message")
-        for part in self.message.walk():
-            # Prioritize plain text over HTML
-            if part.get_content_type() == 'text/plain' and not self.has_text_body:
+        for part in custom_walk(self.message):
+            if part.get_content_type() == 'text/plain':
                 body_text = part.get_content()
-                self.mail_body = body_text
+                if self.mail_body:
+                    self.mail_body += "\n\n" + body_text
+                else:
+                    self.mail_body = body_text
                 self.has_text_body = True
-            if part.get_content_type() == 'text/html' and not self.has_html_body:
+            if part.get_content_type() == 'text/html':
                 body_html = part.get_content()
                 sanitized_html = self.sanitize_html_fonts(body_html)
-                self.mail_html = sanitized_html
+                if self.mail_html:
+                    self.mail_html += "<br><br>" + sanitized_html
+                else:
+                    self.mail_html = sanitized_html
                 self.has_html_body = True
         self.attachments = mail.attachments 
         # unfortunately not all mail have only one id
@@ -724,12 +743,20 @@ class MailViewer(QMainWindow):
         """
         original_body = ""
         html_body = ""
-        for part in self.message.walk():
+        for part in custom_walk(self.message):
             content_type = part.get_content_type()
-            if content_type == 'text/plain' and not original_body:
-                original_body = part.get_payload(decode=True).decode(part.get_content_charset() or 'utf-8', errors='ignore')
-            elif content_type == 'text/html' and not html_body:
-                html_body = part.get_payload(decode=True).decode(part.get_content_charset() or 'utf-8', errors='ignore')
+            if content_type == 'text/plain':
+                body_text = part.get_payload(decode=True).decode(part.get_content_charset() or 'utf-8', errors='ignore')
+                if original_body:
+                    original_body += "\n\n" + body_text
+                else:
+                    original_body = body_text
+            elif content_type == 'text/html':
+                body_html = part.get_payload(decode=True).decode(part.get_content_charset() or 'utf-8', errors='ignore')
+                if html_body:
+                    html_body += "\n\n" + body_html
+                else:
+                    html_body = body_html
         if not original_body and html_body:
             original_body = html_to_plain_text( html_body )
         return original_body
