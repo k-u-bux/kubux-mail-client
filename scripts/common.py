@@ -7,6 +7,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, QSize, QPoint, QObject, QTimer, QMetaObject
 from PySide6.QtGui import QFont, QKeySequence, QAction
 import logging
+import sys
 from pathlib import Path
 from datetime import datetime
 import secrets
@@ -15,6 +16,7 @@ import subprocess
 import shutil
 import tempfile
 import email
+from email import policy
 from config import config
 import re
 import html2text
@@ -177,6 +179,35 @@ def html_to_plain_text_hack(html_content):
     text = re.sub(r'\n{3,}', '\n\n', text)
     
     return text.strip()
+
+def extract_email_text(file_path: Path) -> str:
+    """
+    Extracts the subject, from, to, cc, and plain text body from an email file
+    to use for classification.
+    """
+    try:
+        with open(file_path, 'rb') as f:
+            msg = email.message_from_binary_file(f, policy=policy.default)
+
+        subject = msg.get("Subject", "")
+        from_field = msg.get("From", "")
+        to_field = msg.get("To", "")
+        cc_field = msg.get("Cc", "")
+
+        body = ""
+        if msg.is_multipart():
+            for part in msg.walk():
+                ctype = part.get_content_type()
+                if ctype == 'text/plain':
+                    body = part.get_content()
+                    break
+        else:
+            body = msg.get_content()
+
+        return f"Subject: {subject}\nFrom: {from_field}\nTo: {to_field}\nCc: {cc_field}\n\n{body}"
+    except Exception as e:
+        sys.stderr.write(f"Error processing {file_path}: {e}\n")
+        return ""
 
 def create_date_item ( timestamp ):
     """Creates a sortable QTableWidgetItem for the date."""

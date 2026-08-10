@@ -11,6 +11,7 @@ from pathlib import Path
 from datetime import datetime
 import secrets
 import os
+import atexit
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
@@ -25,6 +26,7 @@ class DirectoryEventHandler(QObject, FileSystemEventHandler):
         self.timer.timeout.connect(self._wrapped_cb)
         self.observer = None
         self.is_busy = False
+        atexit.register(self.stop)
 
     def _wrapped_cb (self):
         self.is_busy = True
@@ -34,7 +36,6 @@ class DirectoryEventHandler(QObject, FileSystemEventHandler):
             self.is_busy = False
 
     def _process_event(self, event):
-        print("dir event found")
         if not self.is_busy:
             QMetaObject.invokeMethod(self.timer, "start", Qt.QueuedConnection)
 
@@ -52,10 +53,8 @@ class DirectoryEventHandler(QObject, FileSystemEventHandler):
 
     def watch(self, directory: str):
         real_path = os.path.realpath(os.path.expanduser(directory))
-        print(f"Watching physical path: {real_path}")        
         if not real_path or not os.path.isdir(real_path):
             raise FileNotFoundError(f"DirectoryEventHandler cannot watch invalid path: {repr(directory)}")
-        print( f"watching: {real_path}" )
         self.stop()
         self.observer = Observer()
         self.observer.daemon = True

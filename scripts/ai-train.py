@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 
 from pathlib import Path
-import email
-from email import policy
 import argparse
 
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -14,6 +12,7 @@ import joblib
 
 from notmuch_api import find_matching_messages
 from config import config 
+from common import extract_email_text
 
 
 def ignore(title, message):
@@ -37,34 +36,6 @@ def training_on(tag):
     if tag == "mark_for_training":
         return False
     return True
-
-def extract_email_text(file_path: Path) -> str:
-    """
-    Extracts the subject, from, to, cc, and plain text body from an email file
-    to use for classification.
-    """
-    try:
-        with open(file_path, 'rb') as f:
-            msg = email.message_from_binary_file(f, policy=policy.default)
-
-        subject = msg.get("Subject", "")
-        from_field = msg.get("From", "")
-        to_field = msg.get("To", "")
-        cc_field = msg.get("Cc", "")
-
-        body = ""
-        if msg.is_multipart():
-            for part in msg.walk():
-                ctype = part.get_content_type()
-                if ctype == 'text/plain':
-                    body = part.get_content()
-                    break
-        else:
-            body = msg.get_content()
-
-        return f"Subject: {subject}\nFrom: {from_field}\nTo: {to_field}\nCc: {cc_field}\n\n{body}"
-    except Exception as e:
-        return ""
 
 def main():
     parser = argparse.ArgumentParser(description="Retrain an existing AI classifier with new data.")
