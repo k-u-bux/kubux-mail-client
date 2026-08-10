@@ -136,6 +136,9 @@ class Config:
             },
             "autocomplete": {
                 "headers": []
+            },
+            "viewing": {
+                "remote_content": "ondemand"
             }
         }
 
@@ -234,6 +237,9 @@ class Config:
 
     def get_autocompletions(self, category="headers"):
         return self.data.get("autocomplete", {}).get(category, [])
+
+    def get_remote_content_mode(self):
+        return self.data.get("viewing", {}).get("remote_content", "ondemand")
 
     def is_me(self, address_string_list) -> bool:
         from_addresses = getaddresses(address_string_list)

@@ -37,6 +37,44 @@ from header_widget import MailHeaderWidget
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 
+class SafeTextBrowser(QTextBrowser):
+    """QTextBrowser that blocks remote (http/https) resource loading.
+
+    The remote-content policy is read from config:
+      - "enable":   load remote resources silently
+      - "disable":  block remote resources silently
+      - "ondemand": prompt the user once per instance (per mail) the first
+                    time a remote resource is requested, then remember the
+                    decision for the rest of that mail.
+    """
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.load_remote_decision = None  # None = undecided, True = load, False = don't
+
+    def loadResource(self, resource_type, url):
+        if url.scheme().lower() in ("http", "https"):
+            mode = config.get_remote_content_mode()
+            if mode == "enable":
+                return super().loadResource(resource_type, url)
+            if mode == "disable":
+                return None  # always block, no prompt
+            # ondemand
+            if self.load_remote_decision is None:
+                self.load_remote_decision = self._prompt_load_remote()
+            if not self.load_remote_decision:
+                return None
+        return super().loadResource(resource_type, url)
+
+    def _prompt_load_remote(self):
+        box = QMessageBox(self)
+        box.setWindowTitle("Remote content")
+        box.setText("This message references remote content (e.g. images).\nLoad it?")
+        load_btn = box.addButton("Load remote content", QMessageBox.YesRole)
+        box.addButton("Don't load", QMessageBox.NoRole)
+        box.exec()
+        return box.clickedButton() == load_btn
+
+
 def is_attachment(message):
     """A message is an attachment if it embeds another email (message/*)."""
     return message.get_content_maintype() == 'message'
@@ -300,7 +338,7 @@ class MailViewer(QMainWindow):
         self.show_or_hide_headers()
 
         # Mail Content area
-        self.mail_content = QTextBrowser()
+        self.mail_content = SafeTextBrowser()
         self.mail_content.setFont(config.get_text_font())
         self.mail_content.setReadOnly(True)
         self.mail_content.setFont(config.get_text_font())
