@@ -222,11 +222,17 @@ class MailViewer(QMainWindow):
         self.attachments = mail.attachments 
         # unfortunately not all mail have only one id
         if isinstance(mail.message_id, list):
-            if not mail.message_id:
-                raise ValueError("Message-ID list is empty.")
-            self.message_id = mail.message_id[0].strip('<>')
+            self.message_id = mail.message_id[0].strip('<>') if mail.message_id else None
         else:
-            self.message_id = mail.message_id.strip('<>')
+            self.message_id = mail.message_id.strip('<>') if mail.message_id else None
+        # RFC 5322 §3.6.4: Message-ID is SHOULD, not MUST.  A mail without
+        # one is valid.  notmuch indexes such mails under a synthetic id
+        # "notmuch-sha1-<sha1_of_entire_file>" (lib/database.cc).  Derive
+        # the same id so tags/threads work for id-less mails too.
+        if not self.message_id:
+            with open(self.mail_file_path, 'rb') as f:
+                sha1 = hashlib.sha1(f.read()).hexdigest()
+            self.message_id = f"notmuch-sha1-{sha1}"
         print(f"Message-ID = {self.message_id}")
 
 
