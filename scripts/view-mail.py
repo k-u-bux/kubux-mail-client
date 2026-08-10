@@ -152,7 +152,6 @@ class MailViewer(QMainWindow):
         self.resize(QSize(1024, 768))
 
         self.mail_file_path = Path(mail_file_path).expanduser()
-        self.tags = []
         self.tags_state = {}
         self.show_headers = True
         self.attachments = []
@@ -702,10 +701,7 @@ class MailViewer(QMainWindow):
 
     def get_tags(self):
         """Queries the notmuch database for tags of the current mail's message ID."""
-        if not self.message_id:
-            return []
-        self.tags = get_tags_from_query( f'id:{self.message_id}', lambda *args: display_error( self, *args) )
-        return self.tags
+        return get_tags_from_query( f'id:{self.message_id}', lambda *args: display_error( self, *args) )
 
     def update_tags_ui(self):
         """Clears and rebuilds the UI to display the current tags and their states."""
