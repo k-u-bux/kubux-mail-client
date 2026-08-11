@@ -66,7 +66,7 @@ def main():
         messages = find_matching_messages(args.query, ignore)
         for msg in messages:
             tags = [f"{tag}" for tag in msg["tags"] if training_on(tag)]
-            file = f"{msg["filename"][0]}"
+            file = f"{msg['filename'][0]}"
             new_tagged_data[file] = tags
         
     except FileNotFoundError:
@@ -78,7 +78,7 @@ def main():
         messages = find_matching_messages(args.query, ignore)
         for msg in messages:
             tags = [f"{tag}" for tag in msg["tags"] if training_on(tag)]
-            file = f"{msg["filename"][0]}"
+            file = f"{msg['filename'][0]}"
             new_tagged_data[file] = tags
         
         vectorizer = TfidfVectorizer(ngram_range=(1, 5), stop_words=None, min_df=5, max_df=0.8)
