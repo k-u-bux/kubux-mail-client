@@ -372,7 +372,6 @@ class MailViewer(QMainWindow):
         self.mail_content = SafeTextBrowser()
         self.mail_content.setFont(config.get_text_font())
         self.mail_content.setReadOnly(True)
-        self.mail_content.setFont(config.get_text_font())
         self.mail_content.setOpenLinks(False) 
         self.splitter.addWidget(self.mail_content)
         self.mail_content.anchorClicked.connect(self.handle_link_clicked)
