@@ -103,8 +103,7 @@ class SendMail:
         passwd_cmd = account.get("passwd_cmd")        
         sent_dir = account.get("sent_dir")
         failed_dir = account.get("failed_dir");
-        password = subprocess.check_output(passwd_cmd, shell=True, text=True).strip()
-        # password = account.get("password")
+        password = subprocess.check_output(passwd_cmd, shell=True, text=True).strip() if passwd_cmd else None
 
         if not all([smtp_server, smtp_port, username, password, sent_dir, failed_dir]):
             logging.error(f"Account configuration incomplete for {from_addr}")
