@@ -600,24 +600,6 @@ class QueryEditor(QMainWindow):
         self.is_processing_cell_change = True
         
         try:
-            # Get the items from the changed row (only first two columns matter)
-            name_item = self.query_table.item(row, 0)
-            query_item = self.query_table.item(row, 1)
-            
-            name = name_item.text().strip() if name_item else ""
-            query = query_item.text().strip() if query_item else ""
-            
-            # If the top row (row 0) was changed and has content, add a new empty row
-            if row == 0 and (name or query):
-                # Insert a new empty row at the top
-                self.query_table.insertRow(0)
-                
-                # Add empty items to the new top row
-                self.add_empty_row_at_top()
-                
-                # Update the UI to reflect the change
-                self.query_table.update()
-            
             # Save all queries
             self.save_queries_from_table()
         finally:
@@ -721,11 +703,15 @@ class QueryEditor(QMainWindow):
                     item.setFont(text_font)
             self.query_table.setRowHeight(row, row_height)
         # Recreate delegate to pick up new font
+        old_text = self.text_delegate
+        old_drag = self.drag_handle_delegate
         self.text_delegate = NoSelectTextDelegate()
         self.drag_handle_delegate = DragHandleDelegate()
         for col in range(2):
             self.query_table.setItemDelegateForColumn(col, self.text_delegate)
         self.query_table.setItemDelegateForColumn(2, self.drag_handle_delegate)
+        old_text.deleteLater()
+        old_drag.deleteLater()
 
     def closeEvent(self, event):
         Config.unregister_callback(self._on_config_changed)
