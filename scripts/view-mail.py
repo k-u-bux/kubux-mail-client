@@ -28,6 +28,8 @@ import json
 import textwrap
 import base64
 import hashlib
+import mimetypes
+import secrets
 
 from config import config, Config
 from common import display_error, html_to_plain_text, get_db_path, get_run_method, show_window, run_gui_app, tag_dialog
@@ -254,11 +256,8 @@ class MailViewer(QMainWindow):
         current_tags = self.get_tags()
         if '$unseen' in current_tags:
             logging.info("Found '$unseen' tag. Silently replacing with '$unused'.")
-            try:
-                command = ['notmuch', 'tag', '-$unseen', '+$unused', f'id:{self.message_id}']
-                subprocess.run(command, check=True, capture_output=True, text=True)
-            except subprocess.CalledProcessError as e:
-                logging.error(f"Failed to process initial tags: {e.stderr}")
+            command = ['notmuch', 'tag', '-$unseen', '+$unused', f'id:{self.message_id}']
+            subprocess.run(command, check=True, capture_output=True, text=True)
 
 
     def setup_ui(self):
@@ -774,8 +773,6 @@ class MailViewer(QMainWindow):
             self.update_tags_ui()
         except subprocess.CalledProcessError as e:
             display_error(self, "Failed to Remove Tag", f"Failed to remove tag '{tag}':\n\n{e.stderr}")
-        except FileNotFoundError:
-            display_error(self, "Notmuch Not Found", "The 'notmuch' command was not found. Please ensure it is installed and in your PATH.")
     
     def add_tag(self, tag):
         """Adds a new tag to the current mail."""
@@ -1050,7 +1047,12 @@ class MailViewer(QMainWindow):
         try:
             part_index = self.attachments_list.row(item)
             attachment_part = self.attachments[part_index]
-            filename = attachment_part['filename']
+            filename = attachment_part.get('filename')
+            if not filename:
+                # No filename (common for inline parts) — derive a random one
+                # with an extension from the content-type.
+                ext = mimetypes.guess_extension(attachment_part.get('mail_content_type', '')) or '.bin'
+                filename = f"attachment_{secrets.token_hex(4)}{ext}"
 
             # Decode the base64 payload
             payload_bytes = self.get_attachment_payload( attachment_part )
