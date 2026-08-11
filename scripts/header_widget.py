@@ -345,12 +345,20 @@ class MailHeaderWidget(QWidget):
             except Exception:
                 pass
 
+        # Show the parsed timestamp only when a Date header was present;
+        # notmuch's search timestamp is not available here (we only have the
+        # raw file), so a missing Date header must not show a bogus epoch-0.
+        if date_header:
+            date_display = f"{date_header}  [{create_date_item(timestamp).text()}]"
+        else:
+            date_display = "no date given"
+
         self.data = [   
             ("Subject:", message.get("Subject")),
             ("From:",    message.get("From")),
             ("To:",      message.get("To")),
             ("Cc:",      message.get("Cc")),
-            ("Date:",    f"{date_header}  [{create_date_item(timestamp).text()}]")
+            ("Date:",    date_display)
         ]
         
         self.table_widget.setRowCount(len(self.data))
