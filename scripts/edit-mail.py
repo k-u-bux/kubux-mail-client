@@ -462,7 +462,7 @@ class MailEditor(QMainWindow):
             # Generate Message-ID
             from_address = email.utils.parseaddr(headers.get('From', ''))[1]
             domain = from_address.split('@')[1] if '@' in from_address else 'local.machine'
-            headers['Message-ID'] = f"{self.message_id_loc}@{domain}>"
+            headers['Message-ID'] = f"<{self.message_id_loc}@{domain}>"
 
             # Write headers, RFC 2047-encoding non-ASCII display names,
             # then append the MIME body bytes
