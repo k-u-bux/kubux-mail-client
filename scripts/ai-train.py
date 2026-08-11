@@ -110,8 +110,8 @@ def main():
         X_vectorized = vectorizer.transform(X_data)
 
     y_data = []
-    for filename in new_tagged_data.keys():
-        row = [1 if tag in y_data_map.get(filename, []) else 0 for tag in tag_list]
+    for filename in y_data_map.keys():
+        row = [1 if tag in y_data_map[filename] else 0 for tag in tag_list]
         y_data.append(row)
 
     print("Training model...")
