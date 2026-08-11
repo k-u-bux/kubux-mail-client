@@ -882,7 +882,7 @@ class MailViewer(QMainWindow):
 
     def get_quoted_body(self):
         original_body = self.get_body()
-        return textwrap.indent( original_body, '> ', (lambda dummy: True) )
+        return textwrap.indent( original_body, '> ', (lambda line: True) )
 
     def reply(self):
         """
