@@ -26,7 +26,7 @@ class QueryParser:
         if not self.queries_path.exists():
             logging.warning(f"Queries file not found at {self.queries_path}. Using empty named queries.")
             # Create a default file
-            default_queries = []
+            default_queries = {"queries": []}
             try:
                 with open(self.queries_path, "w") as f:
                     json.dump(default_queries, f)
