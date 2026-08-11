@@ -296,17 +296,17 @@ class MailViewer(QMainWindow):
         self.tags_menu = QMenu(self)
         self.tags_menu.setFont(config.get_menu_font())
         for tag in config.get_tags():
-            l = lambda checked, dummy=f"{tag}": self.really_toggle_tag( dummy )
+            l = lambda checked, dummy=f"{tag}": self.toggle_tag( dummy )
             action = self.tags_menu.addAction(f"+/- {tag}")
             action.triggered.connect( l )
         self.tags_menu.addSeparator()
         for tag in config.get_status_tags():
-            l = lambda checked, dummy=f"{tag}": self.really_toggle_tag( dummy )
+            l = lambda checked, dummy=f"{tag}": self.toggle_tag( dummy )
             action = self.tags_menu.addAction(f"+/- {tag}")
             action.triggered.connect( l )
         self.tags_menu.addSeparator()
-        self.tags_menu.addAction("+/- spam").triggered.connect( lambda: self.really_toggle_tag("spam") )
-        self.tags_menu.addAction("+/- deleted").triggered.connect( lambda: self.really_toggle_tag("deleted") )
+        self.tags_menu.addAction("+/- spam").triggered.connect( lambda: self.toggle_tag("spam") )
+        self.tags_menu.addAction("+/- deleted").triggered.connect( lambda: self.toggle_tag("deleted") )
         self.tags_menu.addSeparator()
         self.tags_menu.addAction("Add Tags").triggered.connect( lambda: self.add_tag_dialog() )
         self.tags_button.setMenu(self.tags_menu)
@@ -778,17 +778,6 @@ class MailViewer(QMainWindow):
         except FileNotFoundError:
             display_error(self, "Notmuch Not Found", "The 'notmuch' command was not found. Please ensure it is installed and in your PATH.")
     
-    def really_remove_tag(self, tag):
-        self.tags_state.pop(tag)
-        self.remove_tag(tag)
-
-    def really_toggle_tag(self, tag):
-        is_attached = self.tags_state.get(tag, False)
-        if is_attached:
-            self.really_remove_tag(tag)
-        else:
-            self.add_tag(tag)
-
     def add_tag(self, tag):
         """Adds a new tag to the current mail."""
         try:
