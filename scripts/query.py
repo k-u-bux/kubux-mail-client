@@ -6,6 +6,9 @@ import re
 
 from config import config
 
+# A notmuch term that matches no messages, used to neuter broken query references.
+ALWAYS_FALSE_TERM = "(id:00000000000000000000000000000000)"
+
 class QueryParser:
     """
     Parses and expands user-defined named queries.
@@ -18,6 +21,7 @@ class QueryParser:
         self.queries = self._load_queries().get("queries",[])
         self.named_queries = {name:query for name, query in self.queries if name != ""}
         self.names  = [name for name, query in self.queries if name != ""]
+        self.warnings = []
 
     def _load_queries(self):
         """
@@ -46,7 +50,10 @@ class QueryParser:
         """
         Expands named queries in the given expression.
         Handles nested queries and checks for circular dependencies.
+        Broken references (undefined or circular) are replaced with an
+        always-false term and reported in self.warnings instead of raising.
         """
+        self.warnings = []
         return self._expand_queries(query_expression, [])
 
     def _expand_queries(self, expression: str, trace: list) -> str:
@@ -59,20 +66,27 @@ class QueryParser:
         
         expanded_expression = expression
         for ref in references:
-            # Check for circular dependency
+            # Circular dependency: replace with always-false term + warn
             if ref in trace:
-                raise ValueError(f"Circular query reference detected: {' -> '.join(trace + [ref])}")
-            
+                self.warnings.append(
+                    f"Circular query reference detected: {' -> '.join(trace + [ref])}"
+                )
+                expanded_expression = expanded_expression.replace(f"${ref}", ALWAYS_FALSE_TERM)
+                continue
+
+            # Undefined query: replace with always-false term + warn
             if ref not in self.named_queries:
-                raise ValueError(f"Undefined query name: '${ref}'")
-            
+                self.warnings.append(f"Undefined query name: '${ref}'")
+                expanded_expression = expanded_expression.replace(f"${ref}", ALWAYS_FALSE_TERM)
+                continue
+
             referenced_query = self.named_queries[ref]
-            
+
             # Recursively expand the referenced query
             expanded_sub_query = self._expand_queries(referenced_query, trace + [ref])
-            
+
             # Substitute the reference with the expanded query, wrapped in parentheses
             # to preserve notmuch's operator precedence
             expanded_expression = expanded_expression.replace(f"${ref}", f"({expanded_sub_query})")
-            
+
         return expanded_expression

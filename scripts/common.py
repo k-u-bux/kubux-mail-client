@@ -245,6 +245,11 @@ def display_error(parent, title, message):
     dialog = CopyableErrorDialog( title, message, parent=parent )
     dialog.exec()
 
+def log_and_display_error(parent, title, message):
+    """Log an error and show it in a copyable diagnostics dialog."""
+    logging.error(f"{title}: {message}")
+    display_error(parent, title, message)
+
 # drafts
 def create_draft(parent, identity_dict):
     """Creates a new draft file for the given identity."""

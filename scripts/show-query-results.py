@@ -26,7 +26,7 @@ from common import (
     create_draft, create_new_mail_menu, launch_drafts_manager, create_summary_text, create_date_item, get_run_method,
     get_db_path, get_row_tags, row_has_tag, each_selected_row, toggle_row_tag, tag_dialog,
     apply_tag_to_selected, get_sender_receiver, setup_key_bindings, show_window, run_gui_app,
-    edit_drafts_menu, edit_config_action
+    edit_drafts_menu, edit_config_action, log_and_display_error
 )
 from watcher import DirectoryEventHandler
 from query import QueryParser
@@ -290,6 +290,8 @@ class QueryResultsViewer(QMainWindow):
 
         parser = QueryParser(config_dir=config.config_dir)
         self.current_query = parser.parse( raw_query )
+        if parser.warnings:
+            log_and_display_error(self, "Query Warning", "\n".join(parser.warnings))
         logging.info(f"[dbg pid={os.getpid()}] execute_query: query='{self.current_query}' mode='{self.view_mode}'")
 
         # record the query
