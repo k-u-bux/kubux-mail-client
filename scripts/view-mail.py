@@ -61,9 +61,8 @@ class SafeTextBrowser(QTextBrowser):
                 return super().loadResource(resource_type, url)
             if mode == "disable":
                 return None  # always block, no prompt
-            # ondemand
-            if self.load_remote_decision is None:
-                self.load_remote_decision = self._prompt_load_remote()
+            # ondemand: the decision is made in display_message (outside the
+            # paint event, where a modal dialog would corrupt the painter).
             if not self.load_remote_decision:
                 return None
         return super().loadResource(resource_type, url)
@@ -451,6 +450,11 @@ class MailViewer(QMainWindow):
         self.update_tags_ui()
 
         if self.shows_html:
+            # Prompt for remote content here, before rendering, so the modal
+            # dialog runs outside the paint event (a modal dialog during
+            # loadResource corrupts the painter and segfaults).
+            if self.mail_content.load_remote_decision is None and self._html_has_remote_content(self.mail_html):
+                self.mail_content.load_remote_decision = self.mail_content._prompt_load_remote()
             self.mail_content.setHtml(self.mail_html)
         else:
             cursor = self.mail_content.textCursor()
@@ -460,6 +464,16 @@ class MailViewer(QMainWindow):
             # For plain text, we need to detect URLs manually
             self.highlight_urls_in_plain_text()
         
+    def _html_has_remote_content(self, html):
+        """Return True if the HTML auto-loads remote content.
+
+        Matches only attributes that fetch content without user interaction
+        (src, srcset, background, poster).  Ordinary <a href="..."> links are
+        excluded: they are only fetched when clicked.
+        """
+        return bool(re.search(r'\b(?:src|srcset|background|poster)\s*=\s*["\']https?://',
+                              html, re.IGNORECASE))
+
     def _strip_trailing_punct(self, url: str):
         """Return (trimmed_url, chars_removed).
 
