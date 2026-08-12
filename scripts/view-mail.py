@@ -452,8 +452,12 @@ class MailViewer(QMainWindow):
         if self.shows_html:
             # Prompt for remote content here, before rendering, so the modal
             # dialog runs outside the paint event (a modal dialog during
-            # loadResource corrupts the painter and segfaults).
-            if self.mail_content.load_remote_decision is None and self._html_has_remote_content(self.mail_html):
+            # loadResource corrupts the painter and segfaults).  Only prompt
+            # in "ondemand" mode; "enable"/"disable" are handled silently by
+            # loadResource.
+            if (config.get_remote_content_mode() == "ondemand"
+                    and self.mail_content.load_remote_decision is None
+                    and self._html_has_remote_content(self.mail_html)):
                 self.mail_content.load_remote_decision = self.mail_content._prompt_load_remote()
             self.mail_content.setHtml(self.mail_html)
         else:
