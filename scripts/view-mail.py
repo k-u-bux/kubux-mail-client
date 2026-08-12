@@ -93,6 +93,25 @@ def _extract_body(html):
     return m.group(1) if m else html
 
 
+def _normalize_message_id(raw):
+    """Normalize a Message-ID the same way notmuch does.
+
+    notmuch strips exactly one leading '<' and one trailing '>' from the
+    raw header value (lib/message-file.c).  A naive .strip('<>') would
+    remove *all* brackets, which breaks mails whose Message-ID has
+    doubled brackets (e.g. '<<...>'), because the resulting id would not
+    match the one notmuch stored.
+    """
+    if not raw:
+        return raw
+    raw = raw.strip()
+    if raw.startswith('<'):
+        raw = raw[1:]
+    if raw.endswith('>'):
+        raw = raw[:-1]
+    return raw
+
+
 def custom_walk(message):
     """Walk the message tree like walk(), but prune message attachment
     subtrees so forwarded/attached emails are not inlined into the body."""
@@ -223,9 +242,9 @@ class MailViewer(QMainWindow):
         self.attachments = mail.attachments 
         # unfortunately not all mail have only one id
         if isinstance(mail.message_id, list):
-            self.message_id = mail.message_id[0].strip('<>') if mail.message_id else None
+            self.message_id = _normalize_message_id(mail.message_id[0]) if mail.message_id else None
         else:
-            self.message_id = mail.message_id.strip('<>') if mail.message_id else None
+            self.message_id = _normalize_message_id(mail.message_id) if mail.message_id else None
         # RFC 5322 §3.6.4: Message-ID is SHOULD, not MUST.  A mail without
         # one is valid.  notmuch indexes such mails under a synthetic id
         # "notmuch-sha1-<sha1_of_entire_file>" (lib/database.cc).  Derive

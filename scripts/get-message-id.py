@@ -2,10 +2,29 @@ import sys
 import email
 from email import policy
 
+def _normalize_message_id(raw):
+    """Normalize a Message-ID the same way notmuch does.
+
+    notmuch strips exactly one leading '<' and one trailing '>' from the
+    raw header value (lib/message-file.c).  A naive .strip('<>') would
+    remove *all* brackets, which breaks mails whose Message-ID has
+    doubled brackets (e.g. '<<...>'), because the resulting id would not
+    match the one notmuch stored.
+    """
+    if not raw:
+        return raw
+    raw = raw.strip()
+    if raw.startswith('<'):
+        raw = raw[1:]
+    if raw.endswith('>'):
+        raw = raw[:-1]
+    return raw
+
+
 def get_message_id_from_file(file_path):
     """
     Parses an email file and returns the Message-ID header value
-    without the surrounding angle brackets.
+    normalized the way notmuch stores it.
 
     Args:
         file_path (str): The path to the email file.
@@ -18,7 +37,7 @@ def get_message_id_from_file(file_path):
             msg = email.message_from_binary_file(f, policy=policy.compat32)
             message_id = msg['Message-ID']
             if message_id:
-                return message_id.strip('<>')
+                return _normalize_message_id(message_id)
             else:
                 return None
                 
