@@ -250,6 +250,16 @@ def log_and_display_error(parent, title, message):
     logging.error(f"{title}: {message}")
     display_error(parent, title, message)
 
+def decision_dialog(parent, title, message, yes_text, no_text):
+    """Show a yes/no decision dialog; return True if 'yes' was chosen."""
+    box = QMessageBox(parent)
+    box.setWindowTitle(title)
+    box.setText(message)
+    yes_btn = box.addButton(yes_text, QMessageBox.YesRole)
+    box.addButton(no_text, QMessageBox.NoRole)
+    box.exec()
+    return box.clickedButton() == yes_btn
+
 # drafts
 def create_draft(parent, identity_dict):
     """Creates a new draft file for the given identity."""

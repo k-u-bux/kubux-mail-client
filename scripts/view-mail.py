@@ -32,7 +32,7 @@ import mimetypes
 import secrets
 
 from config import config, Config
-from common import display_error, html_to_plain_text, get_db_path, get_run_method, show_window, run_gui_app, tag_dialog
+from common import display_error, html_to_plain_text, get_db_path, get_run_method, show_window, run_gui_app, tag_dialog, decision_dialog
 from watcher import DirectoryEventHandler
 from header_widget import MailHeaderWidget
 
@@ -66,16 +66,6 @@ class SafeTextBrowser(QTextBrowser):
             if not self.load_remote_decision:
                 return None
         return super().loadResource(resource_type, url)
-
-    def _prompt_load_remote(self):
-        box = QMessageBox(self)
-        box.setWindowTitle("Remote content")
-        box.setText("This message references remote content (e.g. images).\nLoad it?")
-        load_btn = box.addButton("Load remote content", QMessageBox.YesRole)
-        box.addButton("Don't load", QMessageBox.NoRole)
-        box.exec()
-        return box.clickedButton() == load_btn
-
 
 def _decode_text_payload(payload, charset):
     """Decode a text/plain or text/html payload per the configured policy.
@@ -458,7 +448,10 @@ class MailViewer(QMainWindow):
             if (config.get_remote_content_mode() == "ondemand"
                     and self.mail_content.load_remote_decision is None
                     and self._html_has_remote_content(self.mail_html)):
-                self.mail_content.load_remote_decision = self.mail_content._prompt_load_remote()
+                self.mail_content.load_remote_decision = decision_dialog(
+                    self, "Remote content",
+                    "This message references remote content (e.g. images).\nLoad it?",
+                    "Load remote content", "Don't load")
             self.mail_content.setHtml(self.mail_html)
         else:
             cursor = self.mail_content.textCursor()
