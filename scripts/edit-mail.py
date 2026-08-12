@@ -459,10 +459,15 @@ class MailEditor(QMainWindow):
                 if references:
                     headers['References'] = references
 
-            # Generate Message-ID
+            # Generate Message-ID.  message_id_loc already includes the
+            # leading '<' (it comes from email.utils.make_msgid() or from
+            # splitting an existing Message-ID on '@'), so do NOT wrap it
+            # in another '<' here — doing so would produce a doubled
+            # opening bracket like '<<...>', which notmuch then stores
+            # with a mismatched id and the viewer cannot find the tags.
             from_address = email.utils.parseaddr(headers.get('From', ''))[1]
             domain = from_address.split('@')[1] if '@' in from_address else 'local.machine'
-            headers['Message-ID'] = f"<{self.message_id_loc}@{domain}>"
+            headers['Message-ID'] = f"{self.message_id_loc}@{domain}>"
 
             # Write headers, RFC 2047-encoding non-ASCII display names,
             # then append the MIME body bytes
