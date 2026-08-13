@@ -274,10 +274,10 @@ echo "  Python virtualenv ready."
 echo "--- Installing scripts ---"
 cp -P "$INSTALL_SRC"/scripts/*.py "$BINDIR/"
 cp -P "$INSTALL_SRC"/scripts/*.jq "$BINDIR/" 2>/dev/null || true
-for f in predict-tags decrypt-on-the-fly mbsync-and-decrypt; do
+for f in predict-tags decrypt-on-the-fly mbsync-and-decrypt pull-from-imap-server; do
     cp -P "$INSTALL_SRC/scripts/$f" "$BINDIR/" 2>/dev/null || true
 done
-chmod +x "$BINDIR"/*.py "$BINDIR"/predict-tags "$BINDIR"/decrypt-on-the-fly "$BINDIR"/mbsync-and-decrypt 2>/dev/null || true
+chmod +x "$BINDIR"/*.py "$BINDIR"/predict-tags "$BINDIR"/decrypt-on-the-fly "$BINDIR"/mbsync-and-decrypt "$BINDIR"/pull-from-imap-server 2>/dev/null || true
 
 # Fix shebangs
 sed -i "s|^python |${VENVDIR}/bin/python |" "$BINDIR/predict-tags" 2>/dev/null || true
