@@ -25,7 +25,8 @@ from common import (
     display_error, 
     create_draft, create_new_mail_menu, launch_drafts_manager, create_summary_text, create_date_item, get_run_method,
     get_db_path, get_row_tags, row_has_tag, each_selected_row, toggle_row_tag, tag_dialog,
-    apply_tag_to_selected, get_sender_receiver, setup_key_bindings, show_window, run_gui_app,
+    apply_tag_to_selected, get_sender_receiver, get_sender, get_receiver, get_cc_receiver,
+    setup_key_bindings, show_window, run_gui_app,
     edit_drafts_menu, edit_config_action, log_and_display_error
 )
 from watcher import DirectoryEventHandler
@@ -336,7 +337,7 @@ class QueryResultsViewer(QMainWindow):
         subject_text = f"<{thread.get('total')}> {thread.get('subject')}"
         authors_text = thread.get("authors", "unknown")
         tags_text = " ".join( [ tag for tag in thread.get("tags") if not tag.startswith("$") ] ) 
-        summary_text = create_summary_text( authors_text, subject_text, tags_text )
+        summary_text = create_summary_text( [ authors_text, subject_text, tags_text ] )
         # summary_text = f"{authors_text}\n{subject_text}"
 
         date_item = create_date_item(date_stamp)
@@ -357,9 +358,12 @@ class QueryResultsViewer(QMainWindow):
         """Helper to populate a row for a mail item from `notmuch show`."""
         date_stamp = mail.get("timestamp")
         subject_text = mail.get("headers", {}).get("Subject", "No Subject")
-        sender_receiver_text = self._get_sender_receiver(mail)
+        sender_receiver_text = get_sender_receiver(mail, config)
+        sender_text = get_sender(mail, config)
+        receiver_text = get_receiver(mail, config)
+        cc_receiver_text = get_cc_receiver(mail, config)
         tags_text = " ".join( [ tag for tag in  mail.get("tags") if not tag.startswith("$") ] )
-        summary_text = create_summary_text( sender_receiver_text, subject_text, tags_text )
+        summary_text = create_summary_text( [ sender_text, receiver_text, cc_receiver_text, subject_text, tags_text ] )
         # summary_text = f"{sender_receiver_text}\n{subject_text}"
 
         date_item = create_date_item(date_stamp)
@@ -376,10 +380,6 @@ class QueryResultsViewer(QMainWindow):
         
         self.results_table.item(row_idx, 0).setData(Qt.ItemDataRole.UserRole, mail)
         
-    def _get_sender_receiver(self, message):
-        """Extracts the sender/receiver based on my email address."""
-        return get_sender_receiver(message, config)
-
     def new_mail_action(self):
         """Creates and displays a menu for selecting an email identity."""
         create_new_mail_menu(self)

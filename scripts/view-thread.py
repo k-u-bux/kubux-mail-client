@@ -26,7 +26,8 @@ from config import config, Config
 from common import (
     display_error, create_summary_text, create_date_item, get_db_path, get_run_method,
     get_row_tags, row_has_tag, each_selected_row, toggle_row_tag, tag_dialog,
-    get_sender_receiver, setup_key_bindings, show_window, run_gui_app
+    get_sender_receiver, get_sender, get_receiver, get_cc_receiver,
+    setup_key_bindings, show_window, run_gui_app
 )
 from watcher import DirectoryEventHandler
 
@@ -195,12 +196,15 @@ class ThreadViewer(QMainWindow):
         self.results_table.setRowCount(len(messages))
         for row_idx, mail in enumerate(messages):
             date_item = create_date_item(mail.get("timestamp"))
-            sender_receiver_text = self._get_sender_receiver(mail)
+            sender_receiver_text = get_sender_receiver(mail, config)
+            sender_text = get_sender(mail, config)
+            receiver_text = get_receiver(mail, config)
+            cc_receiver_text = get_cc_receiver(mail, config)
             sender_receiver_item = QTableWidgetItem(sender_receiver_text)
             subject_text = mail.get("headers", {}).get("Subject", "No Subject")
             tags_text = " ".join( [ tag for tag in  mail.get("tags") if not tag.startswith("$") ] )
             # summary_text = f"{sender_receiver_text}\n{subject_text}"
-            summary_text = create_summary_text( sender_receiver_text, subject_text, tags_text )
+            summary_text = create_summary_text( [ sender_text, receiver_text, cc_receiver_text, subject_text, tags_text ] )
 
             if indent:
                 indent_string = ". " * mail.get('depth', 0)
@@ -217,10 +221,6 @@ class ThreadViewer(QMainWindow):
             
             self.results_table.item(row_idx, 0).setData(Qt.ItemDataRole.UserRole, mail)
             
-    def _get_sender_receiver(self, message):
-        """Extracts the sender/receiver based on my email address."""
-        return get_sender_receiver(message, config)
-
     # get_tags
     def get_tags( self, row ):
         return get_row_tags(self.results_table, row)

@@ -62,10 +62,14 @@ def font_to_html_style(font: QFont) -> str:
             f"font-weight: {weight}; "
             f"font-style: {style};")
 
-def create_summary_text( authors, subject, tags ) -> str:
+def create_summary_text( list_of_strings ) -> str:
+    contents = ""
+    for str in list_of_strings:
+        if str:
+            contents = contents + f"<p>{html.escape(str)}</p>"
     return (
-        f"<div style=\"white-space: pre-wrap;\">"
-        f"<p>{html.escape(authors)}</p><p>{html.escape(subject)}</p><p>{html.escape(tags)}</p>"
+        f"<div style=\"white-space: pre-wrap;\">"+
+        contents+
         f"</div>"
     )
 
@@ -422,11 +426,30 @@ def apply_tag_to_selected(table, apply_tag, op_getter):
 
 def get_sender_receiver(message, config):
     """'From' if not me, else 'to: <To>'."""
+    to_field = message.get("headers", {}).get("To", "unknown <nobody@nowhere.net>")
     from_field = message.get("headers", {}).get("From", "unknown <nobody@nowhere.net>")
     authors_string_list = [from_field] if isinstance(from_field, str) else from_field
     if not config.is_me(authors_string_list):
         return from_field
-    return "to: " + message.get("headers", {}).get("To", "unknown <nobody@nowhere.net>")
+    return "to: " + to_field
+
+def get_sender(message, config):
+    """'From' if not me, else 'to: <To>'."""
+    from_field = message.get("headers", {}).get("From", "unknown <nobody@nowhere.net>")
+    authors_string_list = [from_field] if isinstance(from_field, str) else from_field
+    return f"from: {from_field}"
+
+def get_receiver(message, config):
+    """'From' if not me, else 'to: <To>'."""
+    to_field = message.get("headers", {}).get("To", "unknown <nobody@nowhere.net>")
+    to_string_list = [to_field] if isinstance(to_field, str) else to_field
+    return f"to: {to_field}"
+
+def get_cc_receiver(message, config):
+    """'From' if not me, else 'to: <To>'."""
+    cc_field = message.get("headers", {}).get("Cc", "")
+    cc_string_list = [cc_field] if isinstance(cc_field, str) else to_field
+    return f"cc: {cc_field}" if cc_field else None
 
 def setup_key_bindings(window, actions):
     """Bind config keybindings to actions on the given window."""

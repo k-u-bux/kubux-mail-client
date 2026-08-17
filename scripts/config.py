@@ -249,6 +249,17 @@ class Config:
         # print(f"DEBUG:{from_addrs_only} vs {my_addrs_only}")
         return not from_addrs_only.isdisjoint(my_addrs_only)
 
+    def strip_me(self, address_string_list):
+        from_addresses = getaddresses(address_string_list)
+        my_addresses = getaddresses([me["email"] for me in self.get_identities()])
+        my_addrs_only = {addr.casefold() for name, addr in my_addresses}
+        result = []
+        for name, addr in from_addresses:
+            if addr.casefold() in my_addrs_only:
+                result.append((name, addr))
+        return result
+
+
 # A global config object for easy access
 config = Config()
 
