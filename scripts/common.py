@@ -448,7 +448,7 @@ def get_receiver(message, config):
 def get_cc_receiver(message, config):
     """'From' if not me, else 'to: <To>'."""
     cc_field = message.get("headers", {}).get("Cc", "")
-    cc_string_list = [cc_field] if isinstance(cc_field, str) else to_field
+    cc_string_list = [cc_field] if isinstance(cc_field, str) else cc_field
     return f"cc: {cc_field}" if cc_field else None
 
 def setup_key_bindings(window, actions):
