@@ -338,6 +338,7 @@ class QueryResultsViewer(QMainWindow):
         authors_text = thread.get("authors", "unknown")
         tags_text = " ".join( [ tag for tag in thread.get("tags") if not tag.startswith("$") ] ) 
         summary_text = create_summary_text( [ authors_text, subject_text, tags_text ] )
+        # print( f"DEBUG: {[ authors_text, subject_text, tags_text ]}" )
         # summary_text = f"{authors_text}\n{subject_text}"
 
         date_item = create_date_item(date_stamp)
