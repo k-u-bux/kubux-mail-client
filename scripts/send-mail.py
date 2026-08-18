@@ -116,16 +116,15 @@ class SendMail:
         logging.info(f"Attempting to send mail from {from_addr} to {all_recipients} via {smtp_server}:{smtp_port}")
 
         try:
+            context = ssl.create_default_context()
             # Determine the correct SMTP connection method
             if smtp_port == 465:
                 # Implicit SSL
-                context = ssl.create_default_context()
                 with smtplib.SMTP_SSL(smtp_server, smtp_port, context=context) as server:
                     server.login(username, password)
                     server.send_message(msg)
             else:
                 # STARTTLS
-                context = ssl.create_default_context()
                 with smtplib.SMTP(smtp_server, smtp_port) as server:
                     server.starttls(context=context)
                     server.login(username, password)
