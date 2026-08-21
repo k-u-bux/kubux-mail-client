@@ -130,7 +130,8 @@ class Config:
                         "name": "Default User", 
                         "email": "user@example.com",
                         "drafts": "~/.local/share/kubux-mail-client/mail/drafts",
-                        "template": "~/.config/kubux-mail-client/draft_template.eml"
+                        "template": "~/.config/kubux-mail-client/draft_template.eml",
+                        "signature": ""
                     },
                 ]
             },
@@ -204,6 +205,18 @@ class Config:
 
     def get_identities(self):
         return self.data.get("email_identities", {}).get("identities", [])
+
+    def get_identity(self, email):
+        for i in self.get_identities():
+            if email.casefold() == (i.get('email') or "").casefold():
+                return i
+        return None
+
+    def get_signature(self, email):
+        identity = self.get_identity(email)
+        if identity:
+            return identity.get('signature', "") or ""
+        return ""
 
     def get_max_named_searches(self):
         return self.data.get("searches", {}).get("max_named_searches", 20)

@@ -48,6 +48,7 @@ class MailEditor(QMainWindow):
         self.mail_file_path = Path(mail_file_path).expanduser() if mail_file_path else None
         self.draft_message = self.parse_draft_mail(self.mail_file_path) if self.mail_file_path else None
         self.message_id_loc = None
+        self.current_signature = ""
         
         if self.draft_message is None and self.mail_file_path and self.mail_file_path.exists():
             self.close()
@@ -137,6 +138,10 @@ class MailEditor(QMainWindow):
         
         # Populate the "From" field with available identities
         self.populate_from_field()
+
+        # Swap the signature when the From identity changes
+        combo = self.headers_widget.editors["from_edit"]
+        combo.currentIndexChanged.connect(self._on_from_changed)
 
         self.splitter = QSplitter(Qt.Orientation.Vertical)
         main_layout.addWidget(self.splitter)
@@ -241,6 +246,13 @@ class MailEditor(QMainWindow):
                 break
         self.body_edit.setPlainText(plain_text_body)
 
+        # Append the signature for the draft's From identity
+        from_addr = email.utils.parseaddr(self.draft_message.get('From', ''))[1]
+        signature = config.get_signature(from_addr)
+        if signature:
+            self.current_signature = signature
+            self.body_edit.append(f"\n-- \n{signature}")
+
         # Find and add any attachments
         for part in self.draft_message.walk():
             if part.get_content_disposition() == 'attachment':
@@ -248,6 +260,23 @@ class MailEditor(QMainWindow):
                 if filename:
                     self.attachments.append(part)
                     self.attachments_list.addItem(filename)
+
+    def _on_from_changed(self):
+        """Swap the signature when the From identity changes."""
+        if not hasattr(self, 'body_edit'):
+            return
+        combo = self.headers_widget.editors["from_edit"]
+        from_addr = email.utils.parseaddr(combo.currentText())[1]
+        new_sig = config.get_signature(from_addr)
+        # Remove the old signature block (from the last "-- " separator to end)
+        text = self.body_edit.toPlainText()
+        idx = text.rfind("\n-- \n")
+        if idx != -1:
+            text = text[:idx]
+        if new_sig:
+            text = f"{text}\n-- \n{new_sig}"
+        self.current_signature = new_sig
+        self.body_edit.setPlainText(text)
 
     def toggle_more_headers(self):
         """Toggle visibility of additional header fields."""
