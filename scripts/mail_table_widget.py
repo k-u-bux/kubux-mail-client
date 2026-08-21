@@ -19,7 +19,11 @@ class MailTableWidget(QTableWidget):
     A QTableWidget configured for mail clients with column width management
     and hover highlighting.
     """
-    
+
+    # Total horizontal padding per cell (4px left + 4px right). Single source of
+    # truth: used both in the item stylesheet and in _date_column_width().
+    _item_h_padding = 8
+
     def __init__(self, parent=None):
         super().__init__(parent)
         
@@ -65,9 +69,10 @@ class MailTableWidget(QTableWidget):
         
         # Styling
         self.horizontalHeader().setHighlightSections(False)
-        self.setStyleSheet("""
-            QTableWidget { selection-background-color: rgb(100, 149, 237); color: palette(text); outline: none; }
-            QTableWidget::item { padding-left: 4px; padding-right: 4px; }
+        half = self._item_h_padding // 2
+        self.setStyleSheet(f"""
+            QTableWidget {{ selection-background-color: rgb(100, 149, 237); color: palette(text); outline: none; }}
+            QTableWidget::item {{ padding-left: {half}px; padding-right: {half}px; }}
         """)
         
         # Enable hover tracking
@@ -96,18 +101,47 @@ class MailTableWidget(QTableWidget):
         if total_width > 0:
             self._width_ratio = col1_width / total_width
     
+    def _date_column_width(self):
+        """Width a date cell occupies once a row exists.
+
+        An empty table gives the Date column (ResizeToContents) no content to size
+        against, so it would collapse to the bare ``Date`` header. Use this as a
+        floor so an empty result keeps a Date header with its expected width.
+        """
+        fm = QFontMetrics(config.get_text_font())
+        # Date format used by create_date_item: "%Y-%m-%d %H:%M".
+        return fm.horizontalAdvance("2026-08-21 09:30") + self._item_h_padding
+
     def _fix_column_widths(self, ratio):
-        """Distribute available width between columns 1 and 2 based on ratio."""
-        if self.rowCount() == 0:
-            return
-        
+        """Distribute available width between columns 1 and 2 based on ratio.
+
+        Runs even when the table has no rows: an empty result must still produce a
+        whole header (Date at a sensible width, the two content columns filling the
+        viewport), rather than a collapsed sliver glued to the left edge.
+        """
         total_width = self.viewport().width()
-        date_col_width = self.columnWidth(0)
+        header = self.horizontalHeader()
+
+        if self.rowCount() == 0:
+            # ResizeToContents has nothing to size the Date column against here,
+            # so it would collapse to the bare header. ResizeToContents ignores
+            # setColumnWidth, so switch to Interactive and pin a content width.
+            header.setSectionResizeMode(0, QHeaderView.ResizeMode.Interactive)
+            date_col_width = max(self.columnWidth(0), self._date_column_width())
+            self.setColumnWidth(0, date_col_width)
+        else:
+            # Restore content-driven sizing once rows exist.
+            if header.sectionResizeMode(0) != QHeaderView.ResizeMode.ResizeToContents:
+                header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+            date_col_width = self.columnWidth(0)
+
         remaining_width = total_width - date_col_width
-        
+        if remaining_width <= 0:
+            return
+
         col1_width = int(remaining_width * ratio)
         col2_width = int(remaining_width * (1.0 - ratio))
-        
+
         self.setColumnWidth(1, col1_width)
         self.setColumnWidth(2, col2_width)
     
