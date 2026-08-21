@@ -897,7 +897,16 @@ class MailViewer(QMainWindow):
 
     def get_quoted_body(self):
         original_body = self.get_body()
-        return textwrap.indent( original_body, '> ', (lambda line: True) )
+        lines = original_body.splitlines()
+        # Per RFC 3676 the signature separator is a line consisting of exactly
+        # "-- " (two hyphens + one space) at column 0.
+        for i, line in enumerate(lines):
+            if line == "-- ":
+                # Only treat it as a separator if something follows.
+                if i + 1 < len(lines):
+                    lines = lines[:i]
+                break
+        return textwrap.indent("\n".join(lines), '> ', (lambda line: True))
 
     def reply(self):
         """
