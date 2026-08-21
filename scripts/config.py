@@ -48,13 +48,45 @@ class Config:
         self.dir_watcher.watch( self.config_dir )
         
     def reload_config(self):
-        self.data = self.load_config()
-        # Recalculate all cached fonts
-        self.interface_font = self.get_font('interface')
-        self.menu_font = self.get_font('menu')
-        self.text_font = self.get_font('text')
-        self.popup_font = self.get_font('popup')
-        self.attachment_font = self.get_font('attachment')
+        try:
+            new_data = self.load_config()
+            # Validate by recalculating fonts (catches wrong types)
+            new_interface = self.get_font('interface')
+            new_menu = self.get_font('menu')
+            new_text = self.get_font('text')
+            new_popup = self.get_font('popup')
+            new_attachment = self.get_font('attachment')
+        except toml.TomlDecodeError as e:
+            # e.doc is the full document, e.pos is the character offset.
+            # Extract the offending line for context (position may be imprecise).
+            line_start = e.doc.rfind('\n', 0, e.pos) + 1
+            line_end = e.doc.find('\n', e.pos)
+            if line_end == -1:
+                line_end = len(e.doc)
+            offending_line = e.doc[line_start:line_end]
+            msg = (f"Syntax error in {self.config_path}:\n\n"
+                   f"{e.msg}\n\n"
+                   f"  {offending_line}")
+            logging.error(msg)
+            from common import display_error
+            display_error(None, "Config Error", msg)
+            return
+        except Exception as e:
+            # Type/shape errors: point at the file, show the exception
+            msg = (f"Invalid value in {self.config_path}.\n"
+                   f"Keeping previous settings.\n\n"
+                   f"{type(e).__name__}: {e}")
+            logging.error(msg)
+            from common import display_error
+            display_error(None, "Config Error", msg)
+            return
+        # Commit the new config
+        self.data = new_data
+        self.interface_font = new_interface
+        self.menu_font = new_menu
+        self.text_font = new_text
+        self.popup_font = new_popup
+        self.attachment_font = new_attachment
         # Update QToolTip font so config changes take effect immediately (no restart)
         from PySide6.QtWidgets import QApplication, QToolTip
         QToolTip.setFont(self.popup_font)
