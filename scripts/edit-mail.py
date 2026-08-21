@@ -244,14 +244,13 @@ class MailEditor(QMainWindow):
                 else:
                     plain_text_body = str(payload) if payload else ""
                 break
-        self.body_edit.setPlainText(plain_text_body)
-
         # Append the signature for the draft's From identity
         from_addr = email.utils.parseaddr(self.draft_message.get('From', ''))[1]
         signature = config.get_signature(from_addr)
         if signature:
             self.current_signature = signature
-            self.body_edit.append(f"\n-- \n{signature}")
+            plain_text_body = f"{plain_text_body}\n-- \n{signature}"
+        self.body_edit.setPlainText(plain_text_body)
 
         # Find and add any attachments
         for part in self.draft_message.walk():
