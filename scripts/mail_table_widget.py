@@ -121,6 +121,11 @@ class MailTableWidget(QTableWidget):
         total_width = self.viewport().width()
         header = self.horizontalHeader()
 
+        if self.rowCount() == 0:
+            header.setSectionResizeMode(0, QHeaderView.ResizeMode.Interactive)
+        else:
+            header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+
         date_col_width = self._date_column_width()
         self.setColumnWidth(0, date_col_width)
 
