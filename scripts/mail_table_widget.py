@@ -22,7 +22,7 @@ class MailTableWidget(QTableWidget):
 
     # Total horizontal padding per cell (4px left + 4px right). Single source of
     # truth: used both in the item stylesheet and in _date_column_width().
-    _item_h_padding = 8
+    _item_h_padding = 4
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -69,10 +69,9 @@ class MailTableWidget(QTableWidget):
         
         # Styling
         self.horizontalHeader().setHighlightSections(False)
-        half = self._item_h_padding // 2
         self.setStyleSheet(f"""
             QTableWidget {{ selection-background-color: rgb(100, 149, 237); color: palette(text); outline: none; }}
-            QTableWidget::item {{ padding-left: {half}px; padding-right: {half}px; }}
+            QTableWidget::item {{ padding-left: {self._item_h_padding}px; padding-right: {self._item_h_padding}px; }}
         """)
         
         # Enable hover tracking
@@ -110,7 +109,7 @@ class MailTableWidget(QTableWidget):
         """
         fm = QFontMetrics(config.get_text_font())
         # Date format used by create_date_item: "%Y-%m-%d %H:%M".
-        return fm.horizontalAdvance("2026-08-21 09:30") + self._item_h_padding
+        return fm.horizontalAdvance("2026-08-21 09:30") + 4*self._item_h_padding
 
     def _fix_column_widths(self, ratio):
         """Distribute available width between columns 1 and 2 based on ratio.
@@ -122,18 +121,8 @@ class MailTableWidget(QTableWidget):
         total_width = self.viewport().width()
         header = self.horizontalHeader()
 
-        if self.rowCount() == 0:
-            # ResizeToContents has nothing to size the Date column against here,
-            # so it would collapse to the bare header. ResizeToContents ignores
-            # setColumnWidth, so switch to Interactive and pin a content width.
-            header.setSectionResizeMode(0, QHeaderView.ResizeMode.Interactive)
-            date_col_width = max(self.columnWidth(0), self._date_column_width())
-            self.setColumnWidth(0, date_col_width)
-        else:
-            # Restore content-driven sizing once rows exist.
-            if header.sectionResizeMode(0) != QHeaderView.ResizeMode.ResizeToContents:
-                header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
-            date_col_width = self.columnWidth(0)
+        date_col_width = self._date_column_width()
+        self.setColumnWidth(0, date_col_width)
 
         remaining_width = total_width - date_col_width
         if remaining_width <= 0:
