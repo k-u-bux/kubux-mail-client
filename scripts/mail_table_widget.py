@@ -20,10 +20,6 @@ class MailTableWidget(QTableWidget):
     and hover highlighting.
     """
 
-    # Total horizontal padding per cell (4px left + 4px right). Single source of
-    # truth: used both in the item stylesheet and in _date_column_width().
-    _item_h_padding = 6
-
     def __init__(self, parent=None):
         super().__init__(parent)
         
@@ -71,7 +67,7 @@ class MailTableWidget(QTableWidget):
         self.horizontalHeader().setHighlightSections(False)
         self.setStyleSheet(f"""
             QTableWidget {{ selection-background-color: rgb(100, 149, 237); color: palette(text); outline: none; }}
-            QTableWidget::item {{ padding-left: {self._item_h_padding}px; padding-right: {self._item_h_padding}px; }}
+            QTableWidget::item {{ padding-left: {config.get_padding()}px; padding-right: {config.get_padding()}px; }}
         """)
         
         # Enable hover tracking
@@ -103,7 +99,7 @@ class MailTableWidget(QTableWidget):
     def _date_column_width(self):
         fm = QFontMetrics(config.get_text_font())
         # Date format used by create_date_item: "%Y-%m-%d %H:%M".
-        return fm.horizontalAdvance("2026-08-21 09:30") + 2*self._item_h_padding + 8
+        return fm.horizontalAdvance("2026-08-21 09:30") + 2*config.get_padding() + config.get_buffer()
 
     def _fix_column_widths(self, ratio):
         """Distribute available width between columns 1 and 2 based on ratio.

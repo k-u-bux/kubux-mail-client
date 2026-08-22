@@ -113,7 +113,9 @@ class Config:
                 "popup_font": "monospace",
                 "popup_font_size": 20,
                 "attachment_font": "monospace",
-                "attachment_font_size": 12
+                "attachment_font_size": 12,
+                "padding": 6,
+                "buffer": 8
             },
             "searches": {
                 "search": "tag:inbox and tag:unread",
@@ -195,6 +197,12 @@ class Config:
                         merged_config[key] = value
                 
                 return merged_config
+
+    def get_padding(self):
+        return self.data["visual"].get("padding", 6)
+
+    def get_buffer(self):
+        return self.data["visual"].get("buffer", 8)
 
     def get_font_logical_size(self, font_type: str):
         font = QFont(self.data["visual"][f"{font_type}_font"])
