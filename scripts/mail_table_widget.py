@@ -22,7 +22,7 @@ class MailTableWidget(QTableWidget):
 
     # Total horizontal padding per cell (4px left + 4px right). Single source of
     # truth: used both in the item stylesheet and in _date_column_width().
-    _item_h_padding = 4
+    _item_h_padding = 6
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -50,7 +50,7 @@ class MailTableWidget(QTableWidget):
         self.setFont(config.get_text_font())
         
         # Configure column resizing
-        self.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+        self.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
         self.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Interactive)
         self.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Interactive)
         self.horizontalHeader().setStretchLastSection(False)
@@ -101,33 +101,18 @@ class MailTableWidget(QTableWidget):
             self._width_ratio = col1_width / total_width
     
     def _date_column_width(self):
-        """Width a date cell occupies once a row exists.
-
-        An empty table gives the Date column (ResizeToContents) no content to size
-        against, so it would collapse to the bare ``Date`` header. Use this as a
-        floor so an empty result keeps a Date header with its expected width.
-        """
         fm = QFontMetrics(config.get_text_font())
         # Date format used by create_date_item: "%Y-%m-%d %H:%M".
-        return fm.horizontalAdvance("2026-08-21 09:30") + 4*self._item_h_padding
+        return fm.horizontalAdvance("2026-08-21 09:30") + 2*self._item_h_padding + 8
 
     def _fix_column_widths(self, ratio):
         """Distribute available width between columns 1 and 2 based on ratio.
-
-        Runs even when the table has no rows: an empty result must still produce a
-        whole header (Date at a sensible width, the two content columns filling the
-        viewport), rather than a collapsed sliver glued to the left edge.
         """
         total_width = self.viewport().width()
         header = self.horizontalHeader()
 
         date_col_width = self._date_column_width()
         self.setColumnWidth(0, date_col_width)
-
-        if self.rowCount() == 0:
-            header.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
-        else:
-            header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
 
         remaining_width = total_width - date_col_width
         if remaining_width <= 0:
@@ -138,7 +123,8 @@ class MailTableWidget(QTableWidget):
 
         self.setColumnWidth(1, col1_width)
         self.setColumnWidth(2, col2_width)
-    
+
+     
     def showEvent(self, event):
         """Called when the widget is shown."""
         super().showEvent(event)
