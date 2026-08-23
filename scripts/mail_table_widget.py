@@ -119,6 +119,7 @@ class MailTableWidget(QTableWidget):
         self.setStyle(style)
         self.setColumnCount(3)
         self.setFont(config.get_text_font())
+        self.horizontalHeader().setFont(config.get_text_font())
 
         # Per-column cell-text behavior: install the delegates for the
         # centrally-configured default (which columns elide with '...').
@@ -290,6 +291,7 @@ class MailTableWidget(QTableWidget):
     def update_font(self):
         """Reapply font from config (called on config changes)."""
         self.setFont(config.get_text_font())
+        self.horizontalHeader().setFont(config.get_text_font())
         self.horizontalHeader().setHighlightSections(False)
         self._fix_column_widths(self._width_ratio)
         fm = QFontMetrics(config.get_text_font())
