@@ -91,7 +91,6 @@ class DraftsManager(QMainWindow):
         
         # Set up the table with new column order: Date|To/Cc|Subject|From
         self.drafts_table = MailTableWidget()
-        self.drafts_table.set_elide_columns({2})  # Subject column uses '...' ellipsis
         self.drafts_table.cellDoubleClicked.connect(self.open_selected_draft)
 
         # Enable context menu

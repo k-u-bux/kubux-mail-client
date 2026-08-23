@@ -88,6 +88,13 @@ class MailTableWidget(QTableWidget):
     and hover highlighting.
     """
 
+    # Columns that render over-long text with Qt's classic '...' ellipsis by
+    # default; every other column clips the text at the cell edge.  This is
+    # the central default for ALL tables in the mail client — change it here
+    # to affect every view.  Individual views can still override per-table
+    # via set_elide_columns().  (Subject is column 2.)
+    DEFAULT_ELIDE_COLUMNS = frozenset({2})
+
     def __init__(self, parent=None):
         super().__init__(parent)
         
@@ -113,9 +120,9 @@ class MailTableWidget(QTableWidget):
         self.setColumnCount(3)
         self.setFont(config.get_text_font())
 
-        # Per-column cell-text behavior: clip (no '...') by default; columns
-        # listed in self._elide_columns keep the classic Qt ellipsis.
-        self._elide_columns = set()
+        # Per-column cell-text behavior: install the delegates for the
+        # centrally-configured default (which columns elide with '...').
+        self._elide_columns = set(self.DEFAULT_ELIDE_COLUMNS)
         self._apply_delegates()
         
         # Configure column resizing
