@@ -85,6 +85,7 @@ class ThreadViewer(QMainWindow):
         
         # Table view to serve as both list and tree view
         self.results_table = MailTableWidget()
+        self.results_table.set_elide_columns({2})  # Subject column uses '...' ellipsis
         self.results_table.doubleClicked.connect(self.open_selected_item)
         self.results_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.results_table.customContextMenuRequested.connect(self.show_context_menu)

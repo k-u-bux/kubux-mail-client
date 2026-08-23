@@ -6,12 +6,80 @@ Provides shared functionality for column management and hover effects.
 """
 
 from PySide6.QtWidgets import (
-    QTableWidget, QHeaderView, QAbstractItemView, QProxyStyle, QApplication, QStyle
+    QTableWidget, QHeaderView, QAbstractItemView, QProxyStyle, QApplication, QStyle,
+    QStyledItemDelegate,
 )
 from PySide6.QtCore import Qt, QTimer, QEvent
-from PySide6.QtGui import QColor, QFontMetrics
+from PySide6.QtGui import QColor, QFontMetrics, QPalette
 
 from config import config
+
+
+class ClipTextDelegate(QStyledItemDelegate):
+    """Paint text cells clipped at the cell edge instead of elided with '...'.
+
+    Qt's item views draw over-long cell text with Qt's Ellipsis (``ElideRight``
+    via ``QStyle::drawItemText``, which hardcodes ``ElideRight`` whenever the
+    ``Qt::TextDontClip`` flag is not set), yielding entries like "to: ...".
+    Setting ``option.textElideMode = ElideNone`` is NOT enough, because the
+    style ignores it.  So we render the background/selection via the base
+    class while suppressing its text pass, and then draw the text ourselves,
+    clipped to the column width: it is cut off exactly where the right padding
+    begins, with no ellipsis.
+    """
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        # While True, initStyleOption blanks the cell text so the base class
+        # paints only background/selection and adds no ellipsis of its own.
+        self._suppress_text = False
+
+    def initStyleOption(self, option, widget=None):
+        super().initStyleOption(option, widget)
+        if self._suppress_text:
+            option.text = ""
+
+    def paint(self, painter, option, index):
+        text = index.data(Qt.ItemDataRole.DisplayRole) or ""
+        alignment = index.data(Qt.ItemDataRole.TextAlignmentRole) or \
+            (Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+
+        self._suppress_text = True
+        try:
+            super().paint(painter, option, index)  # background/selection/focus
+        finally:
+            self._suppress_text = False
+
+        if not text:
+            return
+
+        # Draw the real text, single line, honoring per-item alignment,
+        # clipped at the content rect (= cell minus the left/right padding).
+        padding = config.get_padding()
+        rect = option.rect.adjusted(padding, 0, -padding, 0)
+        painter.save()
+        painter.setClipRect(rect)
+        painter.setFont(option.font)
+        if option.state & QStyle.StateFlag.State_Selected:
+            painter.setPen(option.palette.color(QPalette.ColorRole.HighlightedText))
+        else:
+            painter.setPen(option.palette.color(QPalette.ColorRole.Text))
+        painter.drawText(rect, alignment | Qt.TextFlag.TextSingleLine, text)
+        painter.restore()
+
+
+class ElideTextDelegate(QStyledItemDelegate):
+    """The classic Qt behavior: over-long cell text is elided with Qt's
+    Ellipsis ('...'), e.g. 'to: ...'. Installing this (globally or per column)
+    restores the previous rendering.
+
+    Note: ``QStyle::drawItemText`` hardcodes ``ElideRight`` whenever the
+    ``Qt::TextDontClip`` flag is absent, so the default item view elides
+    regardless of ``textElideMode``; this delegate just makes that explicit.
+    """
+    def initStyleOption(self, option, widget=None):
+        super().initStyleOption(option, widget)
+        option.textElideMode = Qt.TextElideMode.ElideRight
 
 
 class MailTableWidget(QTableWidget):
@@ -44,6 +112,11 @@ class MailTableWidget(QTableWidget):
         self.setStyle(style)
         self.setColumnCount(3)
         self.setFont(config.get_text_font())
+
+        # Per-column cell-text behavior: clip (no '...') by default; columns
+        # listed in self._elide_columns keep the classic Qt ellipsis.
+        self._elide_columns = set()
+        self._apply_delegates()
         
         # Configure column resizing
         self.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
@@ -176,7 +249,37 @@ class MailTableWidget(QTableWidget):
                 item.setBackground(QColor(0, 0, 0, 0))
     
     # ========== Helper Methods ==========
-    
+
+    def _apply_delegates(self):
+        """(Re)install per-column delegates.
+
+        Columns in ``self._elide_columns`` render over-long text with Qt's
+        classic '...' ellipsis (ElideTextDelegate); every other column clips
+        the text at the cell edge (ClipTextDelegate).  The table-wide delegate
+        is also set to clip so any column not explicitly configured behaves
+        like the rest.
+        """
+        for col in range(self.columnCount()):
+            if col in self._elide_columns:
+                self.setItemDelegateForColumn(col, ElideTextDelegate(self))
+            else:
+                self.setItemDelegateForColumn(col, ClipTextDelegate(self))
+        self.setItemDelegate(ClipTextDelegate(self))
+
+    def set_elide_columns(self, columns):
+        """Choose which columns render over-long text with Qt's '...' ellipsis
+        instead of clipping at the cell edge.
+
+        ``columns`` is a column index or an iterable of column indices.  Call
+        with ``()`` (or ``set()``) to switch every column back to clipped.
+        """
+        if isinstance(columns, int):
+            columns = [columns]
+        self._elide_columns = set(columns)
+        self._apply_delegates()
+        if self.viewport() is not None:
+            self.viewport().update()
+
     def update_font(self):
         """Reapply font from config (called on config changes)."""
         self.setFont(config.get_text_font())
