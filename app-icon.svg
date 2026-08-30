@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+  <!-- tile -->
+  <rect x="2" y="2" width="44" height="44" rx="10" fill="#3D5AFE"/>
+  <!-- envelope -->
+  <rect x="11" y="15" width="26" height="18" rx="3" fill="none" stroke="#FFFFFF" stroke-width="3"/>
+  <!-- flap -->
+  <path d="M 12.5 17.5 L 24 27 L 35.5 17.5" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
