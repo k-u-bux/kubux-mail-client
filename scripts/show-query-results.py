@@ -83,7 +83,8 @@ class QueryResultsViewer(QMainWindow):
         for named_query in query_parser.names[:config.get_max_named_searches()]:
             logging.info(f"add menu entry for query {named_query}.")
             self.more_menu.addAction(f"${named_query}").triggered.connect(
-                lambda _, dummy=named_query: self.launch_query(dummy)
+                # lambda _, dummy=named_query: self.launch_query(dummy)
+                lambda _, dummy=named_query: self.set_query(f"${dummy}")
             )
 
     def setup_ui(self):
@@ -309,6 +310,10 @@ class QueryResultsViewer(QMainWindow):
         else: # mails mode
             self._execute_mails_query()
 
+    def set_query(self, query):
+        remove_query_from_history( self.history_path, query )
+        self.query_edit.setText(query)
+        self.execute_query()
             
     def _execute_threads_query(self):
         """Fetches and populates the table with thread data."""
@@ -635,13 +640,8 @@ class QueryResultsViewer(QMainWindow):
             return
         for q in history:
             action = self.history_menu.addAction(q)
-            action.triggered.connect(lambda _, query=q: self._select_history_item(query))
+            action.triggered.connect(lambda _, query=q: self.set_query(query))
 
-
-    def _select_history_item(self, query):
-        remove_query_from_history( self.history_path, query )
-        self.query_edit.setText(query)
-        self.execute_query()
 
     def _on_config_changed(self):
         """Reapply fonts and relayout after config changes."""
