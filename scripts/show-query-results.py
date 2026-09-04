@@ -82,7 +82,7 @@ class QueryResultsViewer(QMainWindow):
         query_parser = QueryParser(config_dir=config.config_dir)
         for named_query in query_parser.names[:config.get_max_named_searches()]:
             logging.info(f"add menu entry for query {named_query}.")
-            self.more_menu.addAction(f"${named_query}").triggered.connect(
+            self.more_menu.addAction( named_query ).triggered.connect(
                 # lambda _, dummy=named_query: self.launch_query(dummy)
                 lambda _, dummy=named_query: self.set_query(f"${dummy}")
             )
