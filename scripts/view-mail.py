@@ -848,18 +848,17 @@ class MailViewer(QMainWindow):
         sender = self.message.get("From")
         return getaddresses([sender])[0][1] if sender else ""
 
-    def all_involved(self):
-        sender = self.message.get("From")
-        sender_addr = getaddresses([sender])[0][1] if sender else ""
+    def all_involved(self, include_sender=False):
         original_to = self.message.get("To", "")
         original_cc = self.message.get("Cc", "")
         all_recipients = {addr for name, addr in getaddresses([original_to, original_cc])}
-        if sender:
+        sender_addr = self.reply_to_addr()
+        if sender_addr and include_sender:
             all_recipients.add(sender_addr)
         return all_recipients
         
     def all_my_identities(self):
-        return { addr for addr in self.all_involved() if config.is_me( [addr] ) }
+        return { addr for addr in self.all_involved(True) if config.is_me( [addr] ) }
 
     def my_first_identity(self):
         dummy = list( self.all_my_identities() )
@@ -868,7 +867,7 @@ class MailViewer(QMainWindow):
         return ""
 
     def all_other_identities(self):
-        return { addr for addr in self.all_involved() if not config.is_me( [addr] ) }
+        return { addr for addr in self.all_involved(True) if not config.is_me( [addr] ) }
 
     def get_body(self):
         """
@@ -942,7 +941,7 @@ class MailViewer(QMainWindow):
         sender_addr = self.reply_to_addr()
         to_list = [sender_addr]
        
-        all_recipients = self.all_involved()
+        all_recipients = self.all_involved(False)
         all_recipients.discard(sender_addr)
         cc_list = list(all_recipients)
         
@@ -1016,7 +1015,7 @@ class MailViewer(QMainWindow):
         to_list = []
        
         if cc_all:
-            all_recipients = self.all_involved()
+            all_recipients = self.all_involved(True)
             cc_list = list(all_recipients)
         else:
             cc_list = self.all_my_identities()
