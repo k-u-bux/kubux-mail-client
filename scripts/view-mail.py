@@ -39,6 +39,10 @@ from header_widget import MailHeaderWidget
 # Set up basic logging to console
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
+# Bound for the xdg-mime lookup (its result is used, so it must complete).
+# The viewer launch itself is fire-and-forget — see open_attachment below.
+MIME_QUERY_TIMEOUT = 30
+
 
 class SafeTextBrowser(QTextBrowser):
     """QTextBrowser that blocks remote (http/https) resource loading.
@@ -1110,10 +1114,12 @@ class MailViewer(QMainWindow):
                 temp_path = temp_file.name
                 stats = os.stat(temp_path)
                 print(f"DEBUG: File size on disk: {stats.st_size} bytes")
-                mime_check = subprocess.run(["xdg-mime", "query", "filetype", temp_path], 
-                                            capture_output=True, text=True)
+                mime_check = subprocess.run(["xdg-mime", "query", "filetype", temp_path],
+                                            capture_output=True, text=True,
+                                            timeout=MIME_QUERY_TIMEOUT)
                 print(f"DEBUG: Detected MIME = {mime_check.stdout.strip()}")
-                subprocess.run(["xdg-open", temp_path])
+                # Fire-and-forget, for the same reason as in edit-mail.py.
+                subprocess.Popen(["xdg-open", temp_path])
                 
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Could not open attachment: {e}")

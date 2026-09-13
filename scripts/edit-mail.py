@@ -36,6 +36,29 @@ from header_widget_editable import MailHeaderEditableWidget
 # Set up basic logging to console
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
+def send_failure_reason(stderr: str) -> str:
+    """Diagnostics from the send-mail worker, ready to append to an error dialog.
+
+    send-mail.py logs to stderr as "<timestamp> - LEVEL - <reason>" and exits
+    non-zero; without this the user only ever saw the exit code.  The last
+    ERROR line is the reason, and the "Moved file to:" line says where the
+    message ended up (failed_dir), so both are surfaced.
+    """
+    lines = [line.strip() for line in (stderr or "").splitlines() if line.strip()]
+    reason = ""
+    moved = ""
+    for line in lines:
+        if " - ERROR - " in line:
+            reason = line.split(" - ERROR - ", 1)[1].strip()
+        elif "Moved file to:" in line:
+            moved = line.split("Moved file to:", 1)[1].strip()
+    if not reason and lines:
+        reason = lines[-1]
+    text = f"\n\nReason: {reason}" if reason else ""
+    if moved:
+        text += f"\nMessage moved to: {moved}"
+    return text
+
 # --- Mail Editor Main Class ---
 
 class MailEditor(QMainWindow):
@@ -406,8 +429,11 @@ class MailEditor(QMainWindow):
                 with os.fdopen(temp_file_descriptor, 'wb') as temp_file:
                     temp_file.write(payload_bytes)
                     
-                # 4. Open the temporary file
-                subprocess.run(["xdg-open", temp_path], check=True) 
+                # 4. Open the temporary file.
+                #    Fire-and-forget: xdg-open does not return until the viewer
+                #    exits under some handlers, so waiting on it (with or without
+                #    a timeout) either freezes the editor or kills the viewer.
+                subprocess.Popen(["xdg-open", temp_path])
                 
             finally:
                 # Delete the temporary file immediately after the command starts
@@ -551,7 +577,9 @@ class MailEditor(QMainWindow):
 
             result = subprocess.run(
                 [str(send_mail_path), str(self.mail_file_path)],
-                check=False
+                check=False,
+                capture_output=True,
+                text=True
             )
             if result.returncode == 0:
                 self.close()
@@ -560,6 +588,7 @@ class MailEditor(QMainWindow):
                     self,
                     "Send Error",
                     f"Mail failed to send (Exit Code: {result.returncode}). Please review the message."
+                    + send_failure_reason(result.stderr)
                 )
 
         except Exception as e:

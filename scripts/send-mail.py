@@ -7,6 +7,7 @@ import os
 import email
 import toml
 import smtplib
+import signal
 import ssl
 import logging
 import shutil
@@ -15,6 +16,38 @@ from pathlib import Path
 
 # Set up basic logging to console
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+# Bounds for the blocking steps.  edit-mail.py runs this script synchronously on
+# the Qt main thread, so an unbounded wait here freezes the editor until killed.
+SMTP_TIMEOUT = 30
+PASSWD_CMD_TIMEOUT = 20
+
+
+def _run_passwd_cmd(passwd_cmd: str) -> str:
+    """Run the password helper with a bound that actually holds.
+
+    subprocess.check_output(..., timeout=) only kills the direct child; the
+    helper's own children (pinentry, gpg-agent, a wrapper script's sleep)
+    survive, keep the stdout pipe open and the wait is therefore unbounded.
+    Run the helper in its own session and kill the whole process group.
+    """
+    proc = subprocess.Popen(
+        passwd_cmd, shell=True, text=True,
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        start_new_session=True,
+    )
+    try:
+        out, _err = proc.communicate(timeout=PASSWD_CMD_TIMEOUT)
+    except subprocess.TimeoutExpired:
+        try:
+            os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+        except Exception:
+            proc.kill()
+        proc.communicate()
+        raise
+    if proc.returncode != 0:
+        raise subprocess.CalledProcessError(proc.returncode, passwd_cmd)
+    return out.strip()
 
 class SendMail:
     def __init__(self, config_path: str):
@@ -103,7 +136,7 @@ class SendMail:
         passwd_cmd = account.get("passwd_cmd")        
         sent_dir = account.get("sent_dir")
         failed_dir = account.get("failed_dir");
-        password = subprocess.check_output(passwd_cmd, shell=True, text=True).strip() if passwd_cmd else None
+        password = _run_passwd_cmd(passwd_cmd) if passwd_cmd else None
 
         if not all([smtp_server, smtp_port, username, password, sent_dir, failed_dir]):
             logging.error(f"Account configuration incomplete for {from_addr}")
@@ -120,12 +153,12 @@ class SendMail:
             # Determine the correct SMTP connection method
             if smtp_port == 465:
                 # Implicit SSL
-                with smtplib.SMTP_SSL(smtp_server, smtp_port, context=context) as server:
+                with smtplib.SMTP_SSL(smtp_server, smtp_port, context=context, timeout=SMTP_TIMEOUT) as server:
                     server.login(username, password)
                     server.send_message(msg)
             else:
                 # STARTTLS
-                with smtplib.SMTP(smtp_server, smtp_port) as server:
+                with smtplib.SMTP(smtp_server, smtp_port, timeout=SMTP_TIMEOUT) as server:
                     server.starttls(context=context)
                     server.login(username, password)
                     server.send_message(msg)

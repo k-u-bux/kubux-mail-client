@@ -25,7 +25,7 @@ send_mail = importlib.util.module_from_spec(spec)
 sys.modules["send_mail"] = send_mail
 spec.loader.exec_module(send_mail)
 
-from send_mail import SendMail
+from send_mail import SendMail, SMTP_TIMEOUT
 
 
 class TestSendMailInit:
@@ -281,7 +281,7 @@ failed_dir = "{tmp_path}/failed"
         sender.send_file(str(email_file))
         
         # Verify STARTTLS flow
-        mock_smtp_class.assert_called_once_with("smtp.example.com", 587)
+        mock_smtp_class.assert_called_once_with("smtp.example.com", 587, timeout=SMTP_TIMEOUT)
         mock_smtp_instance.starttls.assert_called_once()
         mock_smtp_instance.login.assert_called_once_with("test@example.com", "test-pass")
         mock_smtp_instance.send_message.assert_called_once()
