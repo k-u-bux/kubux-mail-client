@@ -19,7 +19,7 @@ from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QTextBrowser, QTextEdit, QHBoxLayout,
     QPushButton, QListWidget, QSplitter, QMessageBox, QMenu, QGroupBox,
     QFormLayout, QLabel, QInputDialog, QScrollArea, QDialog, QDialogButtonBox,
-    QFileDialog, QSizePolicy, QAbstractItemView, QCalendarWidget
+    QFileDialog, QSizePolicy, QAbstractItemView, QCalendarWidget, QFrame
 )
 
 from notmuch_api import find_matching_messages, find_matching_threads, apply_tag_to_query, get_tags_from_query, update_unseen_from_query
@@ -312,46 +312,46 @@ def _format_ical_person(value, params):
     return name or address
 
 
-def _calendar_row(label, value_html):
-    """One label/value row of the event table."""
-    return (f'<tr><td style="color:#777777">{html.escape(label)}</td>'
-            f'<td>&nbsp;&nbsp;{value_html}</td></tr>')
+def render_calendar_html(calendar):
+    """Render one parsed calendar part as the rich text of its invite card.
 
-
-def render_calendar_html(calendars):
-    """Render parsed calendar parts (MailViewer._collect_calendars) as HTML
-    for the message area."""
-    blocks = []
-    for calendar in calendars:
-        method = calendar.get("method", "")
-        heading = "Calendar invitation"
-        if method:
-            heading += f" &mdash; {html.escape(method)}"
-        rows = []
-        for event in calendar["events"]:
-            if event.get("summary"):
-                rows.append(_calendar_row("Event", f"<b>{html.escape(event['summary'])}</b>"))
-            when = format_event_when(event)
-            if when:
-                rows.append(_calendar_row("When", html.escape(when)))
-            if event.get("location"):
-                rows.append(_calendar_row("Where", html.escape(event["location"])))
-            if event.get("organizer"):
-                rows.append(_calendar_row("Organizer", html.escape(_format_ical_person(*event["organizer"]))))
-            if event.get("attendees"):
-                people = "<br>".join(html.escape(_format_ical_person(*a)) for a in event["attendees"])
-                rows.append(_calendar_row("Attendees", people))
-            if event.get("status"):
-                rows.append(_calendar_row("Status", html.escape(event["status"])))
-            if event.get("rrule"):
-                rows.append(_calendar_row("Repeats", html.escape(event["rrule"])))
-            if event.get("description"):
-                rows.append(_calendar_row("Notes", html.escape(event["description"]).replace("\n", "<br>")))
-        if method == "CANCEL":
-            rows.insert(0, _calendar_row("", "<b>This message cancels the event.</b>"))
-        blocks.append(f'<p><b>{heading}</b></p>'
-                      f'<table cellspacing="0" cellpadding="2">{"".join(rows)}</table>')
-    return "<br>".join(blocks)
+    One card per part on purpose: a calendar is just another MIME part, so a
+    multipart mail can carry several of them (say REQUEST and CANCEL, or two
+    different events) and each gets its own card and its own button.
+    Deliberately limited to the constructs a QLabel renders reliably (bold,
+    <br>, <p>): the card is a label so that it hugs its text, and the button
+    below it sits directly under the event instead of at the bottom of a
+    pane-filling text browser.
+    """
+    method = calendar.get("method", "")
+    heading = "Calendar invitation"
+    if method:
+        heading += f" &mdash; {html.escape(method)}"
+    lines = [f"<b>{heading}</b>"]
+    if method == "CANCEL":
+        lines.append("<b>This message cancels the event.</b>")
+    for event in calendar["events"]:
+        if event.get("summary"):
+            lines.append(f"<b>Event:</b> {html.escape(event['summary'])}")
+        when = format_event_when(event)
+        if when:
+            lines.append(f"<b>When:</b> {html.escape(when)}")
+        if event.get("location"):
+            lines.append(f"<b>Where:</b> {html.escape(event['location'])}")
+        if event.get("organizer"):
+            lines.append(f"<b>Organizer:</b> {html.escape(_format_ical_person(*event['organizer']))}")
+        if event.get("attendees"):
+            people = [html.escape(_format_ical_person(*a)) for a in event["attendees"]]
+            lines.append("<b>Attendees:</b><br>"
+                         + "<br>".join(f"&nbsp;&nbsp;&nbsp;&nbsp;{p}" for p in people))
+        if event.get("status"):
+            lines.append(f"<b>Status:</b> {html.escape(event['status'])}")
+        if event.get("rrule"):
+            lines.append(f"<b>Repeats:</b> {html.escape(event['rrule'])}")
+        if event.get("description"):
+            notes = html.escape(event["description"]).replace("\n", "<br>")
+            lines.append(f"<b>Notes:</b> {notes}")
+    return "<p>" + "<br>".join(lines) + "</p>"
 
 
 class MailSourceViewer(QDialog):
@@ -485,12 +485,6 @@ class MailViewer(QMainWindow):
                 else:
                     self.mail_html = sanitized_html
                 self.has_html_body = True
-        if self.calendars:
-            # Render the event into the message area, below any body text the
-            # invitation carries.
-            calendar_html = render_calendar_html(self.calendars)
-            self.mail_html = (self.mail_html + "<br><br>" if self.mail_html else "") + calendar_html
-            self.has_html_body = True
         self.attachments = mail.attachments 
         # unfortunately not all mail have only one id
         if isinstance(mail.message_id, list):
@@ -587,16 +581,6 @@ class MailViewer(QMainWindow):
         top_bar_layout.addWidget(self.toggle_html_button)
         self.render_html_button()
 
-        # Invitations get a button that hands the .ics to the desktop's
-        # registered handler (xdg-open), like an ics attachment would.
-        if self.calendars:
-            self.calendar_button = QPushButton("Open Invite")
-            self.calendar_button.clicked.connect(self.open_calendar_invite)
-            self.calendar_button.setToolTip(
-                "Write the calendar file (.ics) to a temporary file and open it\n"
-                "with the desktop's default handler (xdg-open).")
-            top_bar_layout.addWidget(self.calendar_button)
-
         top_bar_layout.addStretch()
 
         self.postpone_button = QPushButton("Postpone")
@@ -637,18 +621,68 @@ class MailViewer(QMainWindow):
         self.splitter.addWidget(self.headers_group_box)
         self.show_or_hide_headers()
 
-        # Mail Content area
-        self.mail_content = SafeTextBrowser()
+        # Mail content area: the mail text on top, and — only for a mail that
+        # actually carries a calendar part — the event card with the button
+        # that hands the .ics to the desktop's handler (xdg-open, like an ics
+        # attachment).  Both live here rather than in the top bar, where a
+        # button for this fringe purpose would cost a slot.
+        self.mail_container = QWidget()
+        mail_container_layout = QVBoxLayout(self.mail_container)
+        mail_container_layout.setContentsMargins(0, 0, 0, 0)
+        mail_container_layout.setSpacing(4)
+
+        has_body = self.has_text_body or self.has_html_body
+
+        self.mail_content = SafeTextBrowser(self.mail_container)
         self.mail_content.setFont(config.get_text_font())
         self.mail_content.setReadOnly(True)
         self.mail_content.setOpenLinks(False) 
-        self.splitter.addWidget(self.mail_content)
+        if has_body:
+            mail_container_layout.addWidget(self.mail_content, 1)
+        else:
+            # Nothing but the invitation: no point showing an empty text pane.
+            self.mail_content.hide()
         self.mail_content.anchorClicked.connect(self.handle_link_clicked)
         self.mail_content.setTextInteractionFlags(Qt.TextBrowserInteraction)
         
         # Add a context menu for clipboard actions and view raw
         self.mail_content.setContextMenuPolicy(Qt.CustomContextMenu)
         self.mail_content.customContextMenuRequested.connect(self.show_content_context_menu)
+
+        # A calendar part is just another MIME part, so render one boxed card
+        # plus one button per part — a multipart mail may carry several (say
+        # REQUEST and CANCEL, or two different events).  The cards are labels
+        # so that each hugs its text: the button below a card then sits
+        # directly under its event, not at the bottom of the pane.
+        self.invite_cards = []
+        self.calendar_buttons = []
+        for index, calendar in enumerate(self.calendars):
+            card = QLabel(render_calendar_html(calendar), self.mail_container)
+            card.setFont(config.get_text_font())
+            card.setTextFormat(Qt.TextFormat.RichText)
+            card.setWordWrap(True)
+            card.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+            card.setFrameShape(QFrame.Shape.StyledPanel)
+            card.setFrameShadow(QFrame.Shadow.Plain)
+            card.setMargin(6)  # breathing room between the text and the frame
+            mail_container_layout.addWidget(card, 0)
+            self.invite_cards.append(card)
+
+            button = QPushButton("Open Invite" if len(self.calendars) == 1
+                                 else f"Open Invite {index + 1}")
+            button.clicked.connect(
+                lambda checked=False, i=index: self.open_calendar_invite(i))
+            button.setToolTip(
+                "Write this calendar part (invite.ics) to a temporary file and\n"
+                "open it with the desktop's default handler (xdg-open).")
+            mail_container_layout.addWidget(button, 0, Qt.AlignmentFlag.AlignLeft)
+            self.calendar_buttons.append(button)
+        if self.calendars and not has_body:
+            # Keep cards and buttons together at the top of the pane (under
+            # the headers) instead of letting the pane push them apart.
+            mail_container_layout.addStretch(1)
+
+        self.splitter.addWidget(self.mail_container)
 
         # Attachments list
         if self.attachments:
@@ -1338,26 +1372,26 @@ class MailViewer(QMainWindow):
             calendars.append({"ics": payload, "method": method, "events": events})
         return calendars
 
-    def open_calendar_invite(self):
-        """Hand the calendar file (.ics) to the default handler via xdg-open."""
-        if not self.calendars:
+    def open_calendar_invite(self, index=0):
+        """Hand one calendar part (.ics) to the default handler via xdg-open."""
+        if not (0 <= index < len(self.calendars)):
             return
         try:
-            temp_path = self._write_calendar_file()
+            temp_path = self._write_calendar_file(index)
             # Fire-and-forget, for the same reason as handle_attachment_open.
             subprocess.Popen(["xdg-open", temp_path])
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Could not open calendar invitation: {e}")
 
-    def _write_calendar_file(self):
-        """Write the first calendar part to a temporary .ics file.
+    def _write_calendar_file(self, index=0):
+        """Write calendar part ``index`` to a temporary .ics file.
 
         The file is not removed again: the handler reads it after xdg-open
         was called and may keep it for the import (same as attachments).
         """
         handle, temp_path = tempfile.mkstemp(prefix="kubux_invite_", suffix=".ics")
         with os.fdopen(handle, "wb") as temp_file:
-            temp_file.write(self.calendars[0]["ics"])
+            temp_file.write(self.calendars[index]["ics"])
         return temp_path
 
     def show_attachment_context_menu(self, pos):
@@ -1481,8 +1515,10 @@ class MailViewer(QMainWindow):
         self.mail_content.setFont(config.get_text_font())
         if hasattr(self, 'attachments_list') and self.attachments_list:
             self.attachments_list.setFont(config.get_attachment_font())
-        if hasattr(self, 'calendar_button') and self.calendar_button:
-            self.calendar_button.setFont(config.get_interface_font())
+        for card in getattr(self, 'invite_cards', []):
+            card.setFont(config.get_text_font())
+        for button in getattr(self, 'calendar_buttons', []):
+            button.setFont(config.get_interface_font())
         self.headers_group_box.update_fonts()
         # Rebuild tags UI to pick up new interface font
         self.update_tags_ui()
