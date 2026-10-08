@@ -9,7 +9,9 @@ import email
 from email import policy
 from email.header import Header
 from email.utils import getaddresses
+import html
 import re
+from datetime import datetime
 from pathlib import Path
 from PySide6.QtCore import Qt, QSize, QUrl, QRegularExpression, QDate
 from PySide6.QtGui import QFont, QKeySequence, QAction, QTextCursor, QTextCharFormat, QColor, QDesktopServices
@@ -125,6 +127,233 @@ def custom_walk(message):
             yield from custom_walk(subpart)
 
 
+# Content types that carry an iCalendar (RFC 5545) payload.  Outlook sends a
+# meeting invitation as a text/calendar part inside a multipart/alternative,
+# with neither filename nor Content-Disposition, so it never reaches
+# mailparser's attachment list and would otherwise render as a blank mail.
+CALENDAR_CONTENT_TYPES = frozenset({
+    "text/calendar",
+    "application/ics",
+    "application/calendar",
+    "text/x-vcalendar",
+})
+
+
+def _unfold_ical_lines(text):
+    """Split an iCalendar text into content lines, undoing RFC 5545 folding.
+
+    A long line is folded by inserting CRLF plus one space or tab; the
+    continuation is glued back onto the previous line without that character.
+    """
+    lines = []
+    for raw in text.replace("\r\n", "\n").replace("\r", "\n").split("\n"):
+        if raw[:1] in (" ", "\t") and lines:
+            lines[-1] += raw[1:]
+        else:
+            lines.append(raw)
+    return lines
+
+
+def _split_ical_line(line):
+    """Split one calendar content line into (name, params, value).
+
+    name is upper-cased, params maps upper-cased parameter names to unquoted
+    values, value is the raw (still escaped) property value.  The name is
+    separated from the value by the first colon outside a quoted parameter.
+    Returns (None, {}, None) for a line without a value separator.
+    """
+    quoted = False
+    head = None
+    value = None
+    for i, ch in enumerate(line):
+        if ch == '"':
+            quoted = not quoted
+        elif ch == ":" and not quoted:
+            head, value = line[:i], line[i + 1:]
+            break
+    if head is None:
+        return None, {}, None
+    fields = head.split(";")
+    params = {}
+    for field in fields[1:]:
+        if "=" in field:
+            key, val = field.split("=", 1)
+            params[key.strip().upper()] = val.strip().strip('"')
+    return fields[0].strip().upper(), params, value
+
+
+def _unescape_ical_text(value):
+    r"""Undo RFC 5545 TEXT escaping (\n, \N, \, \; \\) in a property value."""
+    out = []
+    i = 0
+    while i < len(value):
+        if value[i] == "\\" and i + 1 < len(value):
+            nxt = value[i + 1]
+            out.append("\n" if nxt in "nN" else nxt)
+            i += 2
+        else:
+            out.append(value[i])
+            i += 1
+    return "".join(out)
+
+
+def parse_calendar(ics_text):
+    """Parse an iCalendar text into (method, events).
+
+    method is the VCALENDAR METHOD (REQUEST, CANCEL, ...); events is a list of
+    VEVENT dicts holding only the properties that were present: 'summary',
+    'location', 'description' (unescaped text), 'status', 'rrule', 'start'
+    and 'end' as (value, params) pairs, 'organizer' as (value, params) and
+    'attendees' as a list of (value, params).  VTIMEZONE and other components
+    are skipped, folded lines are handled.
+    """
+    method = ""
+    events = []
+    current = None
+    for line in _unfold_ical_lines(ics_text):
+        name, params, value = _split_ical_line(line)
+        if name is None:
+            continue
+        if name == "BEGIN":
+            if value.strip().upper() == "VEVENT":
+                current = {"attendees": []}
+            continue
+        if name == "END":
+            if value.strip().upper() == "VEVENT" and current is not None:
+                events.append(current)
+                current = None
+            continue
+        if current is None:
+            if name == "METHOD":
+                method = value.strip().upper()
+            continue
+        if name == "ATTENDEE":
+            current["attendees"].append((value, params))
+        elif name == "ORGANIZER":
+            current["organizer"] = (value, params)
+        elif name == "DTSTART":
+            current["start"] = (value, params)
+        elif name == "DTEND":
+            current["end"] = (value, params)
+        elif name in ("SUMMARY", "LOCATION", "DESCRIPTION"):
+            current[name.lower()] = _unescape_ical_text(value)
+        elif name in ("STATUS", "RRULE"):
+            current[name.lower()] = value.strip()
+    return method, events
+
+
+def _parse_ical_moment(value, params):
+    """Return (all_day, datetime or None) for a DATE / DATE-TIME value.
+
+    The datetime is the printed wall-clock time of the value; TZID based
+    zones are not resolved (nothing here does timezone arithmetic).
+    """
+    raw = (value or "").strip()
+    all_day = params.get("VALUE", "").upper() == "DATE" or (
+        len(raw) == 8 and raw.isdigit())
+    try:
+        if all_day:
+            return True, datetime.strptime(raw[:8], "%Y%m%d")
+        digits = raw.rstrip("Z")
+        fmt = "%Y%m%dT%H%M%S" if len(digits) == 15 else "%Y%m%dT%H%M"
+        return False, datetime.strptime(digits, fmt)
+    except ValueError:
+        return all_day, None
+
+
+def _ical_zone_label(value, params, all_day):
+    """Zone suffix for a printed moment: "", " UTC" or " (TZID)"."""
+    if all_day:
+        return ""
+    if (value or "").strip().endswith("Z"):
+        return " UTC"
+    tzid = params.get("TZID")
+    return f" ({tzid})" if tzid else ""
+
+
+def _format_ical_moment(value, params):
+    """Format one iCalendar moment for display; returns (text, datetime)."""
+    all_day, moment = _parse_ical_moment(value, params)
+    if moment is None:
+        # Unparseable: show the raw value rather than nothing.
+        return (value or "").strip(), None
+    if all_day:
+        return f"{moment:%a %Y-%m-%d} (all day)", moment
+    zone = _ical_zone_label(value, params, all_day)
+    return f"{moment:%a %Y-%m-%d %H:%M}{zone}", moment
+
+
+def format_event_when(event):
+    """Format an event's start (and end); a same-day meeting collapses to a
+    range like 'Wed 2027-06-30 12:30-14:00 (TZID)'."""
+    start = event.get("start")
+    if not start:
+        return ""
+    start_text, start_dt = _format_ical_moment(*start)
+    end = event.get("end")
+    if not end:
+        return start_text
+    end_text, end_dt = _format_ical_moment(*end)
+    start_all_day, _ = _parse_ical_moment(*start)
+    if start_dt and end_dt and not start_all_day and start_dt.date() == end_dt.date():
+        zone = _ical_zone_label(start[0], start[1], all_day=False)
+        return f"{start_dt:%a %Y-%m-%d %H:%M}-{end_dt:%H:%M}{zone}"
+    return f"{start_text} - {end_text}"
+
+
+def _format_ical_person(value, params):
+    """Format a calendar address as 'Name <addr>' (CN plus MAILTO value)."""
+    address = (value or "").strip()
+    if address.lower().startswith("mailto:"):
+        address = address[len("mailto:"):]
+    name = params.get("CN", "").strip()
+    if name and address and name.lower() != address.lower():
+        return f"{name} <{address}>"
+    return name or address
+
+
+def _calendar_row(label, value_html):
+    """One label/value row of the event table."""
+    return (f'<tr><td style="color:#777777">{html.escape(label)}</td>'
+            f'<td>&nbsp;&nbsp;{value_html}</td></tr>')
+
+
+def render_calendar_html(calendars):
+    """Render parsed calendar parts (MailViewer._collect_calendars) as HTML
+    for the message area."""
+    blocks = []
+    for calendar in calendars:
+        method = calendar.get("method", "")
+        heading = "Calendar invitation"
+        if method:
+            heading += f" &mdash; {html.escape(method)}"
+        rows = []
+        for event in calendar["events"]:
+            if event.get("summary"):
+                rows.append(_calendar_row("Event", f"<b>{html.escape(event['summary'])}</b>"))
+            when = format_event_when(event)
+            if when:
+                rows.append(_calendar_row("When", html.escape(when)))
+            if event.get("location"):
+                rows.append(_calendar_row("Where", html.escape(event["location"])))
+            if event.get("organizer"):
+                rows.append(_calendar_row("Organizer", html.escape(_format_ical_person(*event["organizer"]))))
+            if event.get("attendees"):
+                people = "<br>".join(html.escape(_format_ical_person(*a)) for a in event["attendees"])
+                rows.append(_calendar_row("Attendees", people))
+            if event.get("status"):
+                rows.append(_calendar_row("Status", html.escape(event["status"])))
+            if event.get("rrule"):
+                rows.append(_calendar_row("Repeats", html.escape(event["rrule"])))
+            if event.get("description"):
+                rows.append(_calendar_row("Notes", html.escape(event["description"]).replace("\n", "<br>")))
+        if method == "CANCEL":
+            rows.insert(0, _calendar_row("", "<b>This message cancels the event.</b>"))
+        blocks.append(f'<p><b>{heading}</b></p>'
+                      f'<table cellspacing="0" cellpadding="2">{"".join(rows)}</table>')
+    return "<br>".join(blocks)
+
+
 class MailSourceViewer(QDialog):
     """A simple dialog to display the raw content of the mail file."""
     def __init__(self, mail_file_path, parent=None):
@@ -169,6 +398,7 @@ class MailViewer(QMainWindow):
         self.tags_state = {}
         self.show_headers = True
         self.attachments = []
+        self.calendars = []
         self.message_id = None
         self.message = None
         self.mail_body = ""
@@ -223,9 +453,19 @@ class MailViewer(QMainWindow):
             logging.error(f"Failed to parse mail file: {e}")
             raise RuntimeError(f"Failed to parse mail file {self.mail_file_path}: {e}") from e
         # print("parsing message")
+        # Meeting invitations arrive as a text/calendar part with neither a
+        # filename nor a Content-Disposition, so mailparser drops them from
+        # its attachment list; collect and parse them ourselves.
+        self.calendars = self._collect_calendars(self.message)
         for part in custom_walk(self.message):
             if part.get_content_type() == 'text/plain':
                 body_text = _decode_text_payload(part.get_payload(decode=True), part.get_content_charset())
+                # An invitation's text/plain alternative is usually empty; its
+                # content sits in the calendar part.  Ignoring such a part
+                # keeps has_text_body false, so the viewer renders the HTML
+                # (where the event is shown) instead of a blank plain body.
+                if self.calendars and not body_text.strip():
+                    continue
                 if self.mail_body:
                     self.mail_body += "\n\n" + body_text
                 else:
@@ -233,6 +473,8 @@ class MailViewer(QMainWindow):
                 self.has_text_body = True
             if part.get_content_type() == 'text/html':
                 body_html = _decode_text_payload(part.get_payload(decode=True), part.get_content_charset())
+                if self.calendars and not body_html.strip():
+                    continue
                 # Take only the <body> inner content so joining several
                 # full HTML documents (each with their own <html>/<body>)
                 # does not produce invalid HTML.
@@ -243,6 +485,12 @@ class MailViewer(QMainWindow):
                 else:
                     self.mail_html = sanitized_html
                 self.has_html_body = True
+        if self.calendars:
+            # Render the event into the message area, below any body text the
+            # invitation carries.
+            calendar_html = render_calendar_html(self.calendars)
+            self.mail_html = (self.mail_html + "<br><br>" if self.mail_html else "") + calendar_html
+            self.has_html_body = True
         self.attachments = mail.attachments 
         # unfortunately not all mail have only one id
         if isinstance(mail.message_id, list):
@@ -338,6 +586,16 @@ class MailViewer(QMainWindow):
         self.toggle_html_button.clicked.connect(self.toggle_force_html)
         top_bar_layout.addWidget(self.toggle_html_button)
         self.render_html_button()
+
+        # Invitations get a button that hands the .ics to the desktop's
+        # registered handler (xdg-open), like an ics attachment would.
+        if self.calendars:
+            self.calendar_button = QPushButton("Open Invite")
+            self.calendar_button.clicked.connect(self.open_calendar_invite)
+            self.calendar_button.setToolTip(
+                "Write the calendar file (.ics) to a temporary file and open it\n"
+                "with the desktop's default handler (xdg-open).")
+            top_bar_layout.addWidget(self.calendar_button)
 
         top_bar_layout.addStretch()
 
@@ -1051,6 +1309,57 @@ class MailViewer(QMainWindow):
         self.do_forward( True )
 
 
+    def _collect_calendars(self, message):
+        """Return the message's calendar parts, decoded and parsed.
+
+        Each entry is {'ics': bytes, 'method': str, 'events': [...]} where
+        'events' is what parse_calendar returned.  Parts without a VEVENT
+        (e.g. a bare VTIMEZONE) are dropped, there is nothing to show for
+        them.
+        """
+        calendars = []
+        for part in custom_walk(message):
+            if part.get_content_type() not in CALENDAR_CONTENT_TYPES:
+                continue
+            payload = part.get_payload(decode=True)
+            if not payload:
+                continue
+            charset = part.get_content_charset() or "utf-8"
+            try:
+                text = payload.decode(charset)
+            except (LookupError, UnicodeDecodeError):
+                text = payload.decode("latin-1")
+            method, events = parse_calendar(text)
+            if not events:
+                continue
+            # The method normally sits in the payload, but Exchange also puts
+            # it into the Content-Type parameters.
+            method = method or (part.get_param("method") or "").upper()
+            calendars.append({"ics": payload, "method": method, "events": events})
+        return calendars
+
+    def open_calendar_invite(self):
+        """Hand the calendar file (.ics) to the default handler via xdg-open."""
+        if not self.calendars:
+            return
+        try:
+            temp_path = self._write_calendar_file()
+            # Fire-and-forget, for the same reason as handle_attachment_open.
+            subprocess.Popen(["xdg-open", temp_path])
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Could not open calendar invitation: {e}")
+
+    def _write_calendar_file(self):
+        """Write the first calendar part to a temporary .ics file.
+
+        The file is not removed again: the handler reads it after xdg-open
+        was called and may keep it for the import (same as attachments).
+        """
+        handle, temp_path = tempfile.mkstemp(prefix="kubux_invite_", suffix=".ics")
+        with os.fdopen(handle, "wb") as temp_file:
+            temp_file.write(self.calendars[0]["ics"])
+        return temp_path
+
     def show_attachment_context_menu(self, pos):
         """Shows a context menu with actions for the clicked attachment."""
         item = self.attachments_list.itemAt(pos)
@@ -1172,6 +1481,8 @@ class MailViewer(QMainWindow):
         self.mail_content.setFont(config.get_text_font())
         if hasattr(self, 'attachments_list') and self.attachments_list:
             self.attachments_list.setFont(config.get_attachment_font())
+        if hasattr(self, 'calendar_button') and self.calendar_button:
+            self.calendar_button.setFont(config.get_interface_font())
         self.headers_group_box.update_fonts()
         # Rebuild tags UI to pick up new interface font
         self.update_tags_ui()
