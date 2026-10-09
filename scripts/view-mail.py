@@ -1325,7 +1325,7 @@ def main():
     parser = argparse.ArgumentParser(description="View a single mail file.")
     parser.add_argument("mail_file", help="The full path to the mail file to view.")
     args = parser.parse_args()
-    run_gui_app( run, args.mail_file )
+    run_gui_app( run, args.mail_file, preload=( "view-thread", "edit-mail" ) )
 
 if __name__ == "__main__":
     main()

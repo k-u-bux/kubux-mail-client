@@ -677,7 +677,8 @@ def main():
     parser = argparse.ArgumentParser(description="View notmuch query results in a list.")
     parser.add_argument("--query", help="The notmuch query to display.", default=config.get_search())
     args = parser.parse_args()
-    run_gui_app( run, args.query )
+    run_gui_app( run, args.query,
+        preload=( "view-mail", "view-thread", "edit-mail", "open-drafts" ) )
 
 if __name__ == "__main__":
     main()

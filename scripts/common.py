@@ -31,6 +31,26 @@ def get_run_method ( mod_name ):
     return import_module( mod_name ).run
 
 
+def preload_modules ( names ):
+    """Import window modules ahead of the click that will need them.
+
+    Import only -- never construct a widget here. Failures are logged, not fatal.
+    """
+    for name in names:
+        try:
+            import_module( name )
+        except Exception as e:
+            logging.warning(f"preload of {name} failed: {e}")
+
+
+def _preload_chain ( names ):
+    """Preload one module per event-loop turn, so paint and input keep flowing."""
+    if not names:
+        return
+    preload_modules( names[ :1 ] )
+    QTimer.singleShot( 0, lambda: _preload_chain( names[ 1: ] ) )
+
+
 def setup_tooltip_font():
     """Set the tooltip font to match the popup font."""
     font = config.get_popup_font()
@@ -357,14 +377,21 @@ def show_window(widget):
     widget.destroyed.connect(lambda: _keep_alive.remove(widget))
     widget.show()
 
-def run_gui_app(run_func, *args):
-    """Set up the QApplication and run the given run_func(*args) inside it."""
+def run_gui_app(run_func, *args, preload=()):
+    """Set up the QApplication and run the given run_func(*args) inside it.
+
+    `preload` names window modules to import once this window is up, so the first
+    click that opens one does not pay the import. It cannot help the first window
+    of a process -- nothing is running yet to preload from.
+    """
     app = QApplication(sys.argv)
     from event_filter import global_drag_filter
     app.installEventFilter(global_drag_filter)
     app.setApplicationName("KubuxMailClient")
     setup_tooltip_font()
     run_func(*args)
+    if preload:
+        QTimer.singleShot( 0, lambda: _preload_chain( tuple( preload ) ) )
     app.exec()
 
 def edit_drafts_menu(parent, button):

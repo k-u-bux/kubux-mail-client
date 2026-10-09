@@ -724,7 +724,8 @@ def run ():
     show_window( editor )
 
 def main():
-    run_gui_app( run )
+    run_gui_app( run,
+        preload=( "show-query-results", "edit-mail", "open-drafts" ) )
 
 if __name__ == "__main__":
     main()

@@ -358,7 +358,7 @@ def main():
     parser = argparse.ArgumentParser(description="View messages in a specific notmuch thread.")
     parser.add_argument("thread_id", help="The thread ID to display.")
     args = parser.parse_args()
-    run_gui_app( run, args.thread_id )
+    run_gui_app( run, args.thread_id, preload=( "view-mail", ) )
 
 if __name__ == "__main__":
     main()

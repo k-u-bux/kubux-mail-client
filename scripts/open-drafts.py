@@ -391,7 +391,7 @@ def main():
     parser.add_argument("--drafts-dir", help="The full path to the drafts directory.")
     parser.add_argument("--email", help="The senders email address.")
     args = parser.parse_args()
-    run_gui_app( run, args.drafts_dir, args.email )
+    run_gui_app( run, args.drafts_dir, args.email, preload=( "edit-mail", ) )
 
 if __name__ == "__main__":
     main()
