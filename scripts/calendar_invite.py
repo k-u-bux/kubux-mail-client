@@ -9,19 +9,23 @@ neither the mail tree nor a widget:
 * `parse_calendar()`          - dependency-free ICS reader (VCALENDAR/VEVENT)
 * `format_event_when()`       - the "Wed 2027-06-30 12:30-14:00 (Europe/Berlin)" line
 * `render_calendar_html()`    - the card shown in the message pane
-* `standardize_ics_timezones()` - rewrite Windows zone keys before exporting
-* `WINDOWS_TO_IANA`           - Windows -> standard (IANA) zone mapping
 
 The viewer finds the parts (MailViewer._collect_calendars) and calls in here:
 picking a calendar part out of a MIME tree is a mail question, not a calendar
-one.  See references/windows-timezone-keys.md in the kubux-mail-client skill.
+one.
+
+An invitation is shown and exported exactly as it arrived: a Windows/Exchange
+zone key ("W. Europe Standard Time") is printed as the document states it.  Such
+keys do occur in ordinary .ics documents (Exchange published/ICS feeds, Outlook
+exports, events an Outlook-side client pushed into CalDAV), so mapping them to a
+tz database name is the calendar application's job — kubux-calendar owns that
+(window ``library/windows_tz.py``) for every document that reaches a calendar,
+invite or not.
 """
 
 import html
 import re
 from datetime import datetime
-
-from PySide6.QtCore import QTimeZone
 
 
 # Content types that carry an iCalendar (RFC 5545) payload.  Outlook sends a
@@ -165,9 +169,9 @@ def _ical_zone_label(value, params, all_day):
     if (value or "").strip().endswith("Z"):
         return " UTC"
     tzid = params.get("TZID")
-    # Show the standard name: a Windows key ("W. Europe Standard Time") is not
-    # a zone anybody can look up.
-    return f" ({standard_timezone_name(tzid)})" if tzid else ""
+    # Printed as the document states it, Windows key or not: the card shows the
+    # invitation as it arrived.
+    return f" ({tzid})" if tzid else ""
 
 
 def _format_ical_moment(value, params):
@@ -209,248 +213,6 @@ def _format_ical_person(value, params):
     if name and address and name.lower() != address.lower():
         return f"{name} <{address}>"
     return name or address
-
-
-# iCalendar TZID occurrences: the TZID property of a VTIMEZONE block
-# ("TZID:W. Europe Standard Time") and the TZID parameter of DTSTART/DTEND
-# (";TZID=W. Europe Standard Time"), whose value may be quoted.
-TZID_PROPERTY_RE = re.compile(r'^(TZID:)("?)([^":;]*)\2\s*$')
-TZID_PARAMETER_RE = re.compile(r'(;TZID=)("?)([^":;]*)\2')
-
-
-# Windows/Exchange time zone keys -> standard (IANA) time zone names.
-#
-# Outlook and Exchange stamp invitations with a Windows zone key, e.g.
-# "DTSTART;TZID=W. Europe Standard Time:20270630T123000", plus a VTIMEZONE
-# block of the same name.  That key is no IANA tz database name, so it means
-# nothing to any other calendar application: it must be mapped to the standard
-# name (here Europe/Berlin) before it is displayed or exported.
-#
-# Source: CLDR common/supplemental/windowsZones.xml, the territory="001" rows —
-# the reference Windows -> tzdb mapping, from the same data ICU is built from —
-# fetched 2026-10-08 from
-# https://raw.githubusercontent.com/unicode-org/cldr/main/common/supplemental/windowsZones.xml
-# sha256 9cf3db6a31fb382fee21b70be6feba1e82766b0fcd06e6261fb7936a73e537ff,
-# 139 keys.  Zones renamed since that revision were modernised against tzdata's
-# link table, but only within the same area (a renamed zone is a spelling fix;
-# a merger such as Atlantic/Reykjavik -> Africa/Abidjan is not chased, the CLDR
-# name stays a valid tzdb name):
-#   US Eastern: America/Indianapolis -> America/Indiana/Indianapolis, Argentina: America/Buenos_Aires -> America/Argentina/Buenos_Aires,
-#   Greenland: America/Godthab -> America/Nuuk, FLE: Europe/Kiev -> Europe/Kyiv, India: Asia/Calcutta -> Asia/Kolkata,
-#   Nepal: Asia/Katmandu -> Asia/Kathmandu, Myanmar: Asia/Rangoon -> Asia/Yangon.
-# Regenerate by re-reading the territory="001" mapZone rows of that file.
-WINDOWS_TO_IANA = {
-    "AUS Central Standard Time": "Australia/Darwin",
-    "AUS Eastern Standard Time": "Australia/Sydney",
-    "Afghanistan Standard Time": "Asia/Kabul",
-    "Alaskan Standard Time": "America/Anchorage",
-    "Aleutian Standard Time": "America/Adak",
-    "Altai Standard Time": "Asia/Barnaul",
-    "Arab Standard Time": "Asia/Riyadh",
-    "Arabian Standard Time": "Asia/Dubai",
-    "Arabic Standard Time": "Asia/Baghdad",
-    "Argentina Standard Time": "America/Argentina/Buenos_Aires",
-    "Astrakhan Standard Time": "Europe/Astrakhan",
-    "Atlantic Standard Time": "America/Halifax",
-    "Aus Central W. Standard Time": "Australia/Eucla",
-    "Azerbaijan Standard Time": "Asia/Baku",
-    "Azores Standard Time": "Atlantic/Azores",
-    "Bahia Standard Time": "America/Bahia",
-    "Bangladesh Standard Time": "Asia/Dhaka",
-    "Belarus Standard Time": "Europe/Minsk",
-    "Bougainville Standard Time": "Pacific/Bougainville",
-    "Canada Central Standard Time": "America/Regina",
-    "Cape Verde Standard Time": "Atlantic/Cape_Verde",
-    "Caucasus Standard Time": "Asia/Yerevan",
-    "Cen. Australia Standard Time": "Australia/Adelaide",
-    "Central America Standard Time": "America/Guatemala",
-    "Central Asia Standard Time": "Asia/Bishkek",
-    "Central Brazilian Standard Time": "America/Cuiaba",
-    "Central Europe Standard Time": "Europe/Budapest",
-    "Central European Standard Time": "Europe/Warsaw",
-    "Central Pacific Standard Time": "Pacific/Guadalcanal",
-    "Central Standard Time": "America/Chicago",
-    "Central Standard Time (Mexico)": "America/Mexico_City",
-    "Chatham Islands Standard Time": "Pacific/Chatham",
-    "China Standard Time": "Asia/Shanghai",
-    "Cuba Standard Time": "America/Havana",
-    "Dateline Standard Time": "Etc/GMT+12",
-    "E. Africa Standard Time": "Africa/Nairobi",
-    "E. Australia Standard Time": "Australia/Brisbane",
-    "E. Europe Standard Time": "Europe/Chisinau",
-    "E. South America Standard Time": "America/Sao_Paulo",
-    "Easter Island Standard Time": "Pacific/Easter",
-    "Eastern Standard Time": "America/New_York",
-    "Eastern Standard Time (Mexico)": "America/Cancun",
-    "Egypt Standard Time": "Africa/Cairo",
-    "Ekaterinburg Standard Time": "Asia/Yekaterinburg",
-    "FLE Standard Time": "Europe/Kyiv",
-    "Fiji Standard Time": "Pacific/Fiji",
-    "GMT Standard Time": "Europe/London",
-    "GTB Standard Time": "Europe/Bucharest",
-    "Georgian Standard Time": "Asia/Tbilisi",
-    "Greenland Standard Time": "America/Nuuk",
-    "Greenwich Standard Time": "Atlantic/Reykjavik",
-    "Haiti Standard Time": "America/Port-au-Prince",
-    "Hawaiian Standard Time": "Pacific/Honolulu",
-    "India Standard Time": "Asia/Kolkata",
-    "Iran Standard Time": "Asia/Tehran",
-    "Israel Standard Time": "Asia/Jerusalem",
-    "Jordan Standard Time": "Asia/Amman",
-    "Kaliningrad Standard Time": "Europe/Kaliningrad",
-    "Korea Standard Time": "Asia/Seoul",
-    "Libya Standard Time": "Africa/Tripoli",
-    "Line Islands Standard Time": "Pacific/Kiritimati",
-    "Lord Howe Standard Time": "Australia/Lord_Howe",
-    "Magadan Standard Time": "Asia/Magadan",
-    "Magallanes Standard Time": "America/Punta_Arenas",
-    "Marquesas Standard Time": "Pacific/Marquesas",
-    "Mauritius Standard Time": "Indian/Mauritius",
-    "Middle East Standard Time": "Asia/Beirut",
-    "Montevideo Standard Time": "America/Montevideo",
-    "Morocco Standard Time": "Africa/Casablanca",
-    "Mountain Standard Time": "America/Denver",
-    "Mountain Standard Time (Mexico)": "America/Mazatlan",
-    "Myanmar Standard Time": "Asia/Yangon",
-    "N. Central Asia Standard Time": "Asia/Novosibirsk",
-    "Namibia Standard Time": "Africa/Windhoek",
-    "Nepal Standard Time": "Asia/Kathmandu",
-    "New Zealand Standard Time": "Pacific/Auckland",
-    "Newfoundland Standard Time": "America/St_Johns",
-    "Norfolk Standard Time": "Pacific/Norfolk",
-    "North Asia East Standard Time": "Asia/Irkutsk",
-    "North Asia Standard Time": "Asia/Krasnoyarsk",
-    "North Korea Standard Time": "Asia/Pyongyang",
-    "Omsk Standard Time": "Asia/Omsk",
-    "Pacific SA Standard Time": "America/Santiago",
-    "Pacific Standard Time": "America/Los_Angeles",
-    "Pacific Standard Time (Mexico)": "America/Tijuana",
-    "Pakistan Standard Time": "Asia/Karachi",
-    "Paraguay Standard Time": "America/Asuncion",
-    "Qyzylorda Standard Time": "Asia/Qyzylorda",
-    "Romance Standard Time": "Europe/Paris",
-    "Russia Time Zone 10": "Asia/Srednekolymsk",
-    "Russia Time Zone 11": "Asia/Kamchatka",
-    "Russia Time Zone 3": "Europe/Samara",
-    "Russian Standard Time": "Europe/Moscow",
-    "SA Eastern Standard Time": "America/Cayenne",
-    "SA Pacific Standard Time": "America/Bogota",
-    "SA Western Standard Time": "America/La_Paz",
-    "SE Asia Standard Time": "Asia/Bangkok",
-    "Saint Pierre Standard Time": "America/Miquelon",
-    "Sakhalin Standard Time": "Asia/Sakhalin",
-    "Samoa Standard Time": "Pacific/Apia",
-    "Sao Tome Standard Time": "Africa/Sao_Tome",
-    "Saratov Standard Time": "Europe/Saratov",
-    "Singapore Standard Time": "Asia/Singapore",
-    "South Africa Standard Time": "Africa/Johannesburg",
-    "South Sudan Standard Time": "Africa/Juba",
-    "Sri Lanka Standard Time": "Asia/Colombo",
-    "Sudan Standard Time": "Africa/Khartoum",
-    "Syria Standard Time": "Asia/Damascus",
-    "Taipei Standard Time": "Asia/Taipei",
-    "Tasmania Standard Time": "Australia/Hobart",
-    "Tocantins Standard Time": "America/Araguaina",
-    "Tokyo Standard Time": "Asia/Tokyo",
-    "Tomsk Standard Time": "Asia/Tomsk",
-    "Tonga Standard Time": "Pacific/Tongatapu",
-    "Transbaikal Standard Time": "Asia/Chita",
-    "Turkey Standard Time": "Europe/Istanbul",
-    "Turks And Caicos Standard Time": "America/Grand_Turk",
-    "US Eastern Standard Time": "America/Indiana/Indianapolis",
-    "US Mountain Standard Time": "America/Phoenix",
-    "UTC": "Etc/UTC",
-    "UTC+12": "Etc/GMT-12",
-    "UTC+13": "Etc/GMT-13",
-    "UTC-02": "Etc/GMT+2",
-    "UTC-08": "Etc/GMT+8",
-    "UTC-09": "Etc/GMT+9",
-    "UTC-11": "Etc/GMT+11",
-    "Ulaanbaatar Standard Time": "Asia/Ulaanbaatar",
-    "Venezuela Standard Time": "America/Caracas",
-    "Vladivostok Standard Time": "Asia/Vladivostok",
-    "Volgograd Standard Time": "Europe/Volgograd",
-    "W. Australia Standard Time": "Australia/Perth",
-    "W. Central Africa Standard Time": "Africa/Lagos",
-    "W. Europe Standard Time": "Europe/Berlin",
-    "W. Mongolia Standard Time": "Asia/Hovd",
-    "West Asia Standard Time": "Asia/Tashkent",
-    "West Bank Standard Time": "Asia/Hebron",
-    "West Pacific Standard Time": "Pacific/Port_Moresby",
-    "Yakutsk Standard Time": "Asia/Yakutsk",
-    "Yukon Standard Time": "America/Whitehorse",
-}
-
-
-
-def standard_timezone_name(tzid):
-    """Map a time zone id to a standard (IANA) name.
-
-    Outlook/Exchange use Windows zone keys ("W. Europe Standard Time"), which
-    are no tz database names and mean nothing to other calendar applications;
-    the CLDR mapping turns them into one ("Europe/Berlin").  Names that already
-    look standard are returned as they are.
-    """
-    key = (tzid or "").strip().strip('"')
-    if not key or "/" in key:
-        return key
-    name = WINDOWS_TO_IANA.get(key)
-    if name:
-        return name
-    # Key not in the mapping (added since, or proprietary): fall back to any
-    # zone Qt/ICU knows for it, whose offsets are the same by construction.
-    ids = QTimeZone.windowsIdToIanaIds(key.encode("utf-8"))
-    return bytes(ids[0]).decode("utf-8") if ids else key
-
-
-def _fold_ical_line(line, limit=75):
-    """Fold one content line to ``limit`` octets (RFC 5545 §3.1).
-
-    Counts octets, not characters, and never splits a multi-byte character; a
-    continuation line carries one leading space, which counts towards the limit
-    too.  Short lines are returned unchanged.
-    """
-    if len(line.encode("utf-8")) <= limit:
-        return line
-    chunks = []
-    current = ""
-    used = 0
-    for char in line:
-        size = len(char.encode("utf-8"))
-        if used + size > limit - (1 if chunks else 0):
-            chunks.append(current)
-            current = ""
-            used = 0
-        current += char
-        used += size
-    chunks.append(current)
-    return "\r\n ".join(chunks)
-
-
-def standardize_ics_timezones(ics_text):
-    """Rewrite Windows/Exchange zone keys in an iCalendar text.
-
-    Renames the TZID property of the VTIMEZONE blocks and the TZID parameters
-    of DTSTART/DTEND alike, so the file stays self-consistent and every
-    calendar application can resolve the zones by name.  Needed because the
-    file is handed to xdg-open, where a Windows key is not resolvable.
-
-    Lines are unfolded before and refolded after (a TZID may be folded across
-    lines), which is why even untouched long lines come back refolded.
-    """
-    def rename(match):
-        quote = match.group(2)
-        return f"{match.group(1)}{quote}{standard_timezone_name(match.group(3))}{quote}"
-
-    lines = _unfold_ical_lines(ics_text)
-    while lines and not lines[-1]:
-        lines.pop()
-    folded = []
-    for line in lines:
-        line = TZID_PROPERTY_RE.sub(rename, line)
-        line = TZID_PARAMETER_RE.sub(rename, line)
-        folded.append(_fold_ical_line(line))
-    return "\r\n".join(folded) + "\r\n"
 
 
 def render_calendar_html(calendar):

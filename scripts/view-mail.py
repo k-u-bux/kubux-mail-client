@@ -22,7 +22,7 @@ from PySide6.QtWidgets import (
 )
 
 from notmuch_api import find_matching_messages, find_matching_threads, apply_tag_to_query, get_tags_from_query, update_unseen_from_query
-from calendar_invite import CALENDAR_CONTENT_TYPES, parse_calendar, render_calendar_html, standardize_ics_timezones
+from calendar_invite import CALENDAR_CONTENT_TYPES, parse_calendar, render_calendar_html
 
 import logging
 import subprocess
@@ -1159,13 +1159,13 @@ class MailViewer(QMainWindow):
     def _write_calendar_file(self, index=0):
         """Write calendar part ``index`` to a temporary .ics file.
 
-        The zone keys are standardized first: xdg-open hands the file to a
-        calendar application, which cannot resolve a Windows key such as
-        "W. Europe Standard Time".  The file is not removed again: the handler
-        reads it after xdg-open was called and may keep it for the import
-        (same as attachments).
+        The payload is written as it arrived: mapping foreign zone keys is the
+        calendar application's business (kubux-calendar normalises a document
+        when it imports it).  The file is not removed again: the handler reads
+        it after xdg-open was called and may keep it for the import (same as
+        attachments).
         """
-        ics_text = standardize_ics_timezones(self.calendars[index]["text"])
+        ics_text = self.calendars[index]["text"]
         handle, temp_path = tempfile.mkstemp(prefix="kubux_invite_", suffix=".ics")
         with os.fdopen(handle, "wb") as temp_file:
             temp_file.write(ics_text.encode("utf-8"))
