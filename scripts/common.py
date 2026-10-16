@@ -443,8 +443,14 @@ def toggle_row_tag(table, row, tag, apply_tag):
     apply_tag(op, row)
 
 def tag_dialog(parent):
-    text, ok = QInputDialog.getText(parent, "Tags", "+/-tag(s) (separated by commas):")
+    dialog = QInputDialog(parent)
+    dialog.setWindowTitle("Tags")
+    dialog.setLabelText("+/-tag(s) (separated by commas):")
+    dialog.setFont( config.get_popup_font() )
+    ok = dialog.exec() == QDialog.Accepted
+    text = dialog.textValue()
     return [t.strip() for t in text.split(',')] if ok and text else []
+
 
 def apply_tag_to_selected(table, apply_tag, op_getter):
     """Apply a tag operation to every selected row. op_getter(row) returns the op."""
