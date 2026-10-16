@@ -345,6 +345,8 @@ class MailEditor(QMainWindow):
 
     def add_attachment(self, file_path=None):
         if not file_path:
+            # The desktop's native chooser owns its font; a Qt font setting does
+            # not reach it.
             file_path, _ = QFileDialog.getOpenFileName(self, "Add Attachment")
             if not file_path:
                 return

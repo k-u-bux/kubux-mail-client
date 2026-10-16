@@ -12,7 +12,7 @@ from mail_table_widget import MailTableWidget
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLineEdit, QPushButton, QTableWidget, QTableWidgetItem, QHeaderView,
-    QMessageBox, QDialog, QDialogButtonBox, QLabel, QTextEdit, QInputDialog,
+    QDialog, QDialogButtonBox, QLabel, QTextEdit, QInputDialog,
     QCheckBox, QAbstractItemView, QMenu, QWidgetAction
 )
 from PySide6.QtCore import Qt, QSize, QTimer, QItemSelectionModel, QEvent
@@ -453,7 +453,7 @@ class QueryResultsViewer(QMainWindow):
                 try:
                     get_run_method( "view-thread" )( thread_id )
                 except Exception as e:
-                    QMessageBox.critical(self, "Error", f"Could not launch mail viewer: {e}")
+                    display_error(self, "Error", f"Could not launch mail viewer: {e}")
             else:
                 logging.warning("Could not find thread ID for selected row.")
         else: # mails mode
@@ -463,7 +463,7 @@ class QueryResultsViewer(QMainWindow):
                 try:
                     get_run_method( "view-mail" )( mail_file_path[ 0 ] )
                 except Exception as e:
-                    QMessageBox.critical(self, "Error", f"Could not launch mail viewer: {e}")
+                    display_error(self, "Error", f"Could not launch mail viewer: {e}")
             else:
                 logging.warning("Could not find mail file path for selected row.")
 
@@ -488,7 +488,7 @@ class QueryResultsViewer(QMainWindow):
                 try:
                     get_run_method( "view-thread" )( thread_id )
                 except Exception as e:
-                    QMessageBox.critical(self, "Error", f"Could not launch thread viewer: {e}")
+                    display_error(self, "Error", f"Could not launch thread viewer: {e}")
             else:
                 logging.warning("Could not find thread ID for selected row.")
         else: # mails mode
@@ -520,7 +520,7 @@ class QueryResultsViewer(QMainWindow):
             try:
                 get_run_method( "view-mail" )( mail_file_path[0] )
             except Exception as e:
-                QMessageBox.critical(self, "Error", f"Could not launch mail viewer: {e}")
+                display_error(self, "Error", f"Could not launch mail viewer: {e}")
         else:
                 logging.warning("Could not find mail file path for selected row.")
 
@@ -542,7 +542,7 @@ class QueryResultsViewer(QMainWindow):
             try:
                 get_run_method( "view-mail" )( mail_file_path[0] )
             except Exception as e:
-                QMessageBox.critical(self, "Error", f"Could not launch mail viewer: {e}")
+                display_error(self, "Error", f"Could not launch mail viewer: {e}")
         else:
                 logging.warning("Could not find mail file path for selected row.")
 

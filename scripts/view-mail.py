@@ -17,7 +17,7 @@ from PySide6.QtGui import QFont, QKeySequence, QAction, QTextCursor, QTextCharFo
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QTextBrowser, QTextEdit, QHBoxLayout,
     QPushButton, QListWidget, QSplitter, QMessageBox, QMenu, QGroupBox,
-    QFormLayout, QLabel, QInputDialog, QScrollArea, QDialog, QDialogButtonBox,
+    QFormLayout, QLabel, QScrollArea, QDialog, QDialogButtonBox,
     QFileDialog, QSizePolicy, QAbstractItemView, QCalendarWidget, QFrame
 )
 
@@ -34,7 +34,9 @@ import mimetypes
 import secrets
 
 from config import config, Config
-from common import display_error, html_to_plain_text, get_db_path, get_run_method, show_window, run_gui_app, tag_dialog, decision_dialog
+from common import (display_error, html_to_plain_text, get_db_path, get_run_method,
+                    show_window, run_gui_app, tag_dialog, decision_dialog,
+                    message_box, ask_text)
 from watcher import DirectoryEventHandler
 from header_widget import MailHeaderWidget
 
@@ -134,6 +136,9 @@ class MailSourceViewer(QDialog):
         self.setWindowFlags(Qt.Window)
         self.setWindowTitle("Raw Message Source")
         self.resize(800, 600)
+        # Chrome of a top-level window; the source pane below sets the text
+        # font for its own body.
+        self.setFont(config.get_interface_font())
 
         main_layout = QVBoxLayout(self)
 
@@ -539,7 +544,8 @@ class MailViewer(QMainWindow):
                 self.mail_content.load_remote_decision = decision_dialog(
                     self, "Remote content",
                     "This message references remote content (e.g. images).\nLoad it?",
-                    "Load remote content", "Don't load")
+                    "Load remote content", "Don't load",
+                    config.get_interface_font())
             self.mail_content.setHtml(self.mail_html)
         else:
             cursor = self.mail_content.textCursor()
@@ -642,11 +648,12 @@ class MailViewer(QMainWindow):
         # guessed from spoofable headers (From/Reply-To/List-Post/List-Id),
         # which an attacker fully controls. Drop them instead.
         if url.isRelative():
-            QMessageBox.warning(
+            message_box(
                 self,
                 "Relative URL",
                 "This message contains a relative link, which cannot be opened safely.\n\n"
-                f"Link: {url.toString()}"
+                f"Link: {url.toString()}",
+                config.get_interface_font()
             )
             return
         
@@ -657,11 +664,12 @@ class MailViewer(QMainWindow):
             QDesktopServices.openUrl(url)
         else:
             # For security, only allow http, https, and file schemes
-            QMessageBox.warning(
+            message_box(
                 self,
                 "Unsafe URL Scheme",
                 f"The URL uses an unsafe scheme: {scheme}://"
-                "\n\nOnly http://, https://, and file:// URLs can be opened."
+                "\n\nOnly http://, https://, and file:// URLs can be opened.",
+                config.get_interface_font()
             )
     
     def extract_domain_from_header(self, header_value):
@@ -736,6 +744,9 @@ class MailViewer(QMainWindow):
         dialog = QDialog(self)
         dialog.setWindowTitle("Postpone Until")
         dialog.setModal(True)
+        # Chrome of a top-level window; the label and the date picker inside
+        # inherit it.
+        dialog.setFont(config.get_interface_font())
 
         layout = QVBoxLayout(dialog)
 
@@ -847,8 +858,9 @@ class MailViewer(QMainWindow):
 
     def add_tag_dialog(self):
         """Opens a dialog to add new tags."""
-        text, ok = QInputDialog.getText(self, "Add Tags", "Enter tag(s) to add (comma-separated):")
-        if ok and text:
+        text = ask_text(self, "Add Tags", "Enter tag(s) to add (comma-separated):",
+                        config.get_popup_font())
+        if text:
             new_tags = [t.strip() for t in text.split(',')]
             for tag in new_tags:
                 self.add_tag(tag)
@@ -907,7 +919,7 @@ class MailViewer(QMainWindow):
                 temp_path = temp_file.name
             get_run_method( "edit-mail" )( temp_path )
         except Exception as e:
-            QMessageBox.critical(self, "Error", f"Failed to create or open draft: {e}")
+            display_error(self, "Error", f"Failed to create or open draft: {e}")
 
     def reply_to_addr(self):
         """Returns the Reply-To address if present, else the From address."""
@@ -1050,7 +1062,9 @@ class MailViewer(QMainWindow):
         """
         selected = self.headers_group_box.get_selected_addresses()
         if not selected:
-            QMessageBox.warning(self, "No Addresses Selected", "Please right-click on at least one address to select it before replying.")
+            message_box(self, "No Addresses Selected",
+                        "Please right-click on at least one address to select it before replying.",
+                        config.get_interface_font())
             return
 
         to_list = list(selected)
@@ -1154,7 +1168,7 @@ class MailViewer(QMainWindow):
             # Fire-and-forget, for the same reason as handle_attachment_open.
             subprocess.Popen(["xdg-open", temp_path])
         except Exception as e:
-            QMessageBox.critical(self, "Error", f"Could not open calendar invitation: {e}")
+            display_error(self, "Error", f"Could not open calendar invitation: {e}")
 
     def _write_calendar_file(self, index=0):
         """Write calendar part ``index`` to a temporary .ics file.
@@ -1242,7 +1256,7 @@ class MailViewer(QMainWindow):
                 subprocess.Popen(["xdg-open", temp_path])
                 
         except Exception as e:
-            QMessageBox.critical(self, "Error", f"Could not open attachment: {e}")
+            display_error(self, "Error", f"Could not open attachment: {e}")
 
 
     def handle_attachment_save_as(self, item):
@@ -1252,6 +1266,8 @@ class MailViewer(QMainWindow):
             attachment_part = self.attachments[part_index]
             filename = attachment_part['filename']
 
+            # The desktop's native chooser owns its font; a Qt font setting
+            # does not reach it.
             save_path, _ = QFileDialog.getSaveFileName(self, "Save Attachment", filename)
         
             if save_path:
@@ -1260,7 +1276,7 @@ class MailViewer(QMainWindow):
                     f.write(payload_bytes)
             
         except Exception as e:
-            QMessageBox.critical(self, "Error", f"Could not save attachment: {e}")
+            display_error(self, "Error", f"Could not save attachment: {e}")
 
 
     def show_content_context_menu(self, pos):
@@ -1317,7 +1333,7 @@ def run ( args_mail_file ):
         viewer = MailViewer( args_mail_file )
     except Exception as e:
         logging.error(f"Could not open mail viewer: {e}")
-        QMessageBox.critical(None, "Cannot Open Mail", f"Could not open the mail file:\n\n{e}")
+        display_error(None, "Cannot Open Mail", f"Could not open the mail file:\n\n{e}")
         return
     show_window( viewer )
 

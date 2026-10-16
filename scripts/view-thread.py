@@ -12,7 +12,7 @@ import re
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLineEdit, QPushButton, QTableWidget, QTableWidgetItem, QHeaderView,
-    QMessageBox, QDialog, QDialogButtonBox, QLabel, QTextEdit, QInputDialog,
+    QDialog, QDialogButtonBox, QLabel, QTextEdit, QInputDialog,
     QCheckBox, QAbstractItemView, QMenu, QWidgetAction
 )
 from PySide6.QtCore import Qt, QSize, QTimer, QItemSelectionModel, QEvent
@@ -250,7 +250,7 @@ class ThreadViewer(QMainWindow):
                 try:
                     get_run_method( "view-mail" )( mail_file_path[0] )
                 except Exception as e:
-                    QMessageBox.critical(self, "Error", f"Could not launch mail viewer: {e}")
+                    display_error(self, "Error", f"Could not launch mail viewer: {e}")
             else:
                 logging.warning("Could not find mail file path for selected row.")
 

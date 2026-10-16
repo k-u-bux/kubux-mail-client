@@ -246,10 +246,19 @@ def create_date_item ( timestamp ):
 
 # Custom dialog for displaying copyable error messages
 class CopyableErrorDialog(QDialog):
+    """Dialog for displaying a copyable error message.
+
+    Fonts by role: the message body is selectable text meant to be copied into a
+    bug report, so it follows the text font -- the same split MailSourceViewer
+    uses for its raw mail source.  The dialog chrome (label, buttons) follows
+    the interface font.
+    """
+
     def __init__(self, title, message, parent=None):
         super().__init__(parent)
         self.setWindowTitle(title)
         self.setMinimumWidth(500)
+        self.setFont(config.get_interface_font())
         
         layout = QVBoxLayout(self)
         
@@ -258,6 +267,7 @@ class CopyableErrorDialog(QDialog):
         
         self.text_edit = QTextEdit()
         self.text_edit.setReadOnly(True)
+        self.text_edit.setFont(config.get_text_font())
         self.text_edit.setPlainText(message)
         layout.addWidget(self.text_edit)
         
@@ -274,11 +284,40 @@ def log_and_display_error(parent, title, message):
     logging.error(f"{title}: {message}")
     display_error(parent, title, message)
 
-def decision_dialog(parent, title, message, yes_text, no_text):
+def message_box(parent, title, message, font, icon=QMessageBox.Icon.Warning):
+    """Show a modal notice.
+
+    Qt builds message boxes as top-level windows, so they never inherit a font
+    from the widget they were opened from; every caller states the font it
+    wants.  A diagnostic worth copying belongs in display_error() instead: that
+    dialog is selectable and sets the text font for its body.
+    """
+    box = QMessageBox(parent)
+    box.setWindowTitle(title)
+    box.setIcon(icon)
+    box.setText(message)
+    box.setFont(font)
+    box.exec()
+
+def ask_text(parent, title, label, font):
+    """Prompt for a single line of text; returns None when cancelled.
+
+    Same rule as message_box: a top-level window, so the caller states the font.
+    """
+    dialog = QInputDialog(parent)
+    dialog.setWindowTitle(title)
+    dialog.setLabelText(label)
+    dialog.setFont(font)
+    if dialog.exec() != QDialog.Accepted:
+        return None
+    return dialog.textValue()
+
+def decision_dialog(parent, title, message, yes_text, no_text, font):
     """Show a yes/no decision dialog; return True if 'yes' was chosen."""
     box = QMessageBox(parent)
     box.setWindowTitle(title)
     box.setText(message)
+    box.setFont(font)
     yes_btn = box.addButton(yes_text, QMessageBox.YesRole)
     box.addButton(no_text, QMessageBox.NoRole)
     box.exec()
@@ -443,13 +482,9 @@ def toggle_row_tag(table, row, tag, apply_tag):
     apply_tag(op, row)
 
 def tag_dialog(parent):
-    dialog = QInputDialog(parent)
-    dialog.setWindowTitle("Tags")
-    dialog.setLabelText("+/-tag(s) (separated by commas):")
-    dialog.setFont( config.get_popup_font() )
-    ok = dialog.exec() == QDialog.Accepted
-    text = dialog.textValue()
-    return [t.strip() for t in text.split(',')] if ok and text else []
+    text = ask_text(parent, "Tags", "+/-tag(s) (separated by commas):",
+                    config.get_popup_font())
+    return [t.strip() for t in text.split(',')] if text else []
 
 
 def apply_tag_to_selected(table, apply_tag, op_getter):
