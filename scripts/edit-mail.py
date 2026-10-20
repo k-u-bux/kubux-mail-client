@@ -157,6 +157,7 @@ class MailEditor(QMainWindow):
 
         # Create header widget
         self.headers_widget = MailHeaderEditableWidget(central_widget, config, self.draft_message)
+        self._update_more_headers_button()
         # main_layout.addWidget(self.headers_widget)
         
         # Populate the "From" field with available identities
@@ -272,7 +273,12 @@ class MailEditor(QMainWindow):
         signature = config.get_signature(from_addr)
         if signature:
             self.current_signature = signature
-            plain_text_body = f"{plain_text_body}\n-- \n{signature}"
+            # A saved or cloned draft already ends with the signature;
+            # do not append it a second time
+            if plain_text_body.rstrip().endswith(f"\n-- \n{signature}".rstrip()):
+                plain_text_body = plain_text_body.rstrip()
+            else:
+                plain_text_body = f"{plain_text_body}\n-- \n{signature}"
         self.body_edit.setPlainText(plain_text_body)
 
         # Find and add any attachments
@@ -303,7 +309,10 @@ class MailEditor(QMainWindow):
     def toggle_more_headers(self):
         """Toggle visibility of additional header fields."""
         self.headers_widget.toggle_more_headers()
-        is_visible = any(self.headers_widget.editors[f].isVisible() for f in self.headers_widget.more_headers_fields)
+        self._update_more_headers_button()
+
+    def _update_more_headers_button(self):
+        is_visible = self.headers_widget.more_headers_visible
         self.more_headers_button.setText("Less Headers" if is_visible else "More Headers")
         
     def dragEnterEvent(self, event):

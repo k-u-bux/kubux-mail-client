@@ -713,9 +713,9 @@ class MailHeaderEditableWidget(QScrollArea):
                     # This should be handled by set_from_options
                     pass
                     
-        # Show more headers if they have content
-        if message.get("Bcc") or message.get("Reply-To"):
-            self.more_headers_visible = True
+        # Show more headers if they have content (toggle flips the flag,
+        # so only call it while they are still hidden)
+        if (message.get("Bcc") or message.get("Reply-To")) and not self.more_headers_visible:
             self.toggle_more_headers()
             
         # Extract message ID
