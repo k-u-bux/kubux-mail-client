@@ -77,8 +77,18 @@ class AddressHighlighter(QSyntaxHighlighter):
 
     @staticmethod
     def is_valid_address(segment):
+        # Reject unbalanced or repeated angle brackets.  parseaddr() is
+        # lenient and will accept "aaa <x@kubux.n" without the closing ">",
+        # so validate the bracket structure first.
+        if segment.count('<') != segment.count('>') or segment.count('<') > 1:
+            return False
+        if '<' in segment and segment.index('<') > segment.index('>'):
+            return False
+
         display_name, addr_spec = email.utils.parseaddr(segment)
         if not addr_spec or '@' not in addr_spec or ' ' in addr_spec:
+            return False
+        if '<' in addr_spec or '>' in addr_spec:
             return False
         local, domain = addr_spec.rsplit('@', 1)
         if not local or not domain or '.' not in domain or domain.endswith('.'):
