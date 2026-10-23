@@ -1,6 +1,7 @@
 import sys
 import re
 import subprocess
+import email.utils
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QScrollArea,
     QTextEdit, QGridLayout, QSizePolicy, QFrame, QHBoxLayout, QComboBox,
@@ -8,7 +9,8 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtGui import (
     QFont, QColor, QPainter, QTextCursor, QDrag, QTextCharFormat, 
-    QTextDocument, QPalette, QKeySequence, QShortcut, QDropEvent
+    QTextDocument, QPalette, QKeySequence, QShortcut, QDropEvent,
+    QSyntaxHighlighter
 )
 from PySide6.QtCore import (
     Qt, Signal, QMimeData, QPoint, QSize, QEvent, QRect, QStringListModel
@@ -23,27 +25,66 @@ EMAIL_ADDRESS_REGEX = re.compile(r'(?:"[^"]*"|[^,<>"])*?(?:<([^<>]+)>|([^,<>\s]+
 def sanitize_email_list(address_text):
     """
     Sanitize a comma-separated list of email addresses.
-    
-    Fixes issues like multiple commas, extra whitespace, and ensures
-    consistent ", " formatting between addresses.
-    
-    Args:
-        address_text (str): The input text containing email addresses
-        
-    Returns:
-        str: Properly formatted list with addresses separated by ", "
+
+    Fixes issues like multiple commas, extra whitespace, line breaks
+    (missing commas), semicolons, and ensures consistent ", " formatting
+    between addresses.
     """
     if not address_text:
         return ""
-        
-    # Step 1: Split the text by commas (this handles multiple commas)
-    addresses = address_text.split(',')
-    
-    # Step 2: Strip whitespace from each address and filter out empty ones
+
+    # Replace newlines and semicolons with commas to handle missing commas
+    # and lists pasted from other mail clients.
+    text = re.sub(r'[;\n\r]+', ',', address_text)
+
+    # Split by commas (this handles multiple commas)
+    addresses = text.split(',')
+
+    # Strip whitespace from each address and filter out empty ones
     clean_addresses = [addr.strip() for addr in addresses if addr.strip()]
-    
-    # Step 3: Join with the standard ", " separator
+
+    # Join with the standard ", " separator
     return ", ".join(clean_addresses)
+
+
+class AddressHighlighter(QSyntaxHighlighter):
+    """Highlights malformed email addresses in dark red."""
+
+    def __init__(self, document):
+        super().__init__(document)
+        self.invalid_format = QTextCharFormat()
+        self.invalid_format.setForeground(QColor("darkred"))
+
+    def highlightBlock(self, text):
+        # Find segments separated by commas, semicolons or newlines.
+        for match in re.finditer(r'[^,;\n\r]+', text):
+            start = match.start()
+            end = match.end()
+
+            # Trim surrounding whitespace so only the address itself is flagged.
+            while start < end and text[start].isspace():
+                start += 1
+            while end > start and text[end - 1].isspace():
+                end -= 1
+            if start >= end:
+                continue
+
+            segment = text[start:end]
+            # Only validate segments that actually look like addresses.
+            if '@' in segment or '<' in segment:
+                if not self.is_valid_address(segment):
+                    self.setFormat(start, end - start, self.invalid_format)
+
+    @staticmethod
+    def is_valid_address(segment):
+        display_name, addr_spec = email.utils.parseaddr(segment)
+        if not addr_spec or '@' not in addr_spec or ' ' in addr_spec:
+            return False
+        local, domain = addr_spec.rsplit('@', 1)
+        if not local or not domain or '.' not in domain or domain.endswith('.'):
+            return False
+        return True
+
 
 class AddressAwareTextEdit(QTextEdit):
     """
@@ -52,8 +93,9 @@ class AddressAwareTextEdit(QTextEdit):
     """
     addressDragged = Signal(str)  # Signal emitted when an address is dragged
 
-    def __init__(self, parent=None, read_only=False):
+    def __init__(self, parent=None, read_only=False, validate_addresses=False):
         super().__init__(parent)
+        self.validate_addresses = validate_addresses
         self.setAcceptDrops(True)
         self.setLineWrapMode(QTextEdit.WidgetWidth)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
@@ -83,6 +125,10 @@ class AddressAwareTextEdit(QTextEdit):
         
         # Set up autocomplete functionality
         self.setup_autocomplete()
+
+        # Set up address validation highlighting (dark red for malformed)
+        if validate_addresses:
+            self.highlighter = AddressHighlighter(self.document())
         
     def setup_autocomplete(self):
         """Set up autocomplete for email addresses"""
@@ -315,7 +361,15 @@ class AddressAwareTextEdit(QTextEdit):
         if hasattr(self, 'completer') and event.modifiers() == Qt.AltModifier and Qt.Key_1 <= event.key() <= Qt.Key_9:
             # This is handled in the event filter
             return
-            
+
+        # Handle Shift+Insert (X11 primary selection paste)
+        if event.key() == Qt.Key_Insert and event.modifiers() == Qt.ShiftModifier:
+            super().keyPressEvent(event)
+            if self.validate_addresses:
+                self.sanitize_email_list()
+            event.accept()
+            return
+
         super().keyPressEvent(event)    
 
     def sanitize_email_list(self):
@@ -339,6 +393,12 @@ class AddressAwareTextEdit(QTextEdit):
             new_pos = min(int(rel_pos * len(clean_text)), len(clean_text))
             cursor.setPosition(new_pos)
             self.setTextCursor(cursor)
+
+    def insertFromMimeData(self, source):
+        """Handle paste: sanitize the pasted text (fix line breaks/missing commas)."""
+        super().insertFromMimeData(source)
+        if self.validate_addresses:
+            self.sanitize_email_list()
 
     def mousePressEvent(self, event):
         """Handle mouse press events for potential drag operations."""
@@ -368,6 +428,17 @@ class AddressAwareTextEdit(QTextEdit):
                         break
             
         super().mousePressEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        """Sanitize after middle-click paste (X11 primary selection).
+
+        Qt handles the actual insertion internally for the selection buffer;
+        it does not always route through insertFromMimeData, so we sanitize
+        after the default handler has run.
+        """
+        super().mouseReleaseEvent(event)
+        if self.validate_addresses and event.button() == Qt.MiddleButton:
+            self.sanitize_email_list()
 
     def mouseMoveEvent(self, event):
         """Handle mouse move events to initiate drag operations."""
@@ -615,7 +686,8 @@ class MailHeaderEditableWidget(QScrollArea):
                 editor.setMinimumHeight(30)
             else:
                 # Create text editor for other fields
-                editor = AddressAwareTextEdit()
+                is_address_field = editor_name in ("to_edit", "cc_edit", "bcc_edit", "reply_to_edit")
+                editor = AddressAwareTextEdit(validate_addresses=is_address_field)
                 editor.setFont(self.text_font)
                 editor.setProperty("headerField", True)  # For styling
                 
