@@ -4,8 +4,8 @@ from PySide6.QtWidgets import (
     QMessageBox, QDialog, QDialogButtonBox, QLabel, QTextEdit,
     QCheckBox, QAbstractItemView, QMenu, QToolTip, QInputDialog,
 )
-from PySide6.QtCore import Qt, QSize, QPoint, QObject, QTimer, QMetaObject
-from PySide6.QtGui import QFont, QKeySequence, QAction
+from PySide6.QtCore import Qt, QSize, QPoint, QObject, QTimer, QMetaObject, QMimeData
+from PySide6.QtGui import QFont, QKeySequence, QAction, QDrag
 import logging
 import sys
 from pathlib import Path
@@ -406,6 +406,21 @@ def find_identity( sender_email ):
     return None
 
 # --- Shared GUI boilerplate (used by all GUI scripts) ---
+
+def start_text_drag(source, text, actions):
+    """Run a platform drag that carries *text* as plain text from *source*.
+
+    Blocks until the drop or cancel and returns the action the target chose
+    (Qt.IgnoreAction when nothing was dropped).  *actions* are the actions
+    the source allows; a target asking for another one gets Qt's fallback to
+    the default action.  Used by both header widgets: the editor's address
+    fields offer copy and move, the viewer's header table copy only.
+    """
+    mime_data = QMimeData()
+    mime_data.setText(text)
+    drag = QDrag(source)
+    drag.setMimeData(mime_data)
+    return drag.exec(actions)
 
 _keep_alive = []
 

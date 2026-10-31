@@ -12,28 +12,46 @@ from PySide6.QtCore import (
     Qt, QRect, QMargins, QPoint, QEvent, QSize
 )
 from email.utils import parsedate_to_datetime
-from common import create_date_item
+from common import create_date_item, start_text_drag
+
+# The header rows whose value is an address list.  Only these hand out
+# addresses to a drag; Subject and Date keep plain text selection.
+ADDRESS_LABELS = ("From:", "To:", "Cc:")
 
 class MailHeaderTableWidget(QTableWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setMouseTracking(True)
         self.selection_in_progress = False
-    
+        # A left press on an address arms a drag; the drag starts once the
+        # pointer has moved startDragDistance, as in the editor's fields.
+        self.drag_start_pos = None
+        self.drag_address = None
+
     def mousePressEvent(self, event: QMouseEvent):
         if event.button() == Qt.LeftButton:
-            # Start text selection
-            index = self.indexAt(event.position().toPoint())
+            pos = event.position().toPoint()
+            index = self.indexAt(pos)
             if index.isValid():
                 delegate = self.itemDelegate(index)
+                if hasattr(delegate, 'address_at'):
+                    self.drag_address = delegate.address_at(index, pos)
+                    self.drag_start_pos = pos if self.drag_address else None
+                # Start text selection.  Inside an address this only resets
+                # the previous selection: a move drags the address instead.
                 if hasattr(delegate, 'start_text_selection'):
-                    delegate.start_text_selection(index, event.position().toPoint())
+                    delegate.start_text_selection(index, pos)
                     self.selection_in_progress = True
         elif event.button() == Qt.RightButton:
             # Let base class handle for address selection via editorEvent
             super().mousePressEvent(event)
-    
+
     def mouseMoveEvent(self, event):
+        if self.drag_address is not None:
+            moved = (event.position().toPoint() - self.drag_start_pos).manhattanLength()
+            if moved >= QApplication.startDragDistance():
+                self._start_address_drag()
+            return
         if self.selection_in_progress:
             index = self.indexAt(event.position().toPoint())
             if index.isValid():
@@ -41,8 +59,24 @@ class MailHeaderTableWidget(QTableWidget):
                 if hasattr(delegate, 'update_text_selection'):
                     delegate.update_text_selection(index, event.position().toPoint())
         super().mouseMoveEvent(event)
-    
+
+    def _start_address_drag(self):
+        """Hand the armed address to the platform drag as plain text.
+
+        Copy only: the viewer has nothing to remove.  The editor's address
+        fields answer a drop with MoveAction; Qt falls back to the default
+        action when the source did not offer it, so the drop still lands.
+        """
+        address = self.drag_address
+        self.drag_address = None
+        self.drag_start_pos = None
+        self.selection_in_progress = False
+        start_text_drag(self, address, Qt.CopyAction)
+
     def mouseReleaseEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            self.drag_address = None
+            self.drag_start_pos = None
         if event.button() == Qt.LeftButton and self.selection_in_progress:
             self.selection_in_progress = False
             # Copy to selection buffer for middle-click paste
@@ -271,34 +305,56 @@ class AddressDelegate(TextSelectableDelegate):
         doc = self._make_doc(index)
         return QSize(doc.idealWidth(), doc.documentLayout().documentSize().height())
 
+    def _span_at(self, index, pos):
+        """The (start, end) span of the address under *pos* (viewport
+        coordinates) in the cell's text, or None when the point is not over
+        text.  The document is laid out as paint() lays it out, so the hit
+        test lands on the characters the user sees."""
+        text = index.data(Qt.DisplayRole) if index.data(Qt.DisplayRole) else ""
+        doc = self._make_doc(index)
+        hit_point = pos - self.parent().visualRect(index).topLeft()
+        char_pos = doc.documentLayout().hitTest(hit_point, Qt.HitTestAccuracy.ExactHit)
+        if char_pos < 0:
+            return None
+        for (s, e) in split_addresses(text):
+            if s <= char_pos <= e:
+                return (s, e)
+        return None
+
+    def address_at(self, index, pos):
+        """The address under *pos* (viewport coordinates), as displayed.
+
+        None when the cell is not an address row (the delegate sits on every
+        value cell, but only From, To and Cc hold address lists), when the
+        point is not over text, or when the span is empty.
+        """
+        if not index.data(Qt.UserRole):
+            return None
+        span = self._span_at(index, pos)
+        if span is None:
+            return None
+        text = index.data(Qt.DisplayRole) if index.data(Qt.DisplayRole) else ""
+        return text[span[0]:span[1]].strip() or None
+
     def editorEvent(self, event, model, option, index):
         if event.type() == QEvent.Type.MouseButtonPress and event.button() == Qt.RightButton:
+            span = self._span_at(index, event.position().toPoint())
+            if span is None:
+                return False
             text = index.data(Qt.DisplayRole) if index.data(Qt.DisplayRole) else ""
             row, col = index.row(), index.column()
-            
-            doc = QTextDocument()
-            doc.setDefaultFont(self.config.get_text_font())  # Must match font used in paint()
-            doc.setPlainText(text)
-            doc.setTextWidth(option.rect.width())
-            
-            hit_point = event.position().toPoint() - option.rect.topLeft()
-            
-            char_pos = doc.documentLayout().hitTest(hit_point, Qt.HitTestAccuracy.ExactHit)
-            
-            for (s, e) in split_addresses(text):
-                if s <= char_pos <= e:
-                    address = text[s:e].strip()
-                    
-                    if (row, col) not in self.selected_addresses:
-                        self.selected_addresses[(row, col)] = []
-                    
-                    if address in self.selected_addresses[(row, col)]:
-                        self.selected_addresses[(row, col)].remove(address)
-                    else:
-                        self.selected_addresses[(row, col)].append(address)
-                    
-                    model.dataChanged.emit(index, index, [Qt.DecorationRole, Qt.DisplayRole])
-                    return True # Event handled
+            address = text[span[0]:span[1]].strip()
+
+            if (row, col) not in self.selected_addresses:
+                self.selected_addresses[(row, col)] = []
+
+            if address in self.selected_addresses[(row, col)]:
+                self.selected_addresses[(row, col)].remove(address)
+            else:
+                self.selected_addresses[(row, col)].append(address)
+
+            model.dataChanged.emit(index, index, [Qt.DecorationRole, Qt.DisplayRole])
+            return True # Event handled
         else:
             return False # Allow default behavior for left/middle clicks (text selection)
 
@@ -381,6 +437,8 @@ class MailHeaderWidget(QWidget):
                 self.table_widget.setItem(row_idx, 0, label_item)
                 value_item = QTableWidgetItem(value)
                 value_item.setFlags(value_item.flags() & ~Qt.ItemIsSelectable)
+                # Marks the rows whose addresses can be dragged out.
+                value_item.setData(Qt.UserRole, label in ADDRESS_LABELS)
                 self.table_widget.setItem(row_idx, 1, value_item)
                 row_idx = row_idx + 1
     

@@ -8,7 +8,7 @@ from PySide6.QtWidgets import (
     QCompleter
 )
 from PySide6.QtGui import (
-    QFont, QColor, QPainter, QTextCursor, QDrag, QTextCharFormat, 
+    QFont, QColor, QPainter, QTextCursor, QTextCharFormat,
     QTextDocument, QPalette, QKeySequence, QShortcut, QDropEvent,
     QSyntaxHighlighter
 )
@@ -18,6 +18,7 @@ from PySide6.QtCore import (
 
 # Import the real config instead of using a dummy
 from config import config
+from common import start_text_drag
 
 # Shared comprehensive regex for RFC 5322 email addresses with or without display names
 EMAIL_ADDRESS_REGEX = re.compile(r'(?:"[^"]*"|[^,<>"])*?(?:<([^<>]+)>|([^,<>\s]+@[^,<>\s]+))')
@@ -478,14 +479,8 @@ class AddressAwareTextEdit(QTextEdit):
             super().mouseMoveEvent(event)
             return
             
-        # Start drag operation
-        drag = QDrag(self)
-        mime_data = QMimeData()
-        mime_data.setText(selected_text)
-        drag.setMimeData(mime_data)
-        
         # Execute the drag and emit signal if successful
-        result = drag.exec(Qt.CopyAction | Qt.MoveAction)
+        result = start_text_drag(self, selected_text, Qt.CopyAction | Qt.MoveAction)
         if result == Qt.MoveAction:
             # The address will be removed by the dropEvent of the target
             self.addressDragged.emit(selected_text)
