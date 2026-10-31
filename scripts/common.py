@@ -405,6 +405,58 @@ def find_identity( sender_email ):
             return i
     return None
 
+def split_addresses(text):
+    """Split an address-list into (start, end) spans of each address.
+    Handles RFC 5322 §3.4: quoted strings, angle-addr, domain literals,
+    nested comments, and quoted-pair escapes. A comma separates addresses
+    only when none of these constructs is open.
+
+    Used by the viewer's header table (address under the pointer) and by
+    the editor's address fields (validation highlighting, sanitizing)."""
+    spans = []
+    start = 0
+    in_quote = False
+    in_angle = False
+    in_bracket = False
+    comment_depth = 0
+    i = 0
+    n = len(text)
+    while i < n:
+        c = text[i]
+        if c == '\\' and i + 1 < n:      # quoted-pair escape
+            i += 2
+            continue
+        if in_quote:
+            if c == '"':
+                in_quote = False
+        elif in_angle:
+            if c == '>':
+                in_angle = False
+        elif in_bracket:
+            if c == ']':
+                in_bracket = False
+        elif comment_depth:
+            if c == '(':
+                comment_depth += 1
+            elif c == ')':
+                comment_depth -= 1
+        else:
+            if c == '"':
+                in_quote = True
+            elif c == '<':
+                in_angle = True
+            elif c == '[':
+                in_bracket = True
+            elif c == '(':
+                comment_depth = 1
+            elif c == ',':
+                spans.append((start, i))
+                start = i + 1
+        i += 1
+    if start < n:
+        spans.append((start, n))
+    return spans
+
 # --- Shared GUI boilerplate (used by all GUI scripts) ---
 
 def start_text_drag(source, text, actions):

@@ -18,7 +18,7 @@ from PySide6.QtCore import (
 
 # Import the real config instead of using a dummy
 from config import config
-from common import start_text_drag
+from common import start_text_drag, split_addresses
 
 # Shared comprehensive regex for RFC 5322 email addresses with or without display names
 EMAIL_ADDRESS_REGEX = re.compile(r'(?:"[^"]*"|[^,<>"])*?(?:<([^<>]+)>|([^,<>\s]+@[^,<>\s]+))')
@@ -38,8 +38,10 @@ def sanitize_email_list(address_text):
     # and lists pasted from other mail clients.
     text = re.sub(r'[;\n\r]+', ',', address_text)
 
-    # Split by commas (this handles multiple commas)
-    addresses = text.split(',')
+    # Split at the commas between addresses, not at one inside a quoted
+    # display name such as "Lastname, Firstname" <addr>; repeated commas
+    # yield empty spans, which are dropped below.
+    addresses = [text[s:e] for s, e in split_addresses(text)]
 
     # Strip whitespace from each address and filter out empty ones
     clean_addresses = [addr.strip() for addr in addresses if addr.strip()]
@@ -57,11 +59,11 @@ class AddressHighlighter(QSyntaxHighlighter):
         self.invalid_format.setForeground(QColor("darkred"))
 
     def highlightBlock(self, text):
-        # Find segments separated by commas, semicolons or newlines.
-        for match in re.finditer(r'[^,;\n\r]+', text):
-            start = match.start()
-            end = match.end()
-
+        # Find the addresses.  A comma inside a quoted display name does not
+        # separate; a semicolon does, as it does for the sanitizer, which is
+        # why it is mapped to a comma first (same length, so the spans still
+        # index the original text).
+        for start, end in split_addresses(text.replace(';', ',')):
             # Trim surrounding whitespace so only the address itself is flagged.
             while start < end and text[start].isspace():
                 start += 1
