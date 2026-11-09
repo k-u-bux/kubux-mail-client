@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import common  # noqa: F401  (first import: closes stderr for unattended launches)
+import common  # noqa: F401  (first import: closes stdout+stderr for unattended launches)
 
 import sys
 import os
