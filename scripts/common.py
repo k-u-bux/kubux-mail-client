@@ -1,4 +1,39 @@
-from PySide6.QtWidgets import (
+"""Shared helpers for the kubux-mail-client windows and entry points."""
+import os
+import sys
+
+
+def _silence_unattended_stderr() -> None:
+    """Point fd 2 at /dev/null when this process has no controlling terminal.
+
+    journald — or any other capture of the launcher's stderr — receives every
+    byte written to fd 2: by Python, by the Qt C++ libraries, and by child
+    processes, which inherit the descriptor.  Gating `logging` and `warnings`
+    cannot cover those, so the sink itself is closed: a window opened by the
+    desktop session leaves no trace, while a launch from a terminal keeps its
+    full stream.  An explicit shell redirection keeps the terminal and is
+    therefore still honoured.
+
+    Runs at import time, *above* the imports below, so that nothing — Qt, the
+    config helpers, a subprocess — can write before it.
+    """
+    try:
+        os.close(os.open("/dev/tty", os.O_WRONLY))
+    except OSError:
+        pass
+    else:
+        return                    # started from a terminal: keep stderr
+    try:
+        fd = os.open(os.devnull, os.O_WRONLY)
+    except OSError:
+        return
+    os.dup2(fd, 2)
+    os.close(fd)
+
+
+_silence_unattended_stderr()
+
+from PySide6.QtWidgets import (  # noqa: E402  (after the stderr silencing)
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLineEdit, QPushButton, QTableWidget, QTableWidgetItem, QHeaderView,
     QMessageBox, QDialog, QDialogButtonBox, QLabel, QTextEdit,
