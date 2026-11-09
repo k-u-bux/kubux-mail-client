@@ -36,12 +36,12 @@ import secrets
 from config import config, Config
 from common import (display_error, html_to_plain_text, get_db_path, get_run_method,
                     show_window, run_gui_app, tag_dialog, decision_dialog,
-                    message_box, ask_text)
+                    message_box, ask_text, setup_logging)
 from watcher import DirectoryEventHandler
 from header_widget import MailHeaderWidget
 
-# Set up basic logging to console
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+# Set up logging: stderr, but only when started from a terminal (setup_logging)
+setup_logging()
 
 # Bound for the xdg-mime lookup (its result is used, so it must complete).
 # The viewer launch itself is fire-and-forget — see open_attachment below.

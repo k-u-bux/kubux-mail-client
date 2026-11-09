@@ -27,13 +27,13 @@ from common import (
     get_db_path, get_row_tags, row_has_tag, each_selected_row, toggle_row_tag, tag_dialog,
     apply_tag_to_selected, get_sender_receiver, get_sender, get_receiver, get_cc_receiver,
     setup_key_bindings, show_window, run_gui_app,
-    edit_drafts_menu, edit_config_action, log_and_display_error
+    edit_drafts_menu, edit_config_action, log_and_display_error, setup_logging
 )
 from watcher import DirectoryEventHandler
 from query import QueryParser
 
-# Set up basic logging to console
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+# Set up logging: stderr, but only when started from a terminal (setup_logging)
+setup_logging()
 
 
 def newest_message ( thread_id ):

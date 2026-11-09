@@ -30,11 +30,11 @@ import re
 from email.header import Header
 
 from config import config
-from common import display_error, show_window, run_gui_app
+from common import display_error, show_window, run_gui_app, setup_logging
 from header_widget_editable import MailHeaderEditableWidget
 
-# Set up basic logging to console
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+# Set up logging: stderr, but only when started from a terminal (setup_logging)
+setup_logging()
 
 def send_failure_reason(stderr: str) -> str:
     """Diagnostics from the send-mail worker, ready to append to an error dialog.

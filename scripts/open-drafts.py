@@ -29,10 +29,10 @@ from watcher import DirectoryEventHandler
 
 # Import the shared components
 from config import config, Config
-from common import display_error, create_new_mail_menu, match_address, find_identity, get_run_method, show_window, run_gui_app
+from common import display_error, create_new_mail_menu, match_address, find_identity, get_run_method, show_window, run_gui_app, setup_logging
 
-# Set up basic logging to console
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+# Set up logging: stderr, but only when started from a terminal (setup_logging)
+setup_logging()
 
 class DraftsManager(QMainWindow):
     def __init__(self, drafts_dir_path=None, sender_email="", parent=None):

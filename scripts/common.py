@@ -27,6 +27,43 @@ from datetime import datetime, timezone
 from importlib import import_module
 from html2text import html2text
 
+LOG_FORMAT = '%(asctime)s - %(levelname)s - %(message)s'
+
+
+def _started_from_terminal() -> bool:
+    """True if this process has a controlling terminal.
+
+    stderr is the only log sink.  A window opened by the desktop session or a
+    window manager has no controlling terminal, and its stderr is captured
+    into journald, where mail content does not belong — so those launches log
+    nothing.  An explicit redirection from a shell (`2>file`, `|& tee`) keeps
+    the terminal and is still honoured: that choice is the user's.
+    """
+    try:
+        fd = os.open("/dev/tty", os.O_WRONLY)
+    except OSError:
+        return False
+    try:
+        return os.isatty(fd)
+    finally:
+        os.close(fd)
+
+
+def setup_logging(level: int = logging.INFO) -> None:
+    """Route logging to stderr, but only when started from a terminal.
+
+    Without a controlling terminal a NullHandler is installed instead: with no
+    handler configured at all, `logging.lastResort` would still push WARNING
+    and above to stderr — i.e. straight into the journal.
+    """
+    root = logging.getLogger()
+    root.setLevel(level)
+    if _started_from_terminal():
+        logging.basicConfig(level=level, format=LOG_FORMAT)
+    else:
+        root.addHandler(logging.NullHandler())
+
+
 def get_run_method ( mod_name ):
     return import_module( mod_name ).run
 

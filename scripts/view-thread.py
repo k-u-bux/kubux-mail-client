@@ -27,12 +27,12 @@ from common import (
     display_error, create_summary_text, create_date_item, get_db_path, get_run_method,
     get_row_tags, row_has_tag, each_selected_row, toggle_row_tag, tag_dialog,
     get_sender_receiver, get_sender, get_receiver, get_cc_receiver,
-    setup_key_bindings, show_window, run_gui_app
+    setup_key_bindings, show_window, run_gui_app, setup_logging
 )
 from watcher import DirectoryEventHandler
 
-# Set up basic logging to console
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+# Set up logging: stderr, but only when started from a terminal (setup_logging)
+setup_logging()
 
 
 class ThreadViewer(QMainWindow):
