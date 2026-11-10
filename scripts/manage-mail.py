@@ -20,12 +20,12 @@ from PySide6.QtCore import Qt, QSize, QEvent, QTimer, QRect, QPoint, QMimeData, 
 from PySide6.QtGui import QMouseEvent, QFontMetrics, QAction, QDrag, QColor
 import logging
 
-# Set up logging: stderr, but only when started from a terminal (setup_logging)
-setup_logging()
-
 from config import config, Config
 from query import QueryParser
 from common import display_error, create_draft, create_new_mail_menu, launch_drafts_manager, get_run_method, show_window, run_gui_app, edit_drafts_menu, edit_config_action, setup_logging
+
+# Set up logging: stderr, but only when started from a terminal (setup_logging)
+setup_logging()
 
 
 class CustomLineEdit(QLineEdit):
